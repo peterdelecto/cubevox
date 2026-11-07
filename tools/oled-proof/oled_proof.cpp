@@ -5,8 +5,10 @@
 //     tools/oled-proof/oled_proof.cpp firmware/cubevox/src/core/canvas.cpp \
 //     firmware/cubevox/src/core/fonts.cpp firmware/cubevox/src/ui/screens.cpp \
 //     firmware/cubevox/src/core/registry.cpp firmware/cubevox/src/core/chain_params.cpp \
-//     firmware/cubevox/src/core/unison_rate.cpp -o build/oled_proof && build/oled_proof build/oled-proof.pgm
+//     firmware/cubevox/src/core/unison_rate.cpp firmware/cubevox/src/core/scope.cpp \
+//     firmware/cubevox/src/core/level.cpp -o build/oled_proof && build/oled_proof build/oled-proof.pgm
 
+#include <array>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
@@ -133,15 +135,16 @@ void toggleScreen(Canvas& c) {
 }
 
 // The runtime voice screen, drawn by the firmware's renderer. The input meter is a box at the left
-// with 9 of its 16 segments lit, and the output ribbon runs from column 24 on a swell that fades.
+// with 9 of its 16 segments lit, and the scope draws a 150 Hz tone with a second harmonic from
+// column 24 on, with the window top at the tone's RMS, -21 dBFS.
 void voiceScreen(Canvas& c) {
-  Ribbon ribbon;
-  for (int i = 0; i < kRibbonLevels; ++i) {
-    const float age = static_cast<float>(kRibbonLevels - 1 - i) / static_cast<float>(kRibbonLevels);
-    const float swell = 0.5f + 0.5f * std::sin(static_cast<float>(i) * 0.45f);
-    ribbon.push((1.0f - 0.6f * age) * swell);
+  static std::array<float, kScopeReadSamples> samples;
+  for (int i = 0; i < kScopeReadSamples; ++i) {
+    const float turns = static_cast<float>(i % 320) / 320.0f;
+    samples[static_cast<size_t>(i)] =
+        0.12f * std::sin(6.2831853f * turns) + 0.04f * std::sin(2.0f * 6.2831853f * turns + 0.8f);
   }
-  renderVoice(c, ribbon, 9, Walk{0, 0});
+  renderVoice(c, scopeFrame(samples.data(), -21.0f, false), 9, Walk{0, 0});
 }
 
 void menu(Canvas& c) {

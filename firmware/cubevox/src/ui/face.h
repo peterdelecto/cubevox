@@ -7,10 +7,13 @@
 
 #include <stdint.h>
 
+#include <array>
+
 #include "core/canvas.h"
 #include "core/layout.h"
 #include "core/level.h"
 #include "core/panel.h"
+#include "core/scope.h"
 #include "core/timing.h"
 #include "ui/gui.h"
 #include "ui/menu.h"
@@ -34,11 +37,12 @@ class Face {
   // whenever this returns true.
   bool due(uint32_t nowMs, const Canvas& live);
 
-  // One UI tick. `input` and `output` are what the audio interrupt heard going into the chain and
-  // coming out of it since the last tick. The level bar shows the input and the ribbon shows the
-  // output. From the first tick on, the face is on the panel, so the menu listens to the encoder.
+  // One UI tick. `input` and `output` are the energy that went into the chain and came out of it
+  // since the last tick. The level bar shows the input, and the output sets the scope's scale. On
+  // the voice screen the scope draws the newest samples in `ring`; no other screen reads them. From
+  // the first tick on, the face is on the panel, so the menu listens to the encoder.
   void tick(uint32_t nowMs, const UiContext& ctx, const level::InputEnergy& input,
-            const level::OutputEnergy& output, Menu& menu, Canvas& live);
+            const level::OutputEnergy& output, const ScopeRing& ring, Menu& menu, Canvas& live);
 
  private:
   void render(const GuiFrame& frame, const UiContext& ctx, Menu& menu);
@@ -52,8 +56,9 @@ class Face {
   level::Meter inputMeter_;
   level::OutputMeter outputMeter_;
   int meterSegments_ = 0;
-  Ribbon ribbon_;
-  Canvas target_;                  // the screen the gui picked, before it reaches the panel
+  ScopeFrame scope_;                                  // the last frame read, kept when a read meets the writer
+  std::array<float, kScopeReadSamples> samples_{};    // the read buffer, 8 KB, so not on the stack
+  Canvas target_;                 // the screen the gui picked, before it reaches the panel
   bool targetHoldsMenu_ = false;   // whether the menu's last frame is still in target_
   Every tick_{kUiTickMs};
   bool ticked_ = false;

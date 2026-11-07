@@ -48,9 +48,12 @@ class AudioBlock {
   // writes silence, because the chain, the fades and the cost table all count whole blocks.
   void process(const float* in, float* out, int n);
 
-  // Main thread. The energy of the blocks since the last take, for the ribbon.
+  // Main thread. The energy of the blocks since the last take. The output's is the scope ring's.
   level::InputEnergy takeInputEnergy() { return input_.take(); }
-  level::OutputEnergy takeOutputEnergy() { return output_.take(); }
+  level::OutputEnergy takeOutputEnergy() { return flow_.scope().takeEnergy(); }
+
+  // Main thread. The scope's ring, which holds the newest chain output.
+  const ScopeRing& scope() const { return flow_.scope(); }
 
   // Audio thread, or the headless loop that calls process(). A block counted late, as the board's
   // block interrupt counts one. The next block passes the dry input, and dryBlocks() counts it.
@@ -87,7 +90,6 @@ class AudioBlock {
   std::atomic<float> gatePeak_{0.0f};
 
   EnergyTally input_;
-  EnergyTally output_;
 };
 
 }  // namespace host

@@ -19,6 +19,7 @@
 #include "core/compose.h"
 #include "core/late_block.h"
 #include "core/layout.h"
+#include "core/level.h"
 #include "core/output_stage.h"
 #include "core/panel.h"
 #include "core/settings.h"
@@ -414,6 +415,78 @@ void checkDiscardCuts() {
   check(cut.report.discarded && next.fade.silent && next.fade.to == 0.0f, "runaway: the block after a discard is silent");
 }
 
+// The newest block the scope's ring holds.
+Block newestBlock(const ScopeRing& ring) {
+  std::array<float, kScopeReadSamples> all;
+  ring.read(all.data());
+  Block b;
+  std::copy(all.end() - kN, all.end(), b.begin());
+  return b;
+}
+
+// Every audio block writes one block into the scope's ring, through a layout swap with its silent
+// blocks, a late block and a NaN cut. A chain block writes the chain output, ahead of the output
+// gain, so the fade-out blocks still write the full signal. A silent block, a dry block and a cut
+// block write zeros. The report carries the block's energy.
+void checkScopeRingAdvances() {
+  const ChainSnapshot snap = snapshotOf(emptyLayout(), false, false, false);
+  Rig rig;
+  BlockFlow flow;
+  bool advances = true;
+  bool content = true;
+  bool energy = true;
+  int silent = 0;
+  int dry = 0;
+  int cut = 0;
+  int fading = 0;
+  bool swapped = false;
+  for (int b = 0; b < 220; ++b) {
+    const Block in = b == 170 ? withSample(NAN) : tone(b, 0.5f);
+    if (b == 150) flow.markLate();
+    const uint32_t before = flow.scope().blocks();
+    const BlockFlow::Start start = flow.begin(false, b >= 5 && !swapped);
+    swapped = swapped || start.fade.swap;
+    Block a = in;
+    Block scratch{};
+    const BlockFlow::Report report =
+        flow.run(rig.engines, snap, start, a.data(), scratch.data(), false, StillClock(), [](int, float) {});
+    advances = advances && flow.scope().blocks() == before + 1;
+    const bool zeros = start.fade.silent || start.dry || report.discarded;
+    const Block got = newestBlock(flow.scope());
+    content = content && (zeros ? allZero(got) : got == in);
+    energy = energy && (zeros ? report.outputEnergy == 0.0f : std::fabs(report.outputEnergy - level::sumSquares(in.data(), kN)) < 1e-4f);
+    silent += start.fade.silent ? 1 : 0;
+    dry += start.dry ? 1 : 0;
+    cut += report.discarded ? 1 : 0;
+    fading += (!zeros && start.fade.to < start.fade.from) ? 1 : 0;
+  }
+  check(silent > 0 && dry == 1 && cut == 1 && fading > 0, "scope ring: the run met a swap's silent blocks, one late block, one NaN cut and a fade-out");
+  check(advances, "scope ring: the ring advances one block per audio block through a swap, a late block and a NaN cut");
+  check(content, "scope ring: chain blocks write the chain output, even while the output fades, and silent, dry and cut blocks write zeros");
+  check(energy, "scope ring: the report carries the written block's energy, 0 for a block of zeros");
+}
+
+// POLISH COMP changes the output and leaves the ring as it was, since the scope reads the chain
+// output ahead of it.
+void checkScopeAheadOfPolish() {
+  const ChainSnapshot plain = snapshotOf(emptyLayout(), false, false, false);
+  const ChainSnapshot polished = snapshotOf(emptyLayout(), true, false, false);
+  Rig rigA;
+  Rig rigB;
+  BlockFlow flowA;
+  BlockFlow flowB;
+  bool same = true;
+  bool outputsDiffer = false;
+  for (int b = 0; b < 400; ++b) {
+    const Block in = tone(b, 1.2f);
+    const Played pa = play(flowA, rigA, plain, in);
+    const Played pb = play(flowB, rigB, polished, in);
+    same = same && newestBlock(flowA.scope()) == newestBlock(flowB.scope());
+    outputsDiffer = outputsDiffer || pa.out != pb.out;
+  }
+  check(same && outputsDiffer, "scope ring: a POLISH COMP setting that changes the output leaves the ring the same");
+}
+
 }  // namespace
 
 void checkBlockTail() {
@@ -427,4 +500,6 @@ void checkBlockTail() {
   checkLateBlockPassesDry();
   checkRunawayRecovers();
   checkDiscardCuts();
+  checkScopeRingAdvances();
+  checkScopeAheadOfPolish();
 }

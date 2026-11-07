@@ -24,7 +24,8 @@ STRIDE = SCREEN_BYTES + CAPTION_BYTES
 # GATE THRESHOLD from -40 to -24 DB, 9 mutes from the silent voice, and 10 moves from one readout
 # to another at offset 100, and 11 flips slot 6's toggle on at 0.4 s and off at 1.4 s, so offsets
 # 30 and 60 are the settled ON and OFF frames. Scene 12 is the voice screen on a scripted drive
-# (input steady, output cycling), so its frame 79 holds the level bar and the ribbon together.
+# (input steady, a 150 Hz output tone cycling through twelve levels), so its frame 79 holds the
+# level bar and the scope together; its frame 76 is the loudest level, where the trace is tallest.
 GOLDENS = {
     "settled-210ms": ("2", 99),
     "settled-65pct": ("3", 99),
@@ -38,7 +39,8 @@ GOLDENS = {
     "switch-3": ("10", 102),
     "toggle-on": ("11", 30),
     "toggle-off": ("11", 60),
-    "voice-meter-ribbon": ("12", 79),
+    "voice-scope": ("12", 79),
+    "voice-scope-loud": ("12", 76),
 }
 for offset in (8, 12, 16, 20, 24, 28, 32, 40, 52):
     GOLDENS[f"roll-time-{offset}"] = ("2", offset)

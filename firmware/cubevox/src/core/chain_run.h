@@ -163,16 +163,23 @@ void mixSlotFade(float* wet, const float* dry, int n, int from, int to);
 bool runSlot(ChainEngines& engines, SlotFades& fades, int s, const ChainSnapshot& snap, const float* in, float* out,
              int n, PitchPath& path);
 
+// The tap runChain calls when its caller wants none.
+struct NoTap {
+  void operator()(const float*) const {}
+};
+
 // Walks one block through the chain. The front half of VOX EQ runs first, ahead of slot 1. The
 // slots run in order, then the NaN guard, then POLISH COMP and the back half of VOX EQ. POLISH
 // COMP and both EQ halves run always, and each is a bit-exact copy once settled off. `a` holds
 // the input and takes the finished block; `b` is scratch. `cycleClock` returns a free-running cycle
 // count and times each stage into `cycles`. `fades` carries the slot toggle crossfades from block to
-// block. Returns false when a slot produced a NaN, an infinity or a sample past the guard's bound. The block was then silenced before the polish stages, so the
-// caller cuts the output and clears the engines, POLISH COMP and VOX EQ.
-template <typename Clock>
+// block. `tap(block)` sees the block the guard passed, ahead of POLISH COMP, which is what the scope
+// draws. Returns false when a slot produced a NaN, an infinity or a sample past the guard's bound. The
+// block was then silenced before the polish stages, so the caller cuts the output and clears the
+// engines, POLISH COMP and VOX EQ.
+template <typename Clock, typename Tap = NoTap>
 bool runChain(ChainEngines& engines, SlotFades& fades, float* a, float* b, int n, const ChainSnapshot& snap,
-              Clock cycleClock, ChainCycles& cycles) {
+              Clock cycleClock, ChainCycles& cycles, Tap&& tap = NoTap()) {
   const ChainParams& p = snap.params;
   float* const result = a;
   PitchPath path;
@@ -186,6 +193,7 @@ bool runChain(ChainEngines& engines, SlotFades& fades, float* a, float* b, int n
     if (wrote) std::swap(a, b);
   }
   const bool finite = guardBlock(a, n);
+  tap(a);
   const uint32_t compStart = cycleClock();
   engines.comp.process(a, b, n, p.comp);
   const uint32_t eqStart = cycleClock();

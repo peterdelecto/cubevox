@@ -21,7 +21,7 @@ constexpr uint32_t kReadoutHoldMs = 2000;
 constexpr uint32_t kWalkStepMs = 60000;
 
 enum class Screen : uint8_t {
-  Voice,    // the input level as a scrolling ribbon
+  Voice,    // the input level bar beside the output's scope trace
   Readout,  // the knob that moved last, or the toggle that flipped last
   Muted,    // the word of the top switch, MUTED or BYPASS
   Menu,

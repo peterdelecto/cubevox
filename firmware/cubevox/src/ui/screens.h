@@ -1,4 +1,4 @@
-// The runtime screens are the voice ribbon, the knob readout and the muted word. Each draws a whole
+// The runtime screens are the voice scope, the knob readout and the muted word. Each draws a whole
 // frame onto a canvas it clears first. The code is pure. Spec: docs/specs/2026-10-24-oled-gui-design.md.
 
 #pragma once
@@ -9,6 +9,7 @@
 
 #include "core/canvas.h"
 #include "core/registry.h"
+#include "core/scope.h"
 #include "core/settings.h"
 #include "ui/gui.h"
 
@@ -24,23 +25,20 @@ constexpr int kReadoutBarHeight = 12 + 2 * kScreenPad;
 constexpr int kReadoutNameY = 16;
 constexpr int kReadoutValueY = 34;
 
-// The voice ribbon is mirrored about the horizon, and each level it holds spans two columns, so it
-// scrolls 50 px/s at 25 frames a second. It runs from kRibbonLeftX to kRibbonRightX, and the last
-// column of the panel stays blank. The level count rounds up, so the oldest level fills the one
-// column at kRibbonLeftX and every other level fills two.
-constexpr int kRibbonHorizonY = kCanvasHeight / 2;
-constexpr int kRibbonHalfMax = 22;
-constexpr int kRibbonColumnsPerLevel = 2;
-constexpr int kRibbonLeftX = 24;
-constexpr int kRibbonRightX = kCanvasWidth - 2;
-constexpr int kRibbonLevels = (kRibbonRightX - kRibbonLeftX + kRibbonColumnsPerLevel) / kRibbonColumnsPerLevel;
+// The scope's trace runs about the horizon row from kScopeLeftX to kScopeRightX, one column to each
+// column run of the frame, and the last column of the panel stays blank. The trace reaches
+// kScopeHalfRows above and below the horizon (rows 10 to 54).
+constexpr int kScopeHorizonY = kCanvasHeight / 2;
+constexpr int kScopeLeftX = 24;
+constexpr int kScopeRightX = kCanvasWidth - 2;
+static_assert(kScopeRightX - kScopeLeftX + 1 == kScopeColumns, "one column run to each scope column");
 
 // The input level meter is a 1 px outline box at the left edge with 16 segments inside, like a
 // thermometer without the bulb. The box stands on the voice screen in silence too. Its sides are
 // columns kMeterBoxLeftX and kMeterBoxRightX and its top and bottom are rows kMeterBoxTopY and
 // kMeterBoxBottomY. The interior is columns 6 to 19, rows 9 to 55. Each segment is 2 rows tall with
 // 1 row of gap above it, and the lowest one sits on the interior's last row. Columns 21 to 23,
-// between the box and the ribbon, stay blank.
+// between the box and the trace, stay blank.
 constexpr int kMeterBoxLeftX = 5;
 constexpr int kMeterBoxRightX = 20;
 constexpr int kMeterBoxTopY = 8;
@@ -54,35 +52,17 @@ constexpr int kMeterSegmentRows = 2;
 constexpr int kMeterSegmentGap = 1;
 static_assert(kMeterRows == kMeterSegments * kMeterSegmentRows + (kMeterSegments - 1) * kMeterSegmentGap,
               "the segments and their gaps fill the box exactly");
-static_assert(kRibbonLeftX - kMeterBoxRightX - 1 == 3, "three blank columns lie between the box and the ribbon");
+static_assert(kScopeLeftX - kMeterBoxRightX - 1 == 3, "three blank columns lie between the box and the trace");
 static_assert(kMeterWidth == 14, "the interior is 14 columns wide");
-static_assert(kRibbonLevels * kRibbonColumnsPerLevel >= kRibbonRightX - kRibbonLeftX + 1,
-              "the levels cover every ribbon column");
-
-// Half-height of the ribbon, in pixels, for a level of 0..1.
-int ribbonHalfHeight(float level);
 
 // Lit segments of the level meter, 0 to kMeterSegments, for a level of 0..1.
 int meterSegments(float level);
 
-// The recent output levels, newest first.
-class Ribbon {
- public:
-  // Adds the newest level, which enters at the right edge and scrolls left.
-  void push(float level);
-
-  // Half-height in pixels of the level pushed `age` ticks ago. 0 beyond the history.
-  int half(int age) const;
-
- private:
-  std::array<uint8_t, kRibbonLevels> half_{};
-  int head_ = 0;
-};
-
-// The voice screen. The ribbon is mirrored about the horizon and shifted by `walk`; in silence it
-// is the horizon line alone. The meter box stands at the left edge with `segments` segments lit,
-// held to 0..kMeterSegments. The box, the segments and the ribbon walk together.
-void renderVoice(Canvas& canvas, const Ribbon& ribbon, int segments, Walk walk);
+// The voice screen. Each column of `scope` lights the rows of its run about the horizon, shifted by
+// `walk`; a frame of zeros is the horizon line alone. The meter box stands at the left edge with
+// `segments` segments lit, held to 0..kMeterSegments. The box, the segments and the trace walk
+// together.
+void renderVoice(Canvas& canvas, const ScopeFrame& scope, int segments, Walk walk);
 
 // What the readout needs, taken from the card table and the gui.
 struct ReadoutView {

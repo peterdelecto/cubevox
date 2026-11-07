@@ -149,7 +149,7 @@ void Box::drawFace(const UiContext& ctx, uint32_t nowMs) {
   if (face_.due(nowMs, canvas_)) {
     const level::InputEnergy input = audio_.takeInputEnergy();
     dim_.noteVoice(input, nowMs);
-    face_.tick(nowMs, ctx, input, audio_.takeOutputEnergy(), menu_, canvas_);
+    face_.tick(nowMs, ctx, input, audio_.takeOutputEnergy(), audio_.scope(), menu_, canvas_);
   }
 }
 

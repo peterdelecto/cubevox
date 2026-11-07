@@ -1,7 +1,8 @@
-// Display levels from the audio interrupt's energy tallies. The interrupt sums the energy of each
-// block, once for the input and once for the output. The UI tick turns the energy of one tick into
-// a 0..1 level. The input feeds the level meter, which reads absolute dB. The output feeds the voice
-// ribbon, which reads amplitude against the recent peak and hides steady noise. The code is pure.
+// Display levels from the audio block's energy. The block sums the energy of its input, and the
+// scope's ring keeps the energy of the chain output (core/scope.h). The UI tick turns the energy of
+// one tick into a level. The input feeds the level meter, which reads absolute dB. The output feeds
+// the scope's scale, which reads amplitude against the recent peak and hides steady noise. The code
+// is pure.
 
 #pragma once
 
@@ -14,7 +15,7 @@ namespace level {
 constexpr float kFullDbfs = 0.0f;
 constexpr float kFloorDbfs = -50.0f;
 
-// The output ribbon reads each tick's amplitude over the amplitude of a window top. The top jumps
+// The scope reads each tick's amplitude against the amplitude of a window top. The top jumps
 // up to a louder tick at once and falls at this rate of real time, but never below the minimum, so
 // a quiet tick cannot blow up to full height.
 constexpr float kWindowMinTopDbfs = -30.0f;
@@ -38,8 +39,9 @@ constexpr float kSilence = 0.01f;
 // What toDbfs() returns for an amplitude of 0 or NaN.
 constexpr float kNoSignalDbfs = -200.0f;
 
-// The audio interrupt's tally since the last take. It holds the sum of the squared samples (full
-// scale is 1.0) and the number of samples. The output is tallied the same way as the input.
+// The energy since the last take. It holds the sum of the squared samples (full scale is 1.0) and
+// the number of samples. The input's is tallied by the audio interrupt and the output's is kept in
+// the scope's ring.
 struct InputEnergy {
   float sumSquares = 0.0f;
   uint32_t samples = 0;

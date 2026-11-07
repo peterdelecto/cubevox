@@ -1,6 +1,6 @@
 // Checks the levels behind the voice screen on the host. Covers block energy, the input bar's dB
-// mapping and its instant attack and 120 ms release, and the output ribbon's window. The window top
-// rises at once, falls 10 dB a second and never sits under -30 dBFS. The ribbon reads each tick's
+// mapping and its instant attack and 120 ms release, and the output window that sets the scope's
+// scale. The window top rises at once, falls 10 dB a second and never sits under -30 dBFS. The window reads each tick's
 // amplitude over the top's with no release. A floor follows the quietest tick, and a tick under the
 // floor plus 6 dB reads as silence.
 
