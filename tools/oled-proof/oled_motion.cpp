@@ -44,9 +44,9 @@ constexpr float kSilence = 0.03f;       // env below this counts as silence
 
 // The voice screen. The scope (the output) draws 103 columns from column 24 to 126 about the horizon
 // row 32, each column 8 samples of the chain output, and column 127 stays blank. The scale puts the
-// top of the screen, 22 rows above the horizon, at kScopeCrest times the window top's amplitude.
-// The frame starts at a rising zero crossing before the largest peak in the search span, after a dip
-// under 5 % of the scale. The input meter is a 1 px outline box in columns 5 to 20 and rows 8 to 56,
+// top of the screen, 22 rows above the horizon, at the larger of the frame's peak and the last
+// scale less 3 dB. The frame starts at a rising zero crossing before the largest peak in the search
+// span, after a dip under 5 % of that peak. The input meter is a 1 px outline box in columns 5 to 20 and rows 8 to 56,
 // with 16 segments inside it, each 2 rows tall at columns 6 to 19 with 1 row of gap above it. The
 // lowest segment sits on rows 54 and 55 and the highest on rows 9 and 10. Columns 21 to 23 stay blank.
 constexpr int kScopeLeft = 24;
@@ -56,7 +56,9 @@ constexpr int kFrameSamples = kScopeColumns * kColumnSamples;  // 824
 constexpr int kSearchBack = 1100 + kFrameSamples;               // 1924 back from the newest sample
 constexpr int kReadSamples = 31 * 64;                           // 31 blocks of 64, the newest complete ones
 constexpr float kHysteresisShare = 0.05f;
-constexpr float kScopeCrest = 4.3f;  // peak over RMS of a sung vowel; core/scope.h holds the figure
+constexpr float kScaleFallDb = -3.0f;   // the scale falls this much a frame at most
+constexpr float kMinScale = 1e-6f;      // under this the scope draws the line
+constexpr int kScaleMemory = 120;       // frames the scale is replayed over; 0.708^120 is 1e-18
 constexpr int kHalfMax = 22;
 constexpr int kSamplesPerFrame = 48000 / kFps;                  // one UI tick of audio
 constexpr int kBoxLeft = 5;
@@ -233,17 +235,16 @@ int digitsClipped(Frame& f, int x, int y, const FontDesc& font, const char* s, i
 // frame 0, after `delay` frames of silence, or keeps it silent.
 
 // What the scope draws in one frame: the newest 1984 samples of the chain output, oldest first, the
-// window top in dBFS and whether the tick reads as silence.
+// scale in sample units (0 until fittedScale sets it) and whether the tick reads as silence.
 struct ScopeView {
   std::vector<float> samples = std::vector<float>(kReadSamples, 0.0f);
-  float top = -30.0f;
+  float scale = 0.0f;
   bool silent = true;
 };
 
 struct Voice {
   std::vector<float> perf;  // the output window's level per frame, 0..1, each frame's amplitude over the recent peak's
   std::vector<float> bar;   // the bar's level per frame, 0..1, absolute and linear in dB from -50 to 0 dBFS
-  std::vector<float> top;   // the window top per frame, in dBFS
   std::vector<float> wave;  // the takes and their breaths as samples, kSamplesPerFrame to a frame
   int delay = 0;
   bool silent = false;
@@ -260,7 +261,6 @@ struct Voice {
     const int i = frame - delay;
     if (silent || i < 0 || perf.empty()) return view;
     const size_t k = static_cast<size_t>(i) % perf.size();
-    view.top = top[k];
     view.silent = perf[k] == 0.0f;
     const long end = static_cast<long>((k + 1) * kSamplesPerFrame);
     for (int j = 0; j < kReadSamples; ++j) {
@@ -349,7 +349,6 @@ bool buildVoice(Voice& voice) {
   for (float r : raw) {
     const float db = r > 0.0f ? 20.0f * std::log10(r) : -200.0f;
     voice.perf.push_back(window.step(db, kDt));
-    voice.top.push_back(window.top);
 
     const float pos = clamp01((db - kBarFloorDb) / -kBarFloorDb);
     barSmooth = pos >= barSmooth ? pos : pos + (barSmooth - pos) * barRelease;
@@ -478,24 +477,26 @@ Frame toggleScreen(int slot, bool on) {
   return f;
 }
 
-// The scope's picture, coded from the spec text (scope spec 2 and 4) and not from the firmware.
-// Rows above the horizon count positive. A sample at the scale's top is kHalfMax rows up, and a
-// sample past it clips there.
-int rowsAbove(float v, float scaleTop) {
-  const double rows = static_cast<double>(v) * kHalfMax / static_cast<double>(scaleTop);
+// The scope's picture, coded from the spec text (scope spec 2, 3 and 4) and not from the firmware.
+// Rows above the horizon count positive. A sample at the scale is kHalfMax rows up, and a sample
+// past it clips there.
+int rowsAbove(float v, float scale) {
+  const double rows = static_cast<double>(v) * kHalfMax / static_cast<double>(scale);
   return static_cast<int>(std::floor(std::min<double>(kHalfMax, std::max<double>(-kHalfMax, rows)) + 0.5));
 }
 
 // Where the frame starts in a read: the largest sample in the span from kFrameSamples back to
 // kSearchBack back, then the nearest rising zero crossing before it that follows a dip under
-// -hysteresis, which may lie before the span. Without one the frame is the newest kFrameSamples.
-int frameStart(const std::vector<float>& x, float hysteresis) {
+// -`share` of that sample, which may lie before the span. Without one the frame is the newest
+// kFrameSamples.
+int frameStart(const std::vector<float>& x, float share) {
   const int newestStart = kReadSamples - kFrameSamples;
   const int oldest = kReadSamples - kSearchBack;
   int peak = oldest;
   for (int i = oldest; i <= newestStart; ++i) {
     if (x[static_cast<size_t>(i)] > x[static_cast<size_t>(peak)]) peak = i;
   }
+  const float hysteresis = share * std::max(x[static_cast<size_t>(peak)], 0.0f);
   for (int i = peak; i >= 1; --i) {
     if (x[static_cast<size_t>(i)] < 0.0f || x[static_cast<size_t>(i - 1)] >= 0.0f) continue;
     float lowest = 0.0f;
@@ -503,6 +504,25 @@ int frameStart(const std::vector<float>& x, float hysteresis) {
     if (lowest < -hysteresis) return i;
   }
   return newestStart;
+}
+
+// The scale after frame `frame`, from the frames kScaleMemory back: each frame's peak against the
+// last scale less 3 dB, and a silent frame resets it. `viewAt(j)` is the scope's read at frame j.
+float fittedScale(const std::function<ScopeView(int)>& viewAt, int frame) {
+  const float fall = std::pow(10.0f, kScaleFallDb / 20.0f);
+  float scale = 0.0f;
+  for (int j = std::max(0, frame - kScaleMemory); j <= frame; ++j) {
+    const ScopeView v = viewAt(j);
+    if (v.silent) {
+      scale = 0.0f;
+      continue;
+    }
+    const int start = frameStart(v.samples, kHysteresisShare);
+    float peak = 0.0f;
+    for (int i = start; i < start + kFrameSamples; ++i) peak = std::max(peak, std::fabs(v.samples[static_cast<size_t>(i)]));
+    scale = std::max(peak, scale * fall);
+  }
+  return scale < kMinScale ? 0.0f : scale;
 }
 
 // The voice screen. The output stands as a scope trace about a horizon line, from column 24, and
@@ -521,18 +541,17 @@ Frame voiceScreen(const ScopeView& scope, int segments) {
     const int bottomRow = kBoxBottom - 1 - i * kSegmentPitch;
     f.fill(kBoxLeft + 1, bottomRow - kSegmentRows + 1, kBoxRight - kBoxLeft - 1, kSegmentRows);
   }
-  if (scope.silent) {
+  if (scope.silent || !(scope.scale > 0.0f)) {
     f.hline(kScopeLeft, kScopeLeft + kScopeColumns - 1, cy);
     return f;
   }
-  const float scaleTop = kScopeCrest * std::pow(10.0f, scope.top / 20.0f);
-  const int start = frameStart(scope.samples, kHysteresisShare * scaleTop);
-  int before = rowsAbove(scope.samples[static_cast<size_t>(start)], scaleTop);
+  const int start = frameStart(scope.samples, kHysteresisShare);
+  int before = rowsAbove(scope.samples[static_cast<size_t>(start)], scope.scale);
   for (int c = 0; c < kScopeColumns; ++c) {
     int highest = before;
     int lowest = before;
     for (int i = 0; i < kColumnSamples; ++i) {
-      before = rowsAbove(scope.samples[static_cast<size_t>(start + c * kColumnSamples + i)], scaleTop);
+      before = rowsAbove(scope.samples[static_cast<size_t>(start + c * kColumnSamples + i)], scope.scale);
       highest = std::max(highest, before);
       lowest = std::min(lowest, before);
     }
@@ -542,9 +561,11 @@ Frame voiceScreen(const ScopeView& scope, int segments) {
 }
 
 // The rest screen shows Adam's voice. The scope draws the voice up to the frame, scaled by the
-// output window, and the meter is the same take at its absolute level.
+// frame's peak, and the meter is the same take at its absolute level.
 Frame restScreen(const Live& L) {
-  return voiceScreen(L.voice->scopeAt(L.frame), roundInt(L.voice->barAt(L.frame) * kSegments));
+  ScopeView view = L.voice->scopeAt(L.frame);
+  view.scale = fittedScale([&L](int j) { return L.voice->scopeAt(j); }, L.frame);
+  return voiceScreen(view, roundInt(L.voice->barAt(L.frame) * kSegments));
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -555,7 +576,6 @@ constexpr float kScriptInDb = -23.0f;
 constexpr float kScriptOutDb[12] = {-30, -24, -19, -12, -8, -14, -20, -26, -32, -40, -52, -60};
 
 struct ScriptedWindow {
-  std::vector<float> top;
   std::vector<bool> silent;
 };
 
@@ -564,7 +584,6 @@ ScriptedWindow scriptedWindow(int frames) {
   OutputWindow window;
   for (int k = 0; k < frames; ++k) {
     const float level = window.step(kScriptOutDb[k % 12], kDt);
-    w.top.push_back(window.top);
     w.silent.push_back(level == 0.0f);
   }
   return w;
@@ -574,7 +593,6 @@ ScriptedWindow scriptedWindow(int frames) {
 // frame it falls in.
 ScopeView scriptedScope(const ScriptedWindow& w, int frame) {
   ScopeView view;
-  view.top = w.top[static_cast<size_t>(frame)];
   view.silent = w.silent[static_cast<size_t>(frame)];
   const long end = static_cast<long>(frame + 1) * kSamplesPerFrame;
   for (int j = 0; j < kReadSamples; ++j) {
@@ -767,7 +785,9 @@ Scene scriptScene() {
             static const ScriptedWindow window = scriptedWindow(static_cast<int>(kScriptSceneS * kFps));
             setCaption(cap, "12  BAR AND SCOPE", "IN STEADY, OUT CYCLES");
             const int segments = roundInt(clamp01((kScriptInDb - kBarFloorDb) / -kBarFloorDb) * kSegments);
-            return voiceScreen(scriptedScope(window, i), segments);
+            ScopeView view = scriptedScope(window, i);
+            view.scale = fittedScale([](int j) { return scriptedScope(window, j); }, i);
+            return voiceScreen(view, segments);
           }};
 }
 

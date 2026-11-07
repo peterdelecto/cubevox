@@ -32,8 +32,8 @@ UX audit 2026-11-06 (`build/audit/scope-ux-audit.md`, 7 findings, 3 holds) is fo
    MUTE, so the trace is live the moment the voice screen returns.
 9. He swaps a card from the menu. The output fades out over 50 ms and the trace shrinks with it, the
    line shows while the chain is silent for the swap, then the trace grows back with the fade-in.
-10. He shouts into the mic. The trace flattens on the top and bottom rows for that frame, as a scope
-    clips, and the next frame's scale has risen to it.
+10. He shouts into the mic. The scale rises at once, so the shout fills the height and nothing
+    flattens; the frames after it draw at 70 % and up while the scale settles.
 11. Goes wrong, room noise. A synth idling on the input or a noisy room draws the line, not a band of
     hash, because the floor rule hides steady noise (owner 2026-10-30, the Korg Volca).
 12. Goes wrong, hum. A hum rides the trace up and down and could pull the trigger. None is expected at
@@ -85,8 +85,7 @@ rows tall. The scale now fits each frame.
    6 dB is silence, and the screen draws the line. The floor follows the quietest recent tick, rises
    3 dB a second, and never comes closer than 12 dB to the window top, so the loudest recent tick
    always draws. This is what keeps room noise and an idling synth on the line (owner 2026-10-30).
-4. `OutputMeter` keeps its window top for the floor rule; the trace no longer reads it. The crest
-   constant of the first build goes.
+4. `OutputMeter` keeps its window top for the floor rule; the trace no longer reads it.
 5. The tick RMS that drives the floor is the energy of the blocks the chain wrote into the ring during
    the tick, so the floor and the trace read one signal.
 
@@ -99,7 +98,7 @@ rows tall. The scale now fits each frame.
    at 44 Hz, so the span holds at least one whole cycle of anything the chain can sing down to Octave
    -12 on G2.
 3. In the span, find the sample with the largest value. Step back from it to the nearest rising crossing
-   with hysteresis: the signal must have been under -5 % of the scale's top before it crosses up through
+   with hysteresis: the signal must have been under -5 % of that largest sample before it crosses up through
    zero. The frame starts at that crossing. A vowel has one strongest glottal peak a cycle, so the frame
    starts on the same feature each tick; when two cycles in the span have near-equal peaks the frame may
    shift by one whole period, which draws the same picture.
@@ -134,7 +133,7 @@ rows tall. The scale now fits each frame.
 
 | Where | What |
 |---|---|
-| `core/scope.h`, `scope.cpp` | the ring with its block count and energy; `scopeFrame()` pure: samples + top + silent to 103 column runs (`int8_t lo, hi` rows about the horizon); the trigger |
+| `core/scope.h`, `scope.cpp` | the ring with its block count and energy; `scopeFrame()` pure: samples + last scale + silent to 103 column runs and the new scale (`int8_t lo, hi` rows about the horizon); the trigger |
 | `core/block_flow.h`, `block_flow.cpp` | the write of every block into the ring; `Report.outputEnergy` becomes the ring's energy |
 | `core/chain_run.h` | unchanged apart from comments |
 | `core/level.h`, `level.cpp` | `OutputMeter` unchanged; its energy now comes from the ring; comments |
@@ -201,27 +200,17 @@ rows tall. The scale now fits each frame.
 
 ## 10. As built
 
-Built 2026-11-06 at v2.01.66 (the lead bumps the version). The four gates pass: `ctest` 39 of 39,
-`cubevox-emulator --check`, the firmware build with `-Wstack-usage=1152`, and `go test ./...`.
+Built 2026-11-06 at v2.01.66 with a crest-based scale, and rebuilt 2026-11-07 to the scale of section 3,
+which fits each frame. The four gates pass: `ctest` 39 of 39, `cubevox-emulator --check`, the firmware
+build with `-Wstack-usage=1152`, and `go test ./...`.
 
-Crest, measured with a throwaway program on the three cleaned clips in `samples/` (40 ms ticks of
-1920 samples; the ticks within 6 dB of each clip's loudest; the chain is the default layout with every
-knob at mid travel and every toggle on, read ahead of POLISH COMP):
-
-| Signal | Ticks within 6 dB | Peak over RMS, 90th percentile |
-|---|---|---|
-| Clip 1 alone | 25 | 4.23 (max 4.50) |
-| Clip 2 alone | 15 | 4.27 (max 5.22) |
-| Clip 3 alone | 35 | 4.30 (max 4.81) |
-| Three clips alone, pooled | 75 | 4.27, 12.6 dB |
-| Clip 1 through the chain | 44 | 2.60 (max 3.08) |
-| Clip 2 through the chain | 68 | 2.71 (max 3.40) |
-| Clip 3 through the chain | 39 | 2.84 (max 3.27) |
-| Three clips through the chain, pooled | 151 | 2.72, 8.7 dB |
-
-`kScopeCrest` is 4.3, the dry voice's figure, because the voice with its effects off is the peakiest
-signal the scope meets. The starting guess of 3.0 would have run the 90th percentile of dry vowels 42 %
-past the top and bottom rows. Through the default chain the same ticks reach about 63 % of the height (22 x 2.72 / 4.3).
+The scale fits each frame. `scopeFrame(samples, lastScale, silent)` returns the frame with its new
+scale in `ScopeFrame::scale`. The scale is the larger of the frame's peak magnitude over its 824
+samples and `lastScale` times `dbToGain(-3)`, so the frame's loudest sample lands on row 10 or 54.
+`Face` keeps the scale in its last frame (`scope_.scale`) and passes it back on the next tick. A
+silent tick, or a scale under 1e-6 (-120 dBFS), gives the horizon alone and a scale of 0, so a
+`lastScale` of 0, negative or not a number starts the scale afresh. `kScopeCrest` is gone, and the scope
+no longer reads `OutputMeter::top()`; the meter still updates every tick for the floor rule.
 
 Where the build differs from the design:
 
@@ -240,18 +229,23 @@ Where the build differs from the design:
    span, but its rising crossing is searched down to the second sample of the read. With the crossing
    confined to the span, a peak in the first 30 samples of the span had no crossing and the frame
    free-ran (a 125 sample jump at 49 Hz on 1 tick in about 30).
-5. The hysteresis is 5 % of the scale's top, the crest times the window top's amplitude.
-6. A held note above the -30 dBFS mark can draw one row taller on a tick that falls 0.4 dB under its own
-   top (the window top's rule), as section 3 item 4 says.
+5. The hysteresis is 5 % of the largest sample in the search span, the peak the trigger anchors on,
+   since the frame's scale is not known until the frame's start is.
+6. The face sets the scale to 0 on every tick that is not on the voice screen, so the scope has no
+   history to catch up on when the voice returns (walk item 6). The floor rule's meter keeps tracking.
 7. The board checks at start that the ring sits in RAM_D1 (`checkMemoryAndClock`).
 8. A second golden, `voice-scope-loud`, is frame 76 of scene 12, where the tone is at its loudest and the
-   trace is 10 rows each side. Frame 79 (`voice-scope`) is a quiet tick. `voice-meter-ribbon` is gone.
+   trace fills rows 10 to 54. Frame 79 (`voice-scope`) is three frames later, on a tone 18 dB quieter
+   whose scale has fallen 9 dB from the loud peak, so the trace spans rows 24 to 40. `voice-meter-ribbon`
+   is gone.
 9. The emulator's `--check` has no golden of its own. The golden for the scene is in `firmware_test`.
 10. The proof renderer (`tools/oled-proof/oled_motion.cpp`) draws the scope from the spec's words and
-    draws the real clips' samples on its voice scenes. It needs 48 kHz clips.
+    draws the real clips' samples on its voice scenes. It needs 48 kHz clips. It replays the scale over
+    the 120 frames before each frame, which leaves the scale within 1e-18 of the box's.
 
 Measured on the host (`firmware_test`, ASan and UBSan), worst start drift over 100 ticks of a synthetic
 vowel, shifts by whole periods not counted: 0.84 samples at 98 Hz, 0.69 at 147 Hz, 0.91 at 220 Hz and
 0.53 at 49 Hz; 0.35 with a 2 % offset; 1.59 with breath at -20 dB; 0.78 with a glide from 98 to 110 Hz;
 1.63 for a falling glide at 147 Hz with breath and offset. The tests allow 1.0, 1.0, 3.0, 1.5 and 3.0.
+The test vowels peak at 1, so these figures hold for a hysteresis of 5 % of the peak.
 The two-thread stress passes with no torn block.

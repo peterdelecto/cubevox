@@ -22,14 +22,16 @@ constexpr int kScopeFrameSamples = kScopeColumns * kScopeColumnSamples;
 // this many rows above the horizon.
 constexpr int kScopeHalfRows = 22;
 
-// Peak over RMS of a sung vowel. The scale's top is this many times the window top's RMS, so the
-// loudest vowels reach the top and bottom rows and no further. It is the 90th percentile of the
-// ticks within 6 dB of the loudest on the three clips in samples/ (12.6 dB, 4.27), which is the dry
-// voice; through the default chain the same figure is 2.72. The measurement is in
-// docs/specs/2026-11-06-scope-design.md, "As built".
-constexpr float kScopeCrest = 4.3f;
+// The scale falls this many dB a frame at most, so a quiet frame after a loud one draws at 70 % or
+// more of the height. It rises at once.
+constexpr float kScopeFallDb = -3.0f;
 
-// The trigger arms when the signal has gone under this share of the scale's top.
+// A scale under this (-120 dBFS) is silence, and keeps a near-zero peak from blowing up the row
+// scale.
+constexpr float kScopeMinScale = 1e-6f;
+
+// The trigger arms when the signal has gone under this share of the largest sample in the search
+// span.
 constexpr float kScopeHysteresis = 0.05f;
 
 // The trigger looks for the start of a cycle in the samples from kScopeFrameSamples back to this
@@ -51,8 +53,11 @@ struct ScopeRun {
   int8_t hi = 0;
 };
 
+// `scale` is the sample magnitude that lands on the top and bottom rows. It is 0 for the horizon
+// alone.
 struct ScopeFrame {
   std::array<ScopeRun, kScopeColumns> column{};
+  float scale = 0.0f;
 };
 
 // The newest chain output, one block at a time. One thread writes (the audio block) and one reads
@@ -95,13 +100,15 @@ class ScopeRing {
 // The start of a cycle in `samples`, kScopeReadSamples long and oldest first, as an index. The
 // search takes the span from kScopeFrameSamples back to kScopeSearchBack back from the newest sample
 // and finds the largest sample in it. It steps back from there to the nearest rising zero crossing
-// that follows a dip under -`hysteresis`, and may pass the span's old end to find it, so a peak at
-// the old end still locks on its own cycle. A read with no such crossing returns the start of the
-// newest kScopeFrameSamples samples, which is the frame free-running.
+// that follows a dip under -`hysteresis` times that largest sample, and may pass the span's old end
+// to find it, so a peak at the old end still locks on its own cycle. A read with no such crossing
+// returns the start of the newest kScopeFrameSamples samples, which is the frame free-running.
 int scopeStart(const float* samples, float hysteresis);
 
-// The frame for a read: the 103 column runs the voice screen draws. `topDbfs` is the window top
-// (level::OutputMeter::top) and sets the scale. A column runs from the lowest to the highest of its
-// samples and is stretched to meet the last sample of the column before it, so the trace is one
-// line. A `silent` tick, and a scale that is not positive, give the horizon alone.
-ScopeFrame scopeFrame(const float* samples, float topDbfs, bool silent);
+// The frame for a read: the 103 column runs the voice screen draws. The scale is the larger of the
+// frame's peak magnitude and `lastScale` less kScopeFallDb, so the frame's loudest sample lands on
+// row 10 or 54. The new scale comes back in the frame; pass it as `lastScale` on the next call, and
+// start at 0. A column runs from the lowest to the highest of its samples and is stretched to meet
+// the last sample of the column before it, so the trace is one line. A `silent` tick, and a scale
+// that is not positive, give the horizon alone and a scale of 0.
+ScopeFrame scopeFrame(const float* samples, float lastScale, bool silent);

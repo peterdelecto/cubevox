@@ -15,9 +15,9 @@ namespace level {
 constexpr float kFullDbfs = 0.0f;
 constexpr float kFloorDbfs = -50.0f;
 
-// The scope reads each tick's amplitude against the amplitude of a window top. The top jumps
-// up to a louder tick at once and falls at this rate of real time, but never below the minimum, so
-// a quiet tick cannot blow up to full height.
+// A window top follows each tick's amplitude, and the floor below it decides when the scope draws
+// the line. The top jumps up to a louder tick at once and falls at this rate of real time, but
+// never below the minimum.
 constexpr float kWindowMinTopDbfs = -30.0f;
 constexpr float kWindowFallDbPerS = 10.0f;
 

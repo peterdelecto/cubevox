@@ -136,7 +136,7 @@ void toggleScreen(Canvas& c) {
 
 // The runtime voice screen, drawn by the firmware's renderer. The input meter is a box at the left
 // with 9 of its 16 segments lit, and the scope draws a 150 Hz tone with a second harmonic from
-// column 24 on, with the window top at the tone's RMS, -21 dBFS.
+// column 24 on, scaled to the frame's own peak.
 void voiceScreen(Canvas& c) {
   static std::array<float, kScopeReadSamples> samples;
   for (int i = 0; i < kScopeReadSamples; ++i) {
@@ -144,7 +144,7 @@ void voiceScreen(Canvas& c) {
     samples[static_cast<size_t>(i)] =
         0.12f * std::sin(6.2831853f * turns) + 0.04f * std::sin(2.0f * 6.2831853f * turns + 0.8f);
   }
-  renderVoice(c, scopeFrame(samples.data(), -21.0f, false), 9, Walk{0, 0});
+  renderVoice(c, scopeFrame(samples.data(), 0.0f, false), 9, Walk{0, 0});
 }
 
 void menu(Canvas& c) {
