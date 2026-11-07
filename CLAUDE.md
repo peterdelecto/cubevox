@@ -16,8 +16,8 @@ at a time in a Mac emulator that plays a loaded loop through the effect while th
   near unity, 0 to +0.5 dB RMS over its input on program material. The trim that
   gets a stage there lives in its tuning (wetDb / trimDb); the panel knobs never
   carry a hidden level offset. `level_test` enforces it. Stages with a MIX knob
-  (Harmony, Octave, Formant, Reverb) are trimmed so the WET path alone is unity
-  (Harmony: one voice at High; the reverb's MIX tops at a 0.60 crossfade, so its
+  (Octave, Formant, Reverb) are trimmed so the WET path alone is unity
+  (the reverb's MIX tops at a 0.60 crossfade, so its
   `level_test` row forces the crossfade to the wet); the equal-power crossfade then stays near unity at
   every MIX. Trimming at MIX 50 % instead pushed the wet +8 dB and clipped at full mix
   (owner 2026-10-02). Cards that add their wet on top of the dry (Echo, Chatter,
