@@ -70,26 +70,25 @@ UX audit 2026-11-06 (`build/audit/scope-ux-audit.md`, 7 findings, 3 holds) is fo
 
 ## 3. Scale
 
-1. The scale follows the output's recent peak, the ribbon's rule kept (owner 2026-10-30): a window top
-   in dBFS jumps up to a louder tick's RMS at once, falls 10 dB per second, and never drops under
-   -30 dBFS. `level::OutputMeter` keeps it.
-2. Half-height 22 px is `kScopeCrest * dbToGain(top)` in sample units, where `kScopeCrest` is the
-   peak-to-RMS ratio of a sung vowel. A sine's is 1.41 (3 dB); a vowel's glottal peaks run well over
-   that, and a scale set to a sine would flatten every loud vowel on rows 10 and 54. The build measures
-   the crest of the loudest ticks on Adam's three clips, alone and through the default chain, and sets
-   `kScopeCrest` so the 90th percentile of those ticks just reaches the rows. Starting guess 3.0
-   (9.5 dB). The value and the measurement go in the "As built" section.
-3. The floor rule is kept whole: a tick whose RMS is under the floor plus 6 dB is silence, and the
-   screen draws the line. The floor never rises closer than 12 dB to the top, so the loudest recent tick
-   always draws. In figures, a held note 6 dB or more under the recent top goes to the line in about 5 s;
-   Adam's working level near -20 dBFS sits far above the -36 dBFS that reaches. A plosive 20 dB over the
-   vowel shrinks the next two seconds of singing, since the top falls 10 dB a second. Both are the
-   ribbon's behaviour today.
-4. On a held note the top moves by about 0.4 dB a tick, under one row of 22, and the scale and the frame
-   come from the same tick, so the trace does not pump.
-5. The tick RMS that drives the top and the floor is the energy of the blocks the chain wrote into the
-   ring during the tick, not the DAC's, so the scale and the trace read one signal. The energy is a sum
-   of squares and a count kept beside the ring, taken with the ring.
+Revised 2026-11-07 (owner: "the vertical scale should re-scale itself appropriately"). The first build
+set the height against the loudest recent tick's RMS, which drew an echo tail or a quiet passage a few
+rows tall. The scale now fits each frame.
+
+1. The frame's own peak, the largest sample magnitude in its 824 samples, sets the scale, so the
+   trace's loudest excursion lands on row 10 or 54 whatever the level. Loud and quiet draw the same
+   size; the meter box beside the trace shows the level.
+2. The scale falls, not jumps, between frames: the scale is the larger of this frame's peak and the
+   last scale less 3 dB (75 dB a second at 25 frames). A quiet frame right after a loud one draws at
+   70 % or more, and an echo tail 12 dB under the voice fills the height within four frames. The
+   scale rises at once.
+3. The floor rule is kept whole, from `level::OutputMeter`: a tick whose RMS is under the floor plus
+   6 dB is silence, and the screen draws the line. The floor follows the quietest recent tick, rises
+   3 dB a second, and never comes closer than 12 dB to the window top, so the loudest recent tick
+   always draws. This is what keeps room noise and an idling synth on the line (owner 2026-10-30).
+4. `OutputMeter` keeps its window top for the floor rule; the trace no longer reads it. The crest
+   constant of the first build goes.
+5. The tick RMS that drives the floor is the energy of the blocks the chain wrote into the ring during
+   the tick, so the floor and the trace read one signal.
 
 ## 4. Trigger
 
@@ -157,9 +156,9 @@ UX audit 2026-11-06 (`build/audit/scope-ux-audit.md`, 7 findings, 3 holds) is fo
 2. `core_scope`, columns: on random, clipped and full-scale square input every neighbouring pair of
    columns shares a row or touches, the first column included. A frame of zeros gives row 32 everywhere.
    A tick under the floor gives silent.
-3. `core_scope`, scale: the synthetic vowel at its loudest tick does not clip at the chosen crest; a
-   150 Hz sine at -20 dBFS RMS reaches the rows the crest predicts; a held note at -40 dBFS goes to the
-   line.
+3. `core_scope`, scale: a 150 Hz sine at -20 dBFS and at -40 dBFS each reach rows 10 and 54; a frame
+   at half the previous frame's peak draws at 70 % (the 3 dB fall); a frame 12 dB under fills the
+   height by the fourth frame; a held note under the floor plus 6 dB goes to the line.
 4. `core_scope`, ring: wrap-around returns the newest samples in order; the energy of a known signal
    equals the old DAC-side sum with the output trim at unity; a host two-thread stress where the writer
    fills each block with its block number and the reader asserts every frame is consecutive numbers.
@@ -190,10 +189,9 @@ UX audit 2026-11-06 (`build/audit/scope-ux-audit.md`, 7 findings, 3 holds) is fo
 2. A trigger over free-running: a free-running trace on a held note swims across the screen every tick
    and looks broken. The peak-anchored crossing over the first crossing: a vowel crosses zero several
    times a cycle (audit finding 3).
-3. The ribbon's scale and floor rules are kept rather than a fixed dBFS scale: a fixed scale draws
-   Adam's working level, around -20 dBFS, two pixels tall. The crest term over a sine's peak: a sine
-   scale clips every loud vowel (audit finding 4). RMS over a peak tally: a peak tally would pull the
-   scale up on every plosive and shrink the singing after it.
+3. The scale fits each frame (owner 2026-11-07) over the ribbon's recent-peak rule, which drew an echo
+   tail a few rows tall. The floor rule stays so noise draws the line. A fixed dBFS scale was never
+   in play: it draws Adam's working level, around -20 dBFS, two pixels tall.
 4. No rim dither: a scope trace is a sharp line.
 5. The copy sits in `BlockFlow::run`, not `runChain`, so every audio block writes a block and the ring
    never freezes on a swap, a late block or a NaN cut (audit finding 7). The DAC-side energy tally goes
