@@ -12,5 +12,5 @@
 // and whether the caller must republish the snapshot.
 BenchResult benchRun(BenchOp op, const BenchArgs& args, void (*bootReport)());
 
-// Prints the audio counters, total and per slot.
-void benchReportStats();
+// Prints the audio counters, total and per slot. Bench builds add the slot override masks.
+void reportAudioStats();

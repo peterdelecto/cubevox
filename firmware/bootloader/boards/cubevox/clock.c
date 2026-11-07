@@ -7,6 +7,7 @@
 #include "board_api.h"
 #include "boot_block.h"
 
+CV_STATIC_ASSERT(hse_is_board_crystal, HSE_VALUE == CV_HSE_HZ);
 CV_STATIC_ASSERT(sysclk_360_mhz, CV_SYSCLK_HZ == 360000000u);
 CV_STATIC_ASSERT(usb_48_mhz, CV_USB_HZ == 48000000u);
 
@@ -116,8 +117,8 @@ void clock_init(void) {
   cvResetFlagsTake();
   // The port never calls HAL_Init. The HAL's timeouts below need the tick, and
   // HAL_RCC_ClockConfig's closing HAL_InitTick needs a valid uwTickPrio.
-  HAL_InitTick(TICK_INT_PRIORITY);
-  gFailedStep = crystalStart();
+  // Without the tick the crystal profile cannot time its waits, so a failed start takes the fallback.
+  gFailedStep = HAL_InitTick(TICK_INT_PRIORITY) == HAL_OK ? crystalStart() : CvClockStepClockTree;
   if (gFailedStep != 0u) fallbackStart();
   HAL_PWREx_EnableUSBVoltageDetector();
 }

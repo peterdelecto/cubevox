@@ -2,32 +2,17 @@
 
 #include <array>
 
+#include "core/crc32_zlib.h"
+
 namespace {
 
-constexpr uint32_t kPolynomial = 0xEDB88320u;
 constexpr size_t kCrcFieldBytes = 4;
-
-constexpr std::array<uint32_t, 256> makeTable() {
-  std::array<uint32_t, 256> table = {};
-  for (uint32_t i = 0; i < table.size(); ++i) {
-    uint32_t entry = i;
-    for (int bit = 0; bit < 8; ++bit) entry = (entry & 1u) != 0 ? (entry >> 1) ^ kPolynomial : entry >> 1;
-    table[i] = entry;
-  }
-  return table;
-}
-
-// A byte per step keeps the boot-time check of a 180 KB image to a few milliseconds.
-constexpr std::array<uint32_t, 256> kTable = makeTable();
 
 constexpr std::array<uint8_t, kCrcFieldBytes> kZeroField = {};
 
 }  // namespace
 
-uint32_t crc32Update(uint32_t state, const uint8_t* data, size_t len) {
-  for (size_t i = 0; i < len; ++i) state = kTable[(state ^ data[i]) & 0xFFu] ^ (state >> 8);
-  return state;
-}
+uint32_t crc32Update(uint32_t state, const uint8_t* data, size_t len) { return cvCrc32Update(state, data, len); }
 
 uint32_t crc32(const uint8_t* data, size_t len) { return crc32Finish(crc32Update(kCrc32Init, data, len)); }
 

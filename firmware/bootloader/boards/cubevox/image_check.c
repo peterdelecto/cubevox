@@ -5,29 +5,11 @@
 #include <stdbool.h>
 #include <string.h>
 
+#include "../../../cubevox/src/core/crc32_zlib.h"
 #include "text.h"
 
-// Reflected zlib polynomial.
-#define CV_CRC_POLY 0xEDB88320u
-
-// Built on first use: 1 KB of RAM instead of 1 KB of flash.
-static uint32_t gCrcTable[256];
-static bool gCrcTableReady;
-
-static void crcTableBuild(void) {
-  for (uint32_t i = 0; i < 256u; ++i) {
-    uint32_t c = i;
-    for (uint8_t bit = 0; bit < 8u; ++bit) c = (c & 1u) ? (c >> 1) ^ CV_CRC_POLY : c >> 1;
-    gCrcTable[i] = c;
-  }
-  gCrcTableReady = true;
-}
-
 uint32_t cvCrc32(uint32_t crc, const uint8_t* data, uint32_t length) {
-  if (!gCrcTableReady) crcTableBuild();
-  crc = ~crc;
-  for (uint32_t i = 0; i < length; ++i) crc = gCrcTable[(crc ^ data[i]) & 0xFFu] ^ (crc >> 8);
-  return ~crc;
+  return ~cvCrc32Update(~crc, data, length);
 }
 
 // The CRC the header must carry: the whole image with the CRC field read as zero.

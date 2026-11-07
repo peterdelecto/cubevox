@@ -47,6 +47,16 @@
 #define CV_BANK2_BASE           0x08100000u
 #define CV_BANK2_END            0x08200000u
 
+// The flash word, 256 bits, is the smallest unit the H7 programs. FLASH_ECC_FA1 and FLASH_ECC_FA2
+// count words from the start of their bank in 15 bits, which cover the 1 MB bank.
+#define CV_FLASH_WORD_BYTES     32u
+#define CV_FLASH_ECC_ADDR       0x7FFFu
+
+// The address of the word a FLASH_ECC_FAx register names, for the bank that starts at `bankBase`.
+static inline uint32_t cvEccAddress(uint32_t bankBase, uint32_t eccFa) {
+  return bankBase + (eccFa & CV_FLASH_ECC_ADDR) * CV_FLASH_WORD_BYTES;
+}
+
 // ---- Image header layout -------------------------------------------------------------------
 
 #define CV_IMAGE_HEADER_SIZE            32u
@@ -86,12 +96,22 @@
 
 // ---- USB identity --------------------------------------------------------------------------
 
-// The bootloader enumerates as the pid.codes test id and the application keeps its CDC id. They
-// differ because macOS and Windows remember the device class per id.
+// The bootloader enumerates as the pid.codes test id. The application keeps the core's CDC id, which
+// differs because macOS and Windows remember the device class per id.
 #define CV_USB_VID_BOOT  0x1209u
 #define CV_USB_PID_BOOT  0x0001u
-#define CV_USB_VID_APP   0x0483u
-#define CV_USB_PID_APP   0x5740u
+
+// ---- Clocks --------------------------------------------------------------------------------
+
+// The crystal and the PLL1 profile the bootloader runs on every silicon revision. sysclock.cpp
+// asserts that its older-silicon profile equals this one, and the bootloader's OLED timing depends
+// on the PCLK1 it gives.
+#define CV_HSE_HZ       25000000u
+#define CV_BOOT_PLL_M   5u
+#define CV_BOOT_PLL_N   144u
+#define CV_BOOT_PLL_P   2u
+#define CV_BOOT_PLL_Q   15u
+#define CV_BOOT_PLL_R   2u
 
 // ---- Limits --------------------------------------------------------------------------------
 
@@ -182,6 +202,20 @@ static inline const char* cvOptionResultName(uint32_t result) {
     case CvOptionInterrupted: return "failed, interrupted";
     default: return "unknown";
   }
+}
+
+// RM0433 fields of the two option words the step sets. A clear FLASH_WPSN bit write protects its
+// sector. The wanted BOR level is the highest threshold, about 2.7 V.
+#define CV_OPTSR_BOR_LEV_POS   2u
+#define CV_OPTSR_BOR_LEV_MASK  (3u << CV_OPTSR_BOR_LEV_POS)
+#define CV_WPSN_SECTOR0        1u
+#define CV_BOR_LEVEL_WANTED    3u
+
+// True when OPTSR_CUR and WPSN_CUR1 show BOR level 3 and bank 1 sector 0 write protected. The
+// bootloader acts on the opposite and the boot report says "as wanted" for this one.
+static inline bool cvOptionsInPlace(uint32_t optsrCur, uint32_t wpsnCur1) {
+  const uint32_t borLevel = (optsrCur & CV_OPTSR_BOR_LEV_MASK) >> CV_OPTSR_BOR_LEV_POS;
+  return borLevel == CV_BOR_LEVEL_WANTED && (wpsnCur1 & CV_WPSN_SECTOR0) == 0u;
 }
 
 // True for a result that names a failure. The step tries again only at the next power-on.

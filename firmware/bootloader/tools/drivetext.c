@@ -156,7 +156,7 @@ static int writeDiag(const char* dir, const char* name, const CvDriveState* stat
 // The sample box of DIAG.TXT: a read fault in bank 1 the bootloader recorded, a refused file of
 // another family, one failed write and the release's ROM .bin copied by mistake.
 static void sampleBlock(struct CvBootBlock* block) {
-  static const char kSummary[] = "v2.00.10 up 1234 s software none";
+  static const char kSummary[] = "v2.00.10 1234s software none";
   memset(block, 0, sizeof *block);
   cvBootBlockSeal(block);
   block->lastReason = CvReasonImageUnreadable;

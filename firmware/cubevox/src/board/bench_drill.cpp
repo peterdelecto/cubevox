@@ -86,12 +86,12 @@ BenchResult benchDrillRun(BenchOp op, const BenchArgs& args) {
   switch (op) {
     case BenchOp::SlotOff:
       gBench.slotsOff ^= slotBit(args.slot);
-      benchReportStats();
+      reportAudioStats();
       r.republish = true;
       break;
     case BenchOp::SlotsOn:
       gBench.slotsOff = 0;
-      benchReportStats();
+      reportAudioStats();
       r.republish = true;
       break;
     case BenchOp::SlotOn:

@@ -23,9 +23,7 @@ extern "C" {
 // tap: the 500 ms wait would cost every boot for nothing.
 #define LED_PORT             GPIOB
 #define LED_PIN              GPIO_PIN_7
-#define CV_OLED              1
 #define TINYUF2_DBL_TAP_DFU  0
-#define CV_BOARD_FAMILY      CV_UF2_FAMILY_CUBEVOX
 #define UF2_BOARD_ID         "cubevox-h743-v4"
 #define UF2_VOLUME_LABEL     "CUBEVOX"
 #define LED_STATE_ON         1

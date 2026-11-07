@@ -136,8 +136,7 @@ void cvBootMarkUpdated(struct CvBootBlock* block) {
 // ---- Option bytes -------------------------------------------------------------------------
 
 bool cvOptionsWanted(uint32_t optsrCur, uint32_t wpsnCur1) {
-  const uint32_t borLevel = (optsrCur & CV_OPTSR_BOR_LEV_MASK) >> CV_OPTSR_BOR_LEV_POS;
-  return borLevel != CV_BOR_LEVEL_WANTED || (wpsnCur1 & CV_WPSN_SECTOR0) != 0u;
+  return !cvOptionsInPlace(optsrCur, wpsnCur1);
 }
 
 bool cvOptionsAttempt(const struct CvBootBlock* block, uint32_t optsrCur, uint32_t wpsnCur1) {
@@ -153,9 +152,6 @@ uint32_t cvOptionsWpsn(uint32_t wpsnPrg1) {
 }
 
 // ---- Update mode --------------------------------------------------------------------------
-
-// The flash word, 256 bits, is the smallest unit the H7 programs.
-#define CV_FLASH_WORD_BYTES 32u
 
 bool cvUf2BlockAccepted(uint32_t familyId, uint32_t address, uint32_t length) {
   const bool inRegion = address >= CV_APP_START && address < CV_APP_END && length <= CV_APP_END - address;

@@ -346,5 +346,5 @@ void loop() {
   gDisplay->setContrast(gDim.contrast(nowMs, gSettings.brightness));
   gDisplay->flushStep(gCanvas);
   driveLoadLed(nowMs);
-  if (gStats.due(nowMs)) benchReportStats();
+  if (gStats.due(nowMs)) reportAudioStats();
 }

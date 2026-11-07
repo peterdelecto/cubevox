@@ -99,23 +99,6 @@ EXTI lines in use: 13, 14, 15 (MENU encoder). The toggles are polled, so TOGGLE8
 Free pins: 7-9 (PC13-PC15), 16-18 (PC1, PC2_C, PC3_C), 22-25 (PA0-PA3), 92 (PB6), 95-98 (PB8, PB9, PE0, PE1),
 51-62 (PB12-PB15, PD8-PD15), 64-67 (PC7-PC9, PA8), 69 (PA10), 77-88 (PA15-PD7, the SWD pocket).
 
-### Firmware changes from the previous map
-
-| Net | Was | Now |
-|---|---|---|
-| ENC_MENU_A / B / SW | PB6 / PE11 / PD15 | PE15 / PE14 / PE13 (PE11 is PAD_EN since 2026-10-10) |
-| ENC_KEY_A / B | PB12 / PB13 | removed 2026-10-07 (KEY is a stepped knob on whichever pot its card sits on) |
-| ENC_SEMI_A / B | PB14 / PD10 | removed 2026-10-07 (SEMITONES is a stepped knob on whichever pot its card sits on) |
-| FX_ON_SENSE | PC6 | MUTE_SW on PC6 (K101 removed) |
-| TOGGLE1-8 | PA4, PA5, PA6, PA7, PB0, PB1, PD11, PB10 | PA7, PC4, PB0, PA6, PB2, PA5, PE7, PA4 |
-| MUX_S0-S3 | PD3, PD4, PD6, PB4 | PE12, PE10, PE8, PE9 |
-| XSMT | PE15 | PC5 |
-| VA_SENSE | PC4 (ADC12_INP4) | PB1 (ADC12_INP5) |
-| MUTE_N | PD12 | PB5 |
-| USER_LED | PD7 | PB7 |
-| OLED I2C | I2C1 PB8/PB9 (I2C1_SCL/SDA) | I2C2 PB10/PB11 (I2C_SCL/SDA) |
-| CC1 / CC2 | PA0 / PA3 | not connected |
-
 ### U101 mux channels (CD74HC4067, 2026-10-08)
 
 POT01-08 sit on I0-I7 (pins 9 to 2). The west column is re-mapped so each pin's via column
@@ -136,72 +119,6 @@ slots.cpp follows this table.
 RVGAIN1 (Input Gain) is off the mux and sits in the stage 2 gain leg of the preamp. Since
 2026-10-10 it is the same Alps RK09D1130C2P linear part as the slot pots (C361173), wired as a
 divider with R116 470R and R159 1k. The old RK09D117000C log pot (C470307) is gone.
-
-## 3. How fxbox joins top and h7core
-
-Done. The cubevox top and its h7core child are built as option (c) below. The section stays as the
-record of that choice.
-
-fxbox is hierarchical with a real `(sheet ...)` symbol (`fxbox.kicad_sch` line 18111,
-Sheetname h7core_block, Sheetfile h7core_block.kicad_sch). The file has 0 `global_label`
-rows in either sheet. Each child stub that names a port becomes a `hierarchical_label`;
-the top stubs each sheet pin outward and ends it in a plain net label, so the label text
-joins the net. `cubevox.json` is exactly this fxbox top: `sheets` with one row, `pins`
-with offset/len, and every other part drawn on the top.
-
-schematic.py docstring, lines 39-52:
-
-    Hierarchical mode: a spec with a "ports" list is a child sheet -- every stub naming a
-    port becomes a `hierarchical_label` ... and every port must be used or the spec
-    is refused. A spec with a top-level "sheets" list is a hierarchical top ...
-    A pin naming a port its child lacks, a child port with no top pin, or
-    a pin whose net nothing else on the top already drives, is refused, naming the port.
-    A pin row with `"no_connect": true` gets its sheet pin and a `no_connect` at the pin ...
-
-B96 (ClaudeRouter `docs/QUEUE.md` line 70, still open there): `driven_nets` is computed once from the top body, so
-one child cannot connect to a second child. A second sub-sheet is not buildable.
-
-Recommendation: option (c), top plus one h7core child, which is what the tool supports.
-1. Draw preamp, relay, output buffer, power input, mux and pots, encoders, toggles and OLED
-   header as parts on the cubevox top spec. They drive the nets the sheet pins need.
-2. h7core_block.json is cubevox's own copy. Add a port per new net (TOGGLE1..8,
-   MUTE_SW; ENC_KEY/ENC_SEMI and JACK_TRS_N are gone) and a matching U1 pin row.
-   Add a `sheets[0].pins` row on the top for every added port, and grow `size`
-   (it is `[45, 102]`, last offset 74; each new pin is 2 grid units).
-3. No global labels and no flat single sheet. A flat sheet works but throws away the
-   existing 150-part core and its ERC history.
-
-## 4. Deletions and joins on the cubevox top
-
-Done. None of the parts below is on the cubevox top any more. The references are fxbox's, and the
-cubevox schematic reuses some of the numbers for other parts (Q102 is now the driver of K103). The
-section stays as the record of the conversion.
-
-Delete from `cubevox.json` (refs in the file at the time):
-1. Bridge and surge: Q102, Q103 (AO4606), R115-R118, D106-D109 (BZT52C15), D112-D115 (SMBJ70CA),
-   C116 (PE_BST/PE_SW), C112/C113 rewired to 9V_IN. Keep J106 PJ-002A and D105 SMBJ15CA
-   (rewire BAR_A/BAR_B to the item-11 chain: SS34 then 9V_IN).
-2. Jacks: J102, J103 (PJ-325M), J104, J105 (PJ-611E), R101-R103, R119-R122, D110, D111.
-3. Controls and LEDs: SW101-SW103 (B3F-4055), D101-D103 (WS2812B), U102, R109, R110,
-   RV101-RV105 (RK09K; replace with RK09D1130C1B (C470304) x15 and set the mux inputs), C106-C110.
-4. Relay driver: Q101, R111, R112, NT101. K101 and D104 removed 2026-10-07 (bypass became
-   MUTE; K102 mutes). R111-R114 are the difference-amp resistors and stay.
-5. J101 7-pin SPI OLED becomes a 4-pin I2C header (GND, 3V3, SCL, SDA, matches the module order). R107/R108 stay for ENC.
-Inside `h7core_block.json` (the child holds these, not the top): U12 TLV9062 and R34/R35/R36/
-R41/R42/C70-C73 (ADC driver), U10 TPS63070, U11 LP5912 and their passives
-(ADC_PRE/ADC_VAUX/ADC_BB_*), U7 TPA6132A2 (Section=hp_out), and the OLED SPI,
-MIDI, SYNC, UART8, MUX2-4 and WS2812 ports.
-
-New blocks connect to: 5V (preamp, relay coil, PCM1808 VCC through 10 R, buck
-output), 3V3 and 3V3A (pots, mux, pull-ups), GND,
-ADC_VINL / ADC_VINR (PCM1808 pins 13 and 14, currently internal to the child, so add ports),
-DAC_OUTL (PCM5102A pin 6; the child already exposes LINE_L after a 470 R / 2.2 nF filter,
-so decide whether the item-8 coupling cap hangs on LINE_L or on a new DAC_OUTL port).
-
-SGND in fxbox: the TPA6132A2 headphone amp sense pin (U7 pin 15), the sleeve return of
-J103/J105 and D114/D115, bonded to GND at the jack sleeve by net tie NT101. Cubevox drops
-U7 and every jack that used it, so SGND has no load. Delete the port, the pin row and NT101;
-one GND plane, matching the spec and canon 27.
 
 ## 5. ADC master clock (I01)
 
@@ -274,10 +191,11 @@ the 256/384/512 fs ratio from SCKI/LRCK, and 12.288 MHz at 48 kHz is 256 fs.
    supervisor's maximum release delay, not the 3V3 rise time.
 7. MUX_S0-S3 at the lowest GPIO speed setting. They run 50 mm on B.Cu as one bundle.
 8. MUX1_SIG_ADC (PC0, ADC1/2/3_INP10) has a 100 R / 1 nF RC at the pin (tau 100 ns). Use a
-   sample time of at least 2 us (64.5 cycles at a 25 MHz ADC clock). Wait at least 0.5 ms per
+   sample time of at least 2 us. `board/controls.cpp` samples ADC3 at 810.5 cycles of its 10 MHz ADC
+   clock, a window of about 82 us. Wait at least 0.5 ms per
    channel change before the first conversion. The mux output passes R126/C142 (1k/10n, tau 10 us,
    more at mid-travel of a 10k pot) ahead of the R30/C55 (100R/1n) stage.
 
 VERIFIED (DS12110 Table 10): SAI1 on PE2-PE6, AF6, including SAI1_MCLK_A on PE2.
 NOT VERIFIED: the unused fallbacks (SAI3_MCLK_B on PD14, PF7, SAI2 pins).
-RAN ON THE TEST BOARD, NOT YET ON A CUBEVOX BOARD: the PLL3 settings and the MCKDIV value (`firmware/README.md`, Status).
+PLL3 settings and the MCKDIV value: see `firmware/README.md`, Status, and `hardware/bringup/` for what has run.

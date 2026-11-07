@@ -95,7 +95,7 @@ void reportRecovery(Print& out) {
     out.println("), using the default layout");
   }
 #ifdef CUBEVOX_CROWDTEST
-  out.println("[WARN] test layout in force: Crowd replaces Autotune in slot 2, CPU budget checks off");
+  out.println("[WARN] test layout in force: Mob replaces Autotune in slot 2, CPU budget checks off");
 #endif
 }
 

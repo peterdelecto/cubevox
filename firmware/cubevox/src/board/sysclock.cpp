@@ -18,6 +18,8 @@ namespace {
 
 constexpr uint32_t kRevIdV = 0x2003;
 constexpr uint32_t kPllM = 5;  // 5 MHz reference, PLL1VCIRANGE_2
+constexpr uint32_t kPllP = 2;
+constexpr uint32_t kPllR = 2;
 constexpr uint32_t kUsbHz = 48000000;
 constexpr uint32_t kRomBootloaderIdAddr = 0x1FF1E7FE;
 constexpr uint32_t kVosReadyTimeoutMs = 100;
@@ -41,6 +43,12 @@ constexpr CoreProfile kProfileRevV = {192, 20, PWR_REGULATOR_VOLTAGE_SCALE0, FLA
                                       FLASH_PROGRAMMING_DELAY_2};  // 480 MHz, HCLK 240
 constexpr CoreProfile kProfileOlder = {144, 15, PWR_REGULATOR_VOLTAGE_SCALE1, FLASH_LATENCY_2,
                                        FLASH_PROGRAMMING_DELAY_1};  // 360 MHz, HCLK 180
+
+// The bootloader runs the older profile on every part, with the values in boot_block.h.
+static_assert(kHseHz == CV_HSE_HZ && kPllM == CV_BOOT_PLL_M && kPllP == CV_BOOT_PLL_P &&
+                  kPllR == CV_BOOT_PLL_R && kProfileOlder.pllN == CV_BOOT_PLL_N &&
+                  kProfileOlder.pllQ == CV_BOOT_PLL_Q,
+              "the bootloader's PLL1 profile differs from the application's older-silicon profile");
 
 bool isRevV() { return HAL_GetREVID() == kRevIdV; }
 
@@ -82,9 +90,9 @@ void configurePll1(const CoreProfile& p) {
   osc.PLL.PLLM = kPllM;
   osc.PLL.PLLN = p.pllN;
   osc.PLL.PLLFRACN = 0;
-  osc.PLL.PLLP = 2;
+  osc.PLL.PLLP = kPllP;
   osc.PLL.PLLQ = p.pllQ;
-  osc.PLL.PLLR = 2;
+  osc.PLL.PLLR = kPllR;
   osc.PLL.PLLRGE = RCC_PLL1VCIRANGE_2;
   osc.PLL.PLLVCOSEL = RCC_PLL1VCOWIDE;
   failUnless(HAL_RCC_OscConfig(&osc) == HAL_OK, ClockStep::Oscillator);
