@@ -1,6 +1,7 @@
 #include "core/scope.h"
 
 #include <algorithm>
+#include <cmath>
 
 #include "engine/dsp.h"
 
@@ -26,11 +27,18 @@ int rowsAbove(float sample, float rowsPerUnit) {
   return static_cast<int>(rows + (static_cast<float>(kScopeHalfRows) + 0.5f)) - kScopeHalfRows;
 }
 
-// True when the negative run that ends just before `at` goes under -`hysteresis`.
-bool armedBefore(const float* samples, int at, float hysteresis) {
+// True when the negative run that ends just before `at` goes under -`depth`.
+bool armedBefore(const float* samples, int at, float depth) {
   float lowest = 0.0f;
   for (int k = at - 1; k >= 0 && samples[k] < 0.0f; --k) lowest = std::min(lowest, samples[k]);
-  return lowest < -hysteresis;
+  return lowest < -depth;
+}
+
+// The largest sample magnitude in the kScopeFrameSamples samples from `start`.
+float framePeak(const float* samples, int start) {
+  float peak = 0.0f;
+  for (int i = start; i < start + kScopeFrameSamples; ++i) peak = std::max(peak, std::fabs(samples[i]));
+  return peak;
 }
 
 }  // namespace
@@ -100,19 +108,23 @@ int scopeStart(const float* samples, float hysteresis) {
   for (int i = oldest + 1; i <= newestFrame; ++i) {
     if (samples[i] > samples[peak]) peak = i;
   }
+  const float depth = hysteresis * std::max(samples[peak], 0.0f);
   for (int i = peak; i >= 1; --i) {
-    if (samples[i] >= 0.0f && samples[i - 1] < 0.0f && armedBefore(samples, i, hysteresis)) return i;
+    if (samples[i] >= 0.0f && samples[i - 1] < 0.0f && armedBefore(samples, i, depth)) return i;
   }
   return newestFrame;
 }
 
-ScopeFrame scopeFrame(const float* samples, float topDbfs, bool silent) {
+ScopeFrame scopeFrame(const float* samples, float lastScale, bool silent) {
   ScopeFrame frame;
-  const float top = kScopeCrest * cv::dbToGain(topDbfs);
-  if (silent || !(top > 0.0f)) return frame;
+  if (silent) return frame;
 
-  const float rowsPerUnit = static_cast<float>(kScopeHalfRows) / top;
-  const int start = scopeStart(samples, kScopeHysteresis * top);
+  const int start = scopeStart(samples, kScopeHysteresis);
+  const float scale = std::max(framePeak(samples, start), lastScale * cv::dbToGain(kScopeFallDb));
+  if (!(scale >= kScopeMinScale)) return frame;
+
+  frame.scale = scale;
+  const float rowsPerUnit = static_cast<float>(kScopeHalfRows) / scale;
   int before = rowsAbove(samples[start], rowsPerUnit);  // the first column meets its own first sample
   for (int c = 0; c < kScopeColumns; ++c) {
     const float* const in = samples + start + c * kScopeColumnSamples;

@@ -72,8 +72,10 @@ void Face::tick(uint32_t nowMs, const UiContext& ctx, const level::InputEnergy& 
   meterSegments_ = meterSegments(inputMeter_.update(input, dtMs));
   const float outputLevel = outputMeter_.update(output, dtMs);
   const GuiFrame frame = gui_.tick(nowMs, ctx.topSwitchOn, menu.open());
-  if (frame.screen == Screen::Voice && ring.read(samples_.data())) {
-    scope_ = scopeFrame(samples_.data(), outputMeter_.top(), outputLevel <= 0.0f);
+  if (frame.screen != Screen::Voice) {
+    scope_.scale = 0.0f;
+  } else if (ring.read(samples_.data())) {
+    scope_ = scopeFrame(samples_.data(), scope_.scale, outputLevel <= 0.0f);
   }
   render(frame, ctx, menu);
   if (frame.dissolve == 0) {

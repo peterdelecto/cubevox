@@ -97,13 +97,16 @@ float toneSample(float rms, uint32_t n) {
   return 1.41421356f * rms * std::sin(kTwoPi * turns);
 }
 
-// The rows a 150 Hz tone of RMS `rmsDb` reaches against a window top of `topDb`: its peak over the
-// scale's top (the crest times the top's amplitude), times 22 rows, rounded.
-int expectedRows(float rmsDb, float topDb) {
+// The rows a 150 Hz tone of RMS `rmsDb` reaches against a scale of `scaleDb` (the sample magnitude on
+// row 10 or 54, in dBFS): its peak over the scale, times 22 rows, rounded and clipped to 22.
+int expectedRows(float rmsDb, float scaleDb) {
   const double peak = 1.41421356 * std::pow(10.0, static_cast<double>(rmsDb) / 20.0);
-  const double scaleTop = static_cast<double>(kScopeCrest) * std::pow(10.0, static_cast<double>(topDb) / 20.0);
-  return static_cast<int>(std::floor(kScopeHalfRows * peak / scaleTop + 0.5));
+  const double scale = std::pow(10.0, static_cast<double>(scaleDb) / 20.0);
+  return std::min(kScopeHalfRows, static_cast<int>(std::floor(kScopeHalfRows * peak / scale + 0.5)));
 }
+
+// The scale of a 150 Hz tone of RMS `rmsDb` in dBFS: its peak.
+float peakDb(float rmsDb) { return rmsDb + 3.0103f; }
 
 // The rows the trace reaches above and below the horizon, over columns 24 to 126.
 struct Reach {
@@ -559,9 +562,9 @@ void checkKnobMovedGuards() {
   check(sameCanvas(r.live, readoutScreen(r.layout, 2, 0, 12.0f)), "face: a stepped knob reads its step as a signed number");
 }
 
-// The window top falls in real time, so a tick that comes late reads against a lower top and stands
-// taller. After a full-scale tick the top falls 0.4 dB in 40 ms and 4.8 dB in 480 ms, and the scale's
-// top is the crest times the window top's amplitude.
+// The scale falls 3 dB a frame, not by real time, so a tick that comes late draws the same as one on
+// time. After a loud tick at 0 dBFS RMS (peak +3 dBFS), a tone at -6 dBFS RMS draws against a scale
+// 3 dB under that peak.
 void checkLateTick() {
   FaceRig onTime;
   FaceRig late;
@@ -577,12 +580,11 @@ void checkLateTick() {
     const Reach r = traceReach(c);
     return r.up == h && r.down == h;
   };
-  const int onTimeRows = expectedRows(-6.0f, -0.4f);
-  const int lateRows = expectedRows(-6.0f, -4.8f);
-  check(lateRows > onTimeRows && reaches(onTime.live, onTimeRows),
-        ("face: 40 ms after a full-scale tick, a tone at -6 dBFS reaches " + std::to_string(onTimeRows) + " rows").c_str());
-  check(reaches(late.live, lateRows),
-        ("face: 480 ms after it, when the tick came late, a tone at -6 dBFS reaches " + std::to_string(lateRows) + " rows").c_str());
+  const int rows = expectedRows(-6.0f, peakDb(0.0f) - 3.0f);
+  check(rows < kScopeHalfRows && reaches(onTime.live, rows),
+        ("face: 40 ms after a loud tick, a tone 3 dB quieter reaches " + std::to_string(rows) + " rows").c_str());
+  check(reaches(late.live, rows),
+        ("face: 480 ms after it, when the tick came late, the same tone reaches the same " + std::to_string(rows) + " rows").c_str());
 }
 
 void checkWalkOnPanel() {
@@ -728,27 +730,23 @@ bool meterShows(const Canvas& c, int segments) {
   return ok;
 }
 
-// The voice at three levels, through the whole path. The output sets the scope's scale, which is the
-// crest times the window top's amplitude. The top sits at -30 dBFS or at the level, whichever is
-// louder, so a 150 Hz tone of RMS r reaches round(22 x 1.414 r / (crest x top)) rows. A level above
-// the -30 dBFS mark sets its own top, which a tick of equal level can fall 0.4 dB under, so it
-// reaches that many rows or one more. The input feeds the meter, which reads absolute dB from -50
-// to 0 on 16 segments.
+// The voice at three levels, through the whole path. The scale fits each frame, so a steady 150 Hz
+// tone reaches rows 10 and 54 whatever its level. The input feeds the meter, which reads absolute dB
+// from -50 to 0 on 16 segments.
 void checkVoiceLevels() {
   struct Case {
     float outDb;
-    int slack;
     float inDb;
     int segments;
     const char* pgm;
   };
   const Case cases[] = {
-      {-40.0f, 0, -40.0f, 3, "oled-voice-quiet.pgm"},
-      {-36.0f, 0, -30.0f, 6, "oled-voice-mid.pgm"},
-      {-8.0f, 1, -6.0f, 14, "oled-voice-loud.pgm"},
+      {-40.0f, -40.0f, 3, "oled-voice-quiet.pgm"},
+      {-36.0f, -30.0f, 6, "oled-voice-mid.pgm"},
+      {-8.0f, -6.0f, 14, "oled-voice-loud.pgm"},
   };
   for (const Case& c : cases) {
-    const int half = expectedRows(c.outDb, std::max(c.outDb, -30.0f));
+    const int half = expectedRows(c.outDb, peakDb(c.outDb));
     const std::string out = std::to_string(static_cast<int>(c.outDb)) + " dBFS out";
     const std::string in = std::to_string(static_cast<int>(c.inDb)) + " dBFS in";
     check(meterSegments(level::displayLevel(dbToLinear(c.inDb))) == c.segments,
@@ -758,8 +756,7 @@ void checkVoiceLevels() {
     r.ticks(20);
     r.ticks(30, dbToLinear(c.outDb), dbToLinear(c.inDb));
     const Reach reach = traceReach(r.live);
-    check(reach.up >= half && reach.up <= half + c.slack && reach.down >= half && reach.down <= half + c.slack &&
-              darkFrom127(r.live),
+    check(reach.up == half && reach.down == half && darkFrom127(r.live),
           ("voice: the trace at " + out + " reaches " + std::to_string(half) + " rows each side of the horizon and no more (up " +
            std::to_string(reach.up) + ", down " + std::to_string(reach.down) + ")").c_str());
     check(meterShows(r.live, c.segments),
@@ -784,8 +781,8 @@ void checkEachOwnsItsSource() {
   FaceRig outputOnly;
   outputOnly.ticks(10, dbToLinear(-6.0f), 0.0f);
   const Reach reach = traceReach(outputOnly.live);
-  const int rows = expectedRows(-6.0f, -6.0f);
-  check(meterShows(outputOnly.live, 0) && reach.up >= rows && reach.up <= rows + 1 && reach.down >= rows && reach.down <= rows + 1 &&
+  const int rows = expectedRows(-6.0f, peakDb(-6.0f));
+  check(meterShows(outputOnly.live, 0) && reach.up == rows && reach.down == rows &&
             darkFrom127(outputOnly.live),
         "face: an output with a silent input draws the trace and leaves the meter an empty box");
 }
@@ -798,27 +795,26 @@ void checkOutputHissIsSilence() {
   check(sameCanvas(r.live, lineScreen()), "face: an output hiss at -70 dBFS draws the horizon line and nothing else");
 }
 
-// The scope reads the ring only while the voice screen shows, and the scale keeps tracking under the
-// other screens. After a loud tone, 2.5 s under a readout lets the window top fall to its -30 dBFS
-// floor, so a tone at -40 dBFS then reaches more rows than against the old top. The trace is fresh
-// when the voice returns, with nothing of the tone from before the readout.
+// The scope reads the ring only while the voice screen shows, and its scale restarts when the voice
+// returns. After a loud tone and a readout, a tone at -40 dBFS fills the height at once, where a scale
+// carried from the loud tone would draw it a few rows tall. The trace is fresh when the voice returns,
+// with nothing of the tone from before the readout.
 void checkScopeUnderReadout() {
   FaceRig r;
   r.ticks(10, dbToLinear(-8.0f), 0.0f);
-  check(traceReach(r.live).up >= expectedRows(-8.0f, -8.0f), "face: a tone at -8 dBFS draws before the readout");
+  check(traceReach(r.live).up == kScopeHalfRows, "face: a tone at -8 dBFS draws before the readout");
   r.turn(4, 0, kTime160);
   r.ticks(62);
   check(sameCanvas(r.live, lineScreen()), "face: after the readout the voice returns on the line, with none of the earlier trace");
   r.tick(dbToLinear(-40.0f));
   const Reach reach = traceReach(r.live);
-  const int rows = expectedRows(-40.0f, -30.0f);
-  check(rows > expectedRows(-40.0f, -8.0f) && reach.up == rows && reach.down == rows,
-        ("face: the window top fell under the readout, so a tone at -40 dBFS reaches " + std::to_string(rows) + " rows").c_str());
+  check(expectedRows(-40.0f, peakDb(-8.0f) - 3.0f) < kScopeHalfRows && reach.up == kScopeHalfRows && reach.down == kScopeHalfRows,
+        "face: the scale restarted under the readout, so a tone at -40 dBFS reaches 22 rows");
 }
 
 // The scripted drive of proof scene 12 in tools/oled-proof/oled_motion.cpp. The input holds
 // -23 dBFS (9 segments) and the output is a 150 Hz tone that cycles through twelve levels, one per
-// tick. The golden is the frame after tick 80, when the window top and the scale have followed the
+// tick. The golden is the frame after tick 80, when the scale has followed the
 // cycle for six periods.
 constexpr float kScriptInDb = -23.0f;
 constexpr float kScriptOutDb[12] = {-30.0f, -24.0f, -19.0f, -12.0f, -8.0f, -14.0f, -20.0f, -26.0f, -32.0f, -40.0f, -52.0f, -60.0f};
