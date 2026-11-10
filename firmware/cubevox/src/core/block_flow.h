@@ -79,8 +79,8 @@ class BlockFlow {
   // blocks of a layout change clear the waiting engines, a late block passes the dry input, and
   // every other block runs the chain. BYPASS mixes the dry input in over a chain block. A NaN or an
   // infinity out of a slot cuts the output, clears every engine in the blocks that follow and
-  // resets POLISH COMP and VOX EQ. Every block writes one block into the scope's ring, the chain
-  // output ahead of POLISH COMP when the chain ran and zeros when it did not.
+  // resets VOX EQ. Every block writes one block into the scope's ring, the chain output ahead of
+  // VOX EQ's back half when the chain ran and zeros when it did not.
   template <typename Clock, typename Sink>
   Report run(ChainEngines& engines, const ChainSnapshot& held, const Start& start, float* a, float* b,
              bool bypassOn, Clock cycleClock, Sink&& sink) {
@@ -115,9 +115,9 @@ class BlockFlow {
   }
 
  private:
-  // A slot's NaN or infinity was silenced before the polish stages. The output cuts to zero and every
+  // A slot's NaN or infinity was silenced before VOX EQ's back half. The output cuts to zero and every
   // engine clears in the silent blocks that follow, because the one that produced it is not known.
-  // POLISH COMP and VOX EQ clear too, since the cut output leaves their state to restart from rest.
+  // VOX EQ clears too, since the cut output leaves its state to restart from rest.
   void discard(ChainEngines& engines, const ChainSnapshot& held);
 
   // Clears up to `count` of the waiting engines, lowest first.

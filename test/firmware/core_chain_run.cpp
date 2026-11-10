@@ -97,14 +97,13 @@ Layout layoutOf(std::initializer_list<Card> cards) {
   return layout;
 }
 
-// Turns every toggle on, puts every knob at `knob` and sets both polish stages to `polish`.
-ChainSnapshot snapshotFor(const Layout& layout, float knob, bool polish) {
+// Turns every toggle on, puts every knob at `knob` and sets VOX EQ to ON+CUTS when `eq`, else OFF.
+ChainSnapshot snapshotFor(const Layout& layout, float knob, bool eq) {
   PanelReading panel;
   panel.toggle.fill(true);
   for (auto& slot : panel.knob) slot.fill(knob);
   Settings settings;
-  settings.polishComp = polish;
-  settings.voxEq = polish ? VoxEq::Cuts : VoxEq::Off;
+  settings.voxEq = eq ? VoxEq::Cuts : VoxEq::Off;
   return composeSnapshot(layout, panel, settings, BenchOverrides());
 }
 
@@ -124,8 +123,7 @@ Run runBlock(Rig& rig, const ChainSnapshot& snap, const Block& in, Clock clock) 
 }
 
 // Runs the chain by hand on `rig`'s own engines, with a fresh buffer per stage and a plain copy in
-// between. The front half of VOX EQ goes first, then the slots, then POLISH COMP and the back
-// half of VOX EQ.
+// between. The front half of VOX EQ goes first, then the slots, then the back half of VOX EQ.
 Block byHand(Rig& rig, const ChainSnapshot& snap, const Block& in) {
   Block cur = in;
   Block next{};
@@ -136,9 +134,8 @@ Block byHand(Rig& rig, const ChainSnapshot& snap, const Block& in) {
     const Card c = snap.layout.card[static_cast<size_t>(s)];
     if (runStage(rig.engines, c, cur.data(), next.data(), kN, snap.params, path)) cur = next;
   }
-  rig.engines.comp.process(cur.data(), next.data(), kN, snap.params.comp);
-  rig.engines.polish.processBack(next.data(), cur.data(), kN, snap.params.eq);
-  return cur;
+  rig.engines.polish.processBack(cur.data(), next.data(), kN, snap.params.eq);
+  return next;
 }
 
 void checkRouting() {
@@ -198,8 +195,8 @@ void checkEmptyAndPitchCards() {
 }
 
 // The walk equals the chain run by hand, whichever side the last writing stage left the block on.
-// The polish stages are on, so a finished block that stayed in the scratch buffer would be the
-// compressor's output and differ from the EQ's by much more than the tolerance.
+// VOX EQ is on, so a finished block left in the scratch buffer would miss the back half's dip,
+// presence and trim and differ by much more than the tolerance.
 void checkWalkAgainstHand() {
   constexpr float kTolerance = 1e-5f;
   const std::initializer_list<std::initializer_list<Card>> layouts = {
@@ -225,7 +222,7 @@ void checkWalkAgainstHand() {
   }
 }
 
-// With nothing in the slots and both polish stages off, the block passes bit for bit.
+// With nothing in the slots and VOX EQ off, the block passes bit for bit.
 void checkEmptyChain() {
   const ChainSnapshot snap = snapshotFor(layoutOf({}), 0.5f, false);
   auto rig = newRig();
@@ -234,7 +231,32 @@ void checkEmptyChain() {
     const Block in = tone(b, 0.3f);
     same = same && runBlock(*rig, snap, in, StillClock()).out == in;
   }
-  check(same, "chain: an empty layout with the polish stages off passes the block untouched");
+  check(same, "chain: an empty layout with VOX EQ off passes the block untouched");
+}
+
+// With VOX EQ off, nothing runs between the guard and the end of the chain, so the chain's output is
+// the block the guard passed, bit for bit, whichever buffer the last writing slot left it in.
+void checkOffTailIsGuardedBlock() {
+  const std::initializer_list<std::initializer_list<Card>> layouts = {
+      {Card::Distortion},
+      {Card::Slapback, Card::Distortion},
+      {Card::Unison, Card::Empty, Card::Slapback, Card::Distortion},
+  };
+  bool same = true;
+  for (const auto& cards : layouts) {
+    const ChainSnapshot snap = snapshotFor(layoutOf(cards), 0.5f, false);
+    auto rig = newRig();
+    for (int b = 0; b < 4; ++b) {
+      Block out = tone(b, 0.3f);
+      Block scratch{};
+      Block guarded{};
+      ChainCycles cycles;
+      auto tap = [&guarded](const float* block) { std::copy(block, block + kN, guarded.begin()); };
+      runChain(rig->engines, rig->fades, out.data(), scratch.data(), kN, snap, StillClock(), cycles, tap);
+      same = same && out == guarded && !allZero(out);
+    }
+  }
+  check(same, "chain: with VOX EQ off the output is the block the guard passed, bit for bit");
 }
 
 // Autotune and Octave in one layout each run their own engine on the block the slot ahead hands them: the
@@ -313,12 +335,12 @@ void checkNanGuard() {
     clean = clean && run.finite && allFinite(run.out);
     sound = sound || !allZero(run.out);
   }
-  check(clean && sound, "chain: the polish stages play on after a discarded block");
+  check(clean && sound, "chain: VOX EQ plays on after a discarded block");
 }
 
-// The clock reads twice around the front half of VOX EQ, twice around each slot, then once before
-// POLISH COMP, once between the comp and the back half and once after it. Each bucket gets its own
-// pair of reads, and the EQ bucket adds the front half's pair to the back half's.
+// The clock reads twice around the front half of VOX EQ, twice around each slot, then twice around
+// the back half. Each slot gets its own pair of reads, and the EQ bucket adds the front half's pair
+// to the back half's.
 void checkStageTiming() {
   const ChainSnapshot snap = snapshotFor(defaultLayout(), 0.5f, true);
   auto rig = newRig();
@@ -329,14 +351,13 @@ void checkStageTiming() {
     slots = slots && run.cycles.slot[s] == (at + 1) * (at + 1) - at * at;
   }
   check(slots, "chain: each slot is timed by its own pair of reads");
-  const uint32_t first = 2 + 2 * static_cast<uint32_t>(kSlotCount);  // read index of the first polish read
-  check(run.cycles.comp == (first + 1) * (first + 1) - first * first, "chain: POLISH COMP is timed alone");
-  check(run.cycles.eq == 1 + (first + 2) * (first + 2) - (first + 1) * (first + 1),
+  const uint32_t first = 2 + 2 * static_cast<uint32_t>(kSlotCount);  // read index of the back half's first read
+  check(run.cycles.eq == 1 + (first + 1) * (first + 1) - first * first,
         "chain: VOX EQ is timed by the first pair of reads and the last pair");
 }
 
-// The front half of VOX EQ runs ahead of slot 1 in the caller's buffer. With the slots empty and
-// POLISH COMP off, the chain's output is the front half then the back half, and a 40 Hz tone loses
+// The front half of VOX EQ runs ahead of slot 1 in the caller's buffer. With the slots empty, the
+// chain's output is the front half then the back half, and a 40 Hz tone loses
 // level to the 70 Hz high-pass while the same tone with VOX EQ OFF passes untouched.
 void checkFrontHead() {
   constexpr double kPi = 3.14159265358979323846;
@@ -351,7 +372,6 @@ void checkFrontHead() {
   PanelReading panel;
   panel.toggle.fill(true);
   Settings eqOnly;
-  eqOnly.polishComp = false;
   eqOnly.voxEq = VoxEq::Cuts;
   Settings noCuts = eqOnly;
   noCuts.voxEq = VoxEq::On;
@@ -380,7 +400,7 @@ void checkFrontHead() {
     uncutRms = rms(runBlock(*uncut, onNoCuts, in, StillClock()).out);
     inRms = rms(in);
   }
-  check(same, "chain: the front half runs ahead of slot 1 and the back half after the comp, in the caller's buffer");
+  check(same, "chain: the front half runs ahead of slot 1 and the back half after the last slot, in the caller's buffer");
   check(passes, "chain: with VOX EQ OFF both halves pass the block bit for bit");
   check(outRms < 0.2 * inRms, "chain: at ON+CUTS the 70 Hz high-pass takes a 40 Hz tone down by more than 14 dB");
   check(uncutRms > 0.7 * inRms && uncutRms > 3.0 * outRms,
@@ -525,14 +545,13 @@ Toggles allToggles(bool on) {
   return t;
 }
 
-// Every knob at `knob` and each slot's toggle as given, with both polish stages off, so a slot's
+// Every knob at `knob` and each slot's toggle as given, with VOX EQ off, so a slot's
 // block is the only thing between the input and the output.
 ChainSnapshot snapshotToggles(const Layout& layout, float knob, const Toggles& on) {
   PanelReading panel;
   panel.toggle = on;
   for (auto& slot : panel.knob) slot.fill(knob);
   Settings settings;
-  settings.polishComp = false;
   settings.voxEq = VoxEq::Off;
   return composeSnapshot(layout, panel, settings, BenchOverrides());
 }
@@ -1032,8 +1051,7 @@ void checkPitchCardSwitchOnFromRest() {
               for (auto& k : panel.knob) k.fill(0.5f);
               panel.knob[static_cast<size_t>(slot)] = {knobUpper, knobLower};
               Settings settings;
-              settings.polishComp = false;
-              settings.voxEq = VoxEq::Off;
+                          settings.voxEq = VoxEq::Off;
               return composeSnapshot(layout, panel, settings, BenchOverrides());
             };
             const ChainSnapshot snapOff = snapWith(off);
@@ -1507,8 +1525,7 @@ void checkGrainPairRule() {
       for (auto& k : panel.knob) k.fill(0.5f);
       panel.knob[1][1] = mixKnob;
       Settings settings;
-      settings.polishComp = false;
-      settings.voxEq = VoxEq::Off;
+          settings.voxEq = VoxEq::Off;
       ChainSnapshot snap = composeSnapshot(pair, panel, settings, BenchOverrides());
       snap.params.pitchCards.formant.shiftSt = shift;
       snap.params.pitchCards.autotune.key = 0;
@@ -1739,7 +1756,6 @@ void checkAutotuneTrackerForReaders() {
   for (auto& k : panel.knob) k.fill(0.5f);
   panel.knob[1][1] = 0.0f;
   Settings settings;
-  settings.polishComp = false;
   settings.voxEq = VoxEq::Off;
   const ChainSnapshot mixZero = composeSnapshot(layout, panel, settings, BenchOverrides());
   auto quiet = newRig();
@@ -1971,6 +1987,7 @@ void checkChainRun() {
   checkEmptyAndPitchCards();
   checkWalkAgainstHand();
   checkEmptyChain();
+  checkOffTailIsGuardedBlock();
   checkPitchCardsInSeries();
   checkGrowlRingRests();
   checkNanGuard();

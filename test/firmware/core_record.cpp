@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 #include <cstring>
 #include <vector>
 
@@ -80,14 +81,13 @@ void reseal(RecordBytes& b) {
 RecordBytes asV1(RecordBytes b) {
   b[kOffSchema] = static_cast<uint8_t>(kRecordSchemaV1);
   b[kOffSchema + 1] = 0;
-  for (size_t off : {kOffPolishComp, kOffRetiredPolishEq, kOffTopSwitch, kOffVoxEq}) b[off] = 0;
+  for (size_t off : {kOffRetiredComp, kOffRetiredPolishEq, kOffTopSwitch, kOffVoxEq}) b[off] = 0;
   reseal(b);
   return b;
 }
 
 void checkRecordSchemaV2() {
   Settings changed;
-  changed.polishComp = false;
   changed.voxEq = VoxEq::Cuts;
   changed.topSwitch = TopSwitch::Bypass;
   RecordData in = makeRec(9, OutputLevel::Mic);
@@ -95,12 +95,30 @@ void checkRecordSchemaV2() {
   in.settings.outputLevel = OutputLevel::Mic;
   const RecordBytes b = encodeRecord(in);
   RecordData out;
-  check(b[kOffSchema] == kRecordSchema && b[kOffPolishComp] == 0 && b[kOffRetiredPolishEq] == 0 &&
+  check(b[kOffSchema] == kRecordSchema && b[kOffRetiredComp] == 0 && b[kOffRetiredPolishEq] == 0 &&
             b[kOffVoxEq] == static_cast<uint8_t>(VoxEq::Cuts) && b[kOffTopSwitch] == static_cast<uint8_t>(TopSwitch::Bypass),
-        "record v2: the polish bytes follow the two v1 settings bytes, and VOX EQ sits at byte 9");
-  check(decodeRecord(b.data(), out) && !out.settings.polishComp && out.settings.voxEq == VoxEq::Cuts &&
+        "record v2: bytes 2 and 3 are written 0, the top switch sits at byte 4 and VOX EQ at byte 9");
+  check(decodeRecord(b.data(), out) && out.settings.voxEq == VoxEq::Cuts &&
             out.settings.topSwitch == TopSwitch::Bypass && out.settings.outputLevel == OutputLevel::Mic,
-        "record v2: round trip keeps the polish settings");
+        "record v2: round trip keeps VOX EQ and the top switch");
+
+  // A record saved with byte 2 at 0, 1 or any other value loads with every other setting kept, and
+  // the next save writes the byte as 0.
+  for (const uint8_t held : {uint8_t{0}, uint8_t{1}, uint8_t{255}}) {
+    RecordBytes old = b;
+    old[kOffRetiredComp] = held;
+    reseal(old);
+    RecordData loaded;
+    char what[96];
+    std::snprintf(what, sizeof what, "record v2: retired byte 2 at %u is ignored and saved back as 0",
+                  static_cast<unsigned>(held));
+    check(decodeRecord(old.data(), loaded) && loaded.settings.voxEq == in.settings.voxEq &&
+              loaded.settings.topSwitch == in.settings.topSwitch && loaded.settings.outputLevel == in.settings.outputLevel &&
+              loaded.settings.inputJack == in.settings.inputJack && loaded.settings.debug == in.settings.debug &&
+              loaded.settings.brightness == in.settings.brightness && loaded.layout == in.layout &&
+              loaded.sequence == in.sequence && encodeRecord(loaded)[kOffRetiredComp] == 0,
+          what);
+  }
 
   for (const VoxEq v : {VoxEq::Off, VoxEq::On, VoxEq::Cuts}) {
     RecordData each = makeRec(3);
@@ -110,9 +128,9 @@ void checkRecordSchemaV2() {
   }
 
   const RecordBytes defaults = encodeRecord(makeRec(1));
-  check(decodeRecord(defaults.data(), out) && out.settings.polishComp && out.settings.voxEq == VoxEq::Off &&
+  check(decodeRecord(defaults.data(), out) && out.settings.voxEq == VoxEq::Off &&
             out.settings.topSwitch == TopSwitch::Mute,
-        "record v2: default settings are comp on, VOX EQ off, MUTE");
+        "record v2: default settings are VOX EQ off, MUTE");
 
   RecordBytes oldOn = defaults;  // a record written while POLISH EQ was an ON/OFF row, stored ON
   oldOn[kOffRetiredPolishEq] = 1;
@@ -130,20 +148,20 @@ void checkRecordSchemaV2() {
   wasV1.settings.inputJack = InputJack::Line;
   const RecordBytes v1 = asV1(encodeRecord(wasV1));
   check(decodeRecord(v1.data(), out) && out.sequence == 4 && out.settings.outputLevel == OutputLevel::Mic &&
-            out.settings.inputJack == InputJack::Line && out.settings.polishComp && out.settings.voxEq == VoxEq::Off &&
+            out.settings.inputJack == InputJack::Line && out.settings.voxEq == VoxEq::Off &&
             out.settings.topSwitch == TopSwitch::Mute,
-        "record v1: decodes with the polish defaults, not the zero bytes");
+        "record v1: decodes with the later settings at their defaults");
   check(classifyRecordEntry(v1.data()) == EntryState::Valid, "record v1: still a valid entry");
   check(encodeRecord(out)[kOffSchema] == kRecordSchema, "record v1: the next save writes v2");
 
   RecordBytes junk = v1;  // a v1 reserved byte is not a setting, whatever it holds
-  junk[kOffPolishComp] = 0x7F;
+  junk[kOffVoxEq] = 0x7F;
   junk[kOffTopSwitch] = 0xFF;
   reseal(junk);
-  check(decodeRecord(junk.data(), out) && out.settings.polishComp && out.settings.topSwitch == TopSwitch::Mute,
+  check(decodeRecord(junk.data(), out) && out.settings.voxEq == VoxEq::Off && out.settings.topSwitch == TopSwitch::Mute,
         "record v1: bytes past the two settings are ignored");
 
-  for (size_t off : {kOffOutputLevel, kOffInputJack, kOffPolishComp, kOffTopSwitch, kOffDebug}) {
+  for (size_t off : {kOffOutputLevel, kOffInputJack, kOffTopSwitch, kOffDebug}) {
     RecordBytes bad = b;
     bad[off] = 2;
     reseal(bad);
@@ -251,7 +269,7 @@ void checkRecordRetiredBytes() {
   earlier[kOffRetired + 1] = 7;
   reseal(earlier);
   check(decodeRecord(earlier.data(), out) && out.settings.voxEq == in.settings.voxEq &&
-            out.settings.polishComp == in.settings.polishComp && out.settings.debug && out.layout == in.layout &&
+            out.settings.topSwitch == in.settings.topSwitch && out.settings.debug && out.layout == in.layout &&
             out.sequence == in.sequence,
         "record: a record from the earlier firmware loads with every other setting intact");
 

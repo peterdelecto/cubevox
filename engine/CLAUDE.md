@@ -60,7 +60,7 @@
   delay lengths subtract the filters' delay (`kFilterDelay`), and the tick stays inlined in
   `Spring::run`, so check the M7 listing for a call to it after any change there.
 - The box runs one variant per stage: Autotune grid PSOLA, the granular Octave, Spring and
-  Chasm reverbs, Distortion 2x oversampled, POLISH COMP at FIRM. Nothing else stays compiled.
+  Chasm reverbs, Distortion 2x oversampled. Nothing else stays compiled.
 - Each pitch card runs its own engine on the block the slot ahead hands it, with a ring of that input
   (`engine/input_ring.h`): `AutotuneFx` (ring 2,176 floats, the tracker, the corrected voice), `OctaveFx` (3,920
   floats), `FormantFx` (3,852 floats and a tracker of its own, for Formant and Apraxia). `Crowd` keeps a 51,024 B

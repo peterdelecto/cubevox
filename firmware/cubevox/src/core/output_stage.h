@@ -1,5 +1,5 @@
-// The audio block's output side, pure so the host test covers it: the guard in front of the polish
-// stages, the output gain ramp and the loop that shapes a block for the DAC.
+// The audio block's output side, pure so the host test covers it: the guard in front of VOX EQ's
+// back half, the output gain ramp and the loop that shapes a block for the DAC.
 
 #pragma once
 
@@ -23,8 +23,9 @@ inline float shapeOutput(float x, float gain) { return clampSample(cv::softCeili
 // Zeroes the block and returns false when it holds a NaN, an infinity or a sample too loud for the
 // chain. The bound is a mean square of 1e6, +60 dBFS RMS. Chain samples stay 67 dB under it, so
 // nothing else trips it. The test reads the sum of squares through its bits, so a NaN, an
-// infinity and a finite runaway all fail, and samples of opposite sign cannot cancel. A block that
-// passes keeps squares small enough that POLISH COMP's detector stays finite.
+// infinity and a finite runaway all fail, and samples of opposite sign cannot cancel. A block past
+// the bound comes from an engine running away, so zeroing it keeps the runaway out of VOX EQ's back
+// half, the scope and the output before a sum of squares can overflow a float.
 bool guardBlock(float* x, int n);
 
 // The gain at a block's first sample and its step per sample.

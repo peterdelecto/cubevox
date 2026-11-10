@@ -126,10 +126,6 @@ BenchResult benchDrillRun(BenchOp op, const BenchArgs& args) {
     case BenchOp::Bypass:
       toggleForced(gBench.bypassOn, "[bench] BYPASS held on", "[bench] BYPASS follows the top switch");
       break;
-    case BenchOp::PolishComp:
-      toggleForced(gBench.compOff, "[bench] POLISH COMP forced off", "[bench] POLISH COMP follows the menu");
-      r.republish = true;
-      break;
     case BenchOp::VoxEq:
       toggleForced(gBench.eqOff, "[bench] VOX EQ forced off", "[bench] VOX EQ follows the menu");
       r.republish = true;

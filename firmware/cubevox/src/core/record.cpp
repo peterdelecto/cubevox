@@ -19,7 +19,7 @@ Card cardFromField(const uint8_t* field, bool& known) {
   return known ? card : Card::Empty;
 }
 
-// Reads the settings bytes. A v1 record carries only the first two, so the polish settings keep
+// Reads the settings bytes. A v1 record carries only the first two, so the later settings keep
 // the defaults already in `s`. A v2 record written before the debug byte existed holds 0 there,
 // which reads as OFF, one written before the brightness byte holds 0 there, which reads as the
 // default level, and one written before the VOX EQ byte holds 0 there, which reads as OFF. The
@@ -33,16 +33,14 @@ bool decodeSettings(const uint8_t* b, uint16_t schema, Settings& s) {
   s.inputJack = static_cast<InputJack>(jack);
   if (schema == kRecordSchemaV1) return true;
 
-  const uint8_t comp = b[kOffPolishComp];
   const uint8_t vox = b[kOffVoxEq];
   const uint8_t top = b[kOffTopSwitch];
   const uint8_t debug = b[kOffDebug];
   const uint8_t brightness = b[kOffBrightness];
-  if (comp > 1 || debug > 1) return false;
+  if (debug > 1) return false;
   if (vox > static_cast<uint8_t>(VoxEq::Cuts)) return false;
   if (top > static_cast<uint8_t>(TopSwitch::Bypass)) return false;
   if (brightness > kBrightnessLevels.size()) return false;
-  s.polishComp = comp != 0;
   s.voxEq = static_cast<VoxEq>(vox);
   s.topSwitch = static_cast<TopSwitch>(top);
   s.debug = debug != 0;
@@ -64,7 +62,6 @@ RecordBytes encodeRecord(const RecordData& rec) {
   }
   b[kOffOutputLevel] = static_cast<uint8_t>(rec.settings.outputLevel);
   b[kOffInputJack] = static_cast<uint8_t>(rec.settings.inputJack);
-  b[kOffPolishComp] = rec.settings.polishComp ? 1 : 0;
   b[kOffTopSwitch] = static_cast<uint8_t>(rec.settings.topSwitch);
   b[kOffDebug] = rec.settings.debug ? 1 : 0;
   b[kOffBrightness] = static_cast<uint8_t>(static_cast<uint8_t>(rec.settings.brightness) + 1);

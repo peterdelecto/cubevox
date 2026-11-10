@@ -320,30 +320,6 @@ bool parseSlots(const char*& p, Fields& f) {
   }
 }
 
-// A JSON true or false. On failure `p` is left where it was.
-bool readBool(const char*& p, bool& v) {
-  skipWs(p);
-  if (skipLiteral(p, "true")) {
-    v = true;
-    return true;
-  }
-  if (skipLiteral(p, "false")) {
-    v = false;
-    return true;
-  }
-  return false;
-}
-
-// Reads a settings flag and marks its field given, or notes the type error and skips the value.
-bool parseFlag(const char*& p, Fields& f, bool& flag, uint8_t given, const char* typeMsg) {
-  if (readBool(p, flag)) {
-    f.req.settingsGiven |= given;
-    return true;
-  }
-  f.typeFail(typeMsg);
-  return skipValue(p, 1);
-}
-
 // A settings word and the value it stands for.
 template <typename T>
 struct SettingsWord {
@@ -386,10 +362,6 @@ bool parseVoxEq(const char*& p, Fields& f) {
 }
 
 bool parseSettingsField(const char*& p, const char* key, Fields& f) {
-  Settings& s = f.req.settings;
-  if (strcmp(key, "polish_comp") == 0) {
-    return parseFlag(p, f, s.polishComp, kGivenPolishComp, "polish_comp must be true or false");
-  }
   if (strcmp(key, "vox_eq") == 0) return parseVoxEq(p, f);
   if (strcmp(key, "top_switch") == 0) return parseTopSwitch(p, f);
   return skipValue(p, 1);
@@ -606,8 +578,8 @@ const char* voxEqWord(VoxEq v) {
 }
 
 void writeSettings(Writer& w, const Settings& s) {
-  w.format("{\"polish_comp\":%s,\"vox_eq\":\"%s\",\"top_switch\":\"%s\"}", s.polishComp ? "true" : "false",
-           voxEqWord(s.voxEq), s.topSwitch == TopSwitch::Bypass ? "bypass" : "mute");
+  w.format("{\"vox_eq\":\"%s\",\"top_switch\":\"%s\"}", voxEqWord(s.voxEq),
+           s.topSwitch == TopSwitch::Bypass ? "bypass" : "mute");
 }
 
 const char* groupName(Group g) {
@@ -727,7 +699,6 @@ bool parseRequest(const char* line, Request& req, char* err, size_t errSize, boo
 }
 
 void applySettings(const Request& req, Settings& current) {
-  if (req.settingsGiven & kGivenPolishComp) current.polishComp = req.settings.polishComp;
   if (req.settingsGiven & kGivenVoxEq) current.voxEq = req.settings.voxEq;
   if (req.settingsGiven & kGivenTopSwitch) current.topSwitch = req.settings.topSwitch;
 }

@@ -29,7 +29,6 @@
 #include "engine/gate.h"
 #include "engine/lofi.h"
 #include "engine/polish.h"
-#include "engine/polish_comp.h"
 #include "engine/reverb.h"
 #include "engine/slapback.h"
 #include "engine/unison.h"
@@ -47,9 +46,6 @@ constexpr int kMeasureFrom = 1 * cv::kSampleRate;
 constexpr double kProgramDbfs = -18.0;
 constexpr double kNoiseDbfs = -40.0;
 
-// The comp thresholds sit at -24 to -30 dBFS, around the voice loops (-22.7 to -24.5 dBFS RMS), so
-// the comp rows run the program at that level and every other row keeps kProgramDbfs.
-constexpr double kCompProgramDbfs = -23.0;
 constexpr double kLoDb = 0.0;
 constexpr double kHiDb = 0.5;
 constexpr double kSlackDb = 0.1;
@@ -107,14 +103,6 @@ Signal program(int seconds = kSeconds) {
   Signal x(n);
   for (size_t i = 0; i < n; ++i) x[i] = static_cast<float>(tone[i] * tg + noise[i] * ng);
   const double g = dbToLin(kProgramDbfs) / rmsRange(x, 0, n);
-  for (float& v : x) v = static_cast<float>(v * g);
-  return x;
-}
-
-// program() scaled so its RMS over the whole signal is targetDb dBFS.
-Signal programAt(double targetDb) {
-  Signal x = program();
-  const double g = dbToLin(targetDb) / rmsRange(x, 0, x.size());
   for (float& v : x) v = static_cast<float>(v * g);
   return x;
 }
@@ -880,74 +868,47 @@ bool slotRows(const Signal& in) {
   return ok;
 }
 
-// The tail's engines in the box's order: the front half of VOX EQ, POLISH COMP, the back half. `cuts`
-// picks VOX EQ's ON+CUTS (true) or ON (false).
-struct Tail {
+// VOX EQ's two halves in series, as the box runs them around the slots. `cuts` picks ON+CUTS (true)
+// or ON (false).
+struct EqHalves {
   cv::Polish eq;
-  cv::PolishComp comp;
   cv::PolishParams params;
-  explicit Tail(bool cuts) {
+  explicit EqHalves(bool cuts) {
     params.cuts = cuts;
     eq.reset();
-    comp.reset();
   }
 
-  void front(const float* in, float* out, int n) { eq.processFront(in, out, n, params); }
-  void compress(const float* in, float* out, int n) { comp.process(in, out, n, cv::PolishCompParams{}); }
-  void back(const float* in, float* out, int n) { eq.processBack(in, out, n, params); }
+  void process(const float* in, float* out, int n) {
+    float mid[cv::kBlock];
+    eq.processFront(in, mid, n, params);
+    eq.processBack(mid, out, n, params);
+  }
 };
 
-// POLISH COMP alone, VOX EQ alone (both halves) at ON and at ON+CUTS, and the whole tail at both, on
-// Adam's clips. The clips sit 1.8 dB apart in level and the comp levels them, so its three readings
-// spread past the mid band. The spread is printed, and the mean holds the rule. VOX EQ and the whole
-// tail hold the mid band per clip and the rule on the mean, at both settings. The comp's makeup lifts
-// the pauses of the third clip, which puts its ON tail near the top of the band.
+// VOX EQ (both halves) at ON and at ON+CUTS on Adam's clips. Each holds the mid band per clip and the
+// rule on the mean.
 bool tailClipRows() {
   double mean = 0.0;
   int count = 0;
-  const auto compOnly = [](const Signal& padded) {
-    auto t = std::make_unique<Tail>(true);
-    return Through{padded, run(padded, [&](const float* i, float* o, int n) { t->compress(i, o, n); })};
-  };
   const auto eqOnly = [](bool cuts) {
     return [cuts](const Signal& padded) {
-      auto t = std::make_unique<Tail>(cuts);
-      return Through{padded, run(padded, [&](const float* i, float* o, int n) {
-                       float mid[cv::kBlock];
-                       t->front(i, mid, n);
-                       t->back(mid, o, n);
-                     })};
+      auto t = std::make_unique<EqHalves>(cuts);
+      return Through{padded, run(padded, [&](const float* i, float* o, int n) { t->process(i, o, n); })};
     };
   };
-  const auto whole = [](bool cuts) {
-    return [cuts](const Signal& padded) {
-      auto t = std::make_unique<Tail>(cuts);
-      return Through{padded, run(padded, [&](const float* i, float* o, int n) {
-                       float a[cv::kBlock];
-                       float b[cv::kBlock];
-                       t->front(i, a, n);
-                       t->compress(a, b, n);
-                       t->back(b, o, n);
-                     })};
-    };
-  };
-  bool ok = clipRows("polish COMP", compOnly, kMidLoDb, kMidHiDb, mean, count, false);
-  if (count > 0) ok &= verdict("polish COMP mean", mean, kLoDb, kHiDb);
+  bool ok = true;
   for (const bool cuts : {false, true}) {
     const std::string eqName = cuts ? "vox EQ ON+CUTS" : "vox EQ ON";
-    const std::string tailName = cuts ? "vox tail ON+CUTS" : "vox tail ON";
     ok &= clipRows(eqName.c_str(), eqOnly(cuts), kMidLoDb, kMidHiDb, mean, count);
     if (count > 0) ok &= verdict((eqName + " mean").c_str(), mean, kLoDb, kHiDb);
-    ok &= clipRows(tailName.c_str(), whole(cuts), kMidLoDb, kMidHiDb, mean, count);
-    if (count > 0) ok &= verdict((tailName + " mean").c_str(), mean, kLoDb, kHiDb);
   }
   return ok;
 }
 
-// The comp on the -23 dBFS program, and the two EQ halves in series on the -18 dBFS one, at ON and at
-// ON+CUTS. The trim in the tuning is set for the pair.
+// The two EQ halves in series on the -18 dBFS program, at ON and at ON+CUTS. The trim in the tuning
+// is set for the pair.
 bool tailRows(const Signal& in) {
-  bool ok = simple<cv::PolishComp>("polish COMP defaults", programAt(kCompProgramDbfs), cv::PolishCompParams{});
+  bool ok = true;
   for (const bool cuts : {false, true}) {
     cv::PolishParams eq;
     eq.cuts = cuts;
