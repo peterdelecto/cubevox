@@ -63,7 +63,8 @@ class Menu {
   // Takes the encoder's input. Until listen() it drops every click, hold and turn. A hold closes the
   // list the way EXIT does, opens the list when the menu is closed the way a click does, and does
   // nothing on the other screens.
-  UiAction update(const UiInput& in, uint32_t nowMs);
+  // `layout` orders the five SLOT rows, so a click acts on the row the screen shows.
+  UiAction update(const UiInput& in, uint32_t nowMs, const Layout& layout);
 
   // Lets input through. The face calls it on every tick, so a click or a turn during the boot splash,
   // when nobody could see the menu it opened, does nothing.
@@ -100,8 +101,8 @@ class Menu {
     }
   };
 
-  UiAction onClick();
-  void onHold();
+  UiAction onClick(const Layout& layout);
+  void onHold(const Layout& layout);
   void onTurn(int32_t detents);
 
   Mode mode_ = Mode::Idle;

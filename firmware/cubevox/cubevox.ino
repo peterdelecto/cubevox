@@ -317,7 +317,7 @@ void loop() {
 
   const UiInput input = menuInput(nowMs);
   if (input.detents != 0 || input.click || input.hold || input.press) gDim.noteActivity(nowMs);
-  const bool settingsChanged = applyAction(gMenu.update(input, nowMs), nowMs);
+  const bool settingsChanged = applyAction(gMenu.update(input, nowMs, gLayout), nowMs);
   saveSettings(settingsChanged, nowMs);
   recordPoll(nowMs);
   diagPoll();

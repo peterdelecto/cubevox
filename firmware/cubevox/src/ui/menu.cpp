@@ -92,6 +92,35 @@ SwapSlot swapSlotOfItem(Item it) {
   }
 }
 
+// The five card rows sit together in the enum, in the family order that breaks ties below.
+constexpr int kFirstCardPos = static_cast<int>(Item::OctaveFormant);
+constexpr int kCardRowCount = 5;
+static_assert(static_cast<int>(Item::Reverb) == kFirstCardPos + kCardRowCount - 1, "the card rows are contiguous");
+
+// Where the card row of family `i` (0 to kCardRowCount - 1, in enum order) sorts: the slot that holds
+// its card, and after every real slot when none does.
+int cardRowKey(const Layout& layout, int i) {
+  const int slot = swapSlotOf(layout, swapSlotOfItem(static_cast<Item>(kFirstCardPos + i)));
+  return slot >= 0 ? slot : kSlotCount;
+}
+
+// The item shown at list position `pos` for `layout`. Every walk of the list goes through here. The
+// card rows keep their five positions and run in ascending slot order; rows with no slot come last
+// and tie in enum order, so the layout alone fixes the list.
+Item itemAt(const Layout& layout, int pos) {
+  if (pos < kFirstCardPos || pos >= kFirstCardPos + kCardRowCount) return static_cast<Item>(pos);
+  for (int i = 0; i < kCardRowCount; ++i) {
+    int rank = 0;
+    for (int j = 0; j < kCardRowCount; ++j) {
+      const int kj = cardRowKey(layout, j);
+      const int ki = cardRowKey(layout, i);
+      if (kj < ki || (kj == ki && j < i)) ++rank;
+    }
+    if (rank == pos - kFirstCardPos) return static_cast<Item>(kFirstCardPos + i);
+  }
+  return static_cast<Item>(pos);
+}
+
 // The label of `it`. The five card rows (Octave and Formant, Unison and Mob, Distortion and
 // Deepthroat, slot 7, reverb) name the slot that holds their card, or a dash when none does, and
 // build the text in `buf`.
@@ -149,7 +178,7 @@ const char* itemValue(Item it, const UiContext& ctx) {
 // stays empty.
 void listRows(MenuFrame& f, const UiContext& ctx, int top) {
   for (int row = 0; row < kVisibleRows && top + row < kItemCount; ++row) {
-    const Item it = static_cast<Item>(top + row);
+    const Item it = itemAt(ctx.layout, top + row);
     char buf[kDisplayCols + 1];
     putRow(f, row, itemValue(it, ctx));
     putRow(f, kVisibleRows + row, itemLabel(it, ctx.layout, buf, sizeof(buf)));
@@ -204,7 +233,7 @@ void drawStarting(MenuFrame& f) {
 
 }  // namespace
 
-UiAction Menu::onClick() {
+UiAction Menu::onClick(const Layout& layout) {
   switch (mode_) {
     case Mode::Idle:
       mode_ = Mode::List;
@@ -212,7 +241,7 @@ UiAction Menu::onClick() {
       top_ = 0;
       break;
     case Mode::List:
-      switch (static_cast<Item>(cursor_)) {
+      switch (itemAt(layout, cursor_)) {
         case Item::InputJack: return UiAction::ToggleInputJack;
         case Item::Output: return UiAction::ToggleOutput;
         case Item::TopSwitch: return UiAction::CycleTopSwitch;
@@ -240,9 +269,9 @@ UiAction Menu::onClick() {
 
 // A hold on the list closes it, as the EXIT row does. A hold with the menu closed opens it, as a click
 // does. The confirm, chain and starting screens ignore it, so a long press never starts the update.
-void Menu::onHold() {
+void Menu::onHold(const Layout& layout) {
   if (mode_ == Mode::Idle) {
-    onClick();
+    onClick(layout);
   } else if (mode_ == Mode::List) {
     mode_ = Mode::Idle;
   }
@@ -262,12 +291,12 @@ void Menu::onTurn(int32_t detents) {
   }
 }
 
-UiAction Menu::update(const UiInput& in, uint32_t nowMs) {
+UiAction Menu::update(const UiInput& in, uint32_t nowMs, const Layout& layout) {
   if (!listening_) return UiAction::None;
   if (in.detents != 0 || in.click || in.hold || in.press) lastActivityMs_ = nowMs;
   if (in.detents != 0) onTurn(in.detents);
-  const UiAction action = in.click ? onClick() : UiAction::None;
-  if (in.hold) onHold();
+  const UiAction action = in.click ? onClick(layout) : UiAction::None;
+  if (in.hold) onHold(layout);
   if (mode_ != Mode::Idle && mode_ != Mode::Starting && nowMs - lastActivityMs_ > kMenuTimeoutMs) mode_ = Mode::Idle;
   return action;
 }

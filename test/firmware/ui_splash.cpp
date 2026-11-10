@@ -261,7 +261,7 @@ void checkInputDuringSplash() {
   splash.start(1000);
   bool quiet = true;
   for (uint32_t now = 1000; now < 1000 + kSplashMs; now += 50) {
-    quiet = quiet && menu.update(click, now) == UiAction::None && menu.update(turn, now) == UiAction::None;
+    quiet = quiet && menu.update(click, now, layout) == UiAction::None && menu.update(turn, now, layout) == UiAction::None;
     quiet = quiet && splash.draw(now, kVersion, live, false) == SplashStep::Up;
     clearAllDirty(live);  // the panel takes the frame
   }
@@ -273,7 +273,7 @@ void checkInputDuringSplash() {
   check(face.due(end + kUiTickMs, live), "splash: the face ticks once the splash has gone");
   const ScopeRing ring;
   face.tick(end + kUiTickMs, ctx, level::InputEnergy(), ring, menu, live);
-  menu.update(click, end + kUiTickMs + 1);
+  menu.update(click, end + kUiTickMs + 1, layout);
   check(menu.open(), "splash: the first click once the face shows opens the menu");
 }
 

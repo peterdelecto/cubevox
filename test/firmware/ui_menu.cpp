@@ -142,21 +142,22 @@ struct MenuRig {
     UiInput in;
     in.detents = detents;
     in.click = click;
-    return menu.update(in, nowMs);
+    return menu.update(in, nowMs, layout);
   }
   UiAction hold(uint32_t advanceMs = 10) {
     nowMs += advanceMs;
     UiInput in;
     in.hold = true;
-    return menu.update(in, nowMs);
+    return menu.update(in, nowMs, layout);
   }
   void draw() { menu.draw(UiContext{layout, panel, settings, topSwitchOn}, canvas); }
 
-  // Opens the list and turns to `item` (see the Row constants).
-  void openListAt(int item) {
-    step(0, true);
-    step(item, false);
-  }
+  // Opens the list and turns to `item` (see the Row constants). A SLOT row is named by its family, so
+  // the cursor lands on wherever this rig's layout lists that family.
+  void openListAt(int item);
+
+  // The screen row `item` sits on when the cursor walked down to it, on this rig's layout.
+  int row(int item) const;
 };
 
 // The list rows, top to bottom (specs 2026-10-24-polish-design.md and 2026-11-10-comp-removal-design.md).
@@ -181,6 +182,32 @@ constexpr int kReverbSlot = 7;
 // The screen row an item sits on when the cursor walked down to it one step at a time: the window
 // scrolls only once the cursor passes the last visible row.
 constexpr int rowOnScreen(int item) { return item < kVisible ? item : kVisible - 1; }
+
+// The list position of `item` on `layout`. The five SLOT rows (kOctaveFormant to kReverb, named by
+// family) take the five positions after INPUT PAD in ascending order of the slot that holds their
+// card, with a family no slot holds last, ties in family order. Written out here independently of the
+// menu so the test checks the menu against it.
+int listPos(const Layout& layout, int item) {
+  if (item < kOctaveFormant || item > kReverb) return item;
+  const SwapSlot family[5] = {SwapSlot::OctaveFormant, SwapSlot::UnisonMob, SwapSlot::DistortionDeepthroat, SwapSlot::Slot7,
+                              SwapSlot::Reverb};
+  int key[5];
+  for (int i = 0; i < 5; ++i) {
+    const int slot = swapSlotOf(layout, family[i]);
+    key[i] = slot < 0 ? kSlotCount : slot;
+  }
+  const int me = item - kOctaveFormant;
+  int before = 0;
+  for (int i = 0; i < 5; ++i) before += key[i] < key[me] || (key[i] == key[me] && i < me) ? 1 : 0;
+  return kOctaveFormant + before;
+}
+
+void MenuRig::openListAt(int item) {
+  step(0, true);
+  step(listPos(layout, item), false);
+}
+
+int MenuRig::row(int item) const { return rowOnScreen(listPos(layout, item)); }
 
 // The label of each item, and the value it shows for the default settings and the default layout,
 // which holds Octave in slot 3, Unison in slot 4, Distortion in slot 6, Gate in slot 7 and Spring in
@@ -552,7 +579,7 @@ void checkMenuReverbValue() {
     m.openListAt(kReverb);
     m.draw();
     const std::string name = std::string("menu: the reverb row reads ") + c.label + " " + c.value + " for " + c.name;
-    check(listRowIs(m.canvas, rowOnScreen(kReverb), c.label, c.value, true), name.c_str());
+    check(listRowIs(m.canvas, m.row(kReverb), c.label, c.value, true), name.c_str());
   }
 }
 
@@ -570,7 +597,7 @@ void checkMenuReverbClick() {
   check(m.layout.card[7] == Card::ReverbChasm && othersSame, "menu: Spring becomes Chasm in its slot, the other slots stay");
   check(layoutValid(m.layout).ok(), "menu: the swapped layout passes the placement rules");
   m.draw();
-  check(cursorRowIs(m.canvas, rowOnScreen(kReverb), kReverb, "CHASM"), "menu: the row shows CHASM after the swap");
+  check(cursorRowIs(m.canvas, m.row(kReverb), kReverb, "CHASM"), "menu: the row shows CHASM after the swap");
 
   check(ui::applyAction(m.step(0, true), m.settings, m.layout) == ui::ApplyResult::LayoutChanged &&
             m.layout == before,
@@ -619,7 +646,7 @@ void checkMenuOctaveFormantValue() {
     m.openListAt(kOctaveFormant);
     m.draw();
     const std::string name = std::string("menu: the Octave and Formant row reads ") + c.label + " " + c.value + " for " + c.name;
-    check(listRowIs(m.canvas, rowOnScreen(kOctaveFormant), c.label, c.value, true), name.c_str());
+    check(listRowIs(m.canvas, m.row(kOctaveFormant), c.label, c.value, true), name.c_str());
   }
 }
 
@@ -631,10 +658,10 @@ void checkMenuOctaveFormantRedraw() {
   clearAllDirty(m.canvas);
   m.draw();
   check(pagesClean(m.canvas), "menu: an unchanged Octave and Formant row is not redrawn");
-  std::swap(m.layout.card[kOctaveSlot], m.layout.card[kOctaveSlot + 1]);  // Octave to slot 4, Unison to slot 3
+  std::swap(m.layout.card[kOctaveSlot], m.layout.card[kOctaveSlot - 1]);  // Octave to slot 2, ahead of every other family
   m.draw();
-  check(!pagesClean(m.canvas) && listRowIs(m.canvas, rowOnScreen(kOctaveFormant), "SLOT 4", "OCTAVE", true),
-        "menu: moving Octave to slot 4 repaints the row with the new slot and the same value");
+  check(!pagesClean(m.canvas) && listRowIs(m.canvas, m.row(kOctaveFormant), "SLOT 2", "OCTAVE", true),
+        "menu: moving Octave to slot 2 repaints the row with the new slot and the same value");
 }
 
 // A click on the Octave and Formant row swaps the card in the slot that holds it and leaves every other
@@ -650,7 +677,7 @@ void checkMenuOctaveFormantClick() {
   check(ui::applyAction(a, m.settings, m.layout) == ui::ApplyResult::LayoutChanged && m.layout == formant,
         "menu: Octave becomes Formant in its slot with the other slots as they were");
   m.draw();
-  check(cursorRowIs(m.canvas, rowOnScreen(kOctaveFormant), kOctaveFormant, "FORMANT"),
+  check(cursorRowIs(m.canvas, m.row(kOctaveFormant), kOctaveFormant, "FORMANT"),
         "menu: the row shows the card the layout holds after the click");
   check(sameSettings(m.settings, Settings()), "menu: the swap touches no setting");
   Layout follower = defaultLayout();
@@ -658,7 +685,7 @@ void checkMenuOctaveFormantClick() {
   check(ui::applyAction(m.step(0, true), m.settings, m.layout) == ui::ApplyResult::LayoutChanged && m.layout == follower,
         "menu: a second click moves Formant on to Apraxia");
   m.draw();
-  check(cursorRowIs(m.canvas, rowOnScreen(kOctaveFormant), kOctaveFormant, "APRAXIA"),
+  check(cursorRowIs(m.canvas, m.row(kOctaveFormant), kOctaveFormant, "APRAXIA"),
         "menu: the row reads APRAXIA after the second click");
   check(ui::applyAction(m.step(0, true), m.settings, m.layout) == ui::ApplyResult::LayoutChanged &&
             m.layout == defaultLayout(),
@@ -680,7 +707,7 @@ void checkMenuOctaveFormantClick() {
             ui::applyAction(refused, tight.settings, tight.layout) == ui::ApplyResult::None && tight.layout == tightBefore,
         "menu: a swap the box would not load leaves the layout as it is");
   tight.draw();
-  check(cursorRowIs(tight.canvas, rowOnScreen(kOctaveFormant), kOctaveFormant, "FORMANT"),
+  check(cursorRowIs(tight.canvas, tight.row(kOctaveFormant), kOctaveFormant, "FORMANT"),
         "menu: and the row still reads FORMANT");
 
   // Octave in slot 1 and Formant in slot 3: the finder names slot 1 and Formant would repeat.
@@ -697,7 +724,7 @@ void checkMenuOctaveFormantClick() {
   none.layout.card[kOctaveSlot] = Card::Empty;
   none.openListAt(kOctaveFormant);
   none.draw();
-  check(listRowIs(none.canvas, rowOnScreen(kOctaveFormant), "SLOT -", "OCTAVE", true), "menu: the row reads SLOT - with no card to swap");
+  check(listRowIs(none.canvas, none.row(kOctaveFormant), "SLOT -", "OCTAVE", true), "menu: the row reads SLOT - with no card to swap");
   const Layout noneBefore = none.layout;
   const UiAction nothing = none.step(0, true);
   check(nothing == UiAction::SwapOctaveFormant && ui::applyAction(nothing, none.settings, none.layout) == ui::ApplyResult::None &&
@@ -740,7 +767,7 @@ void checkMenuUnisonCrowdValue() {
     m.openListAt(kUnisonCrowd);
     m.draw();
     const std::string name = std::string("menu: the Unison and Crowd row reads ") + c.label + " " + c.value + " for " + c.name;
-    check(listRowIs(m.canvas, rowOnScreen(kUnisonCrowd), c.label, c.value, true), name.c_str());
+    check(listRowIs(m.canvas, m.row(kUnisonCrowd), c.label, c.value, true), name.c_str());
   }
 }
 
@@ -755,7 +782,7 @@ void checkMenuUnisonCrowdRedraw() {
   check(pagesClean(m.canvas), "menu: an unchanged Unison and Crowd row is not redrawn");
   std::swap(m.layout.card[kUnisonSlot], m.layout.card[kUnisonSlot + 1]);  // Unison to slot 5, Echo to slot 4
   m.draw();
-  check(!pagesClean(m.canvas) && listRowIs(m.canvas, rowOnScreen(kUnisonCrowd), "SLOT 5", "UNISON", true),
+  check(!pagesClean(m.canvas) && listRowIs(m.canvas, m.row(kUnisonCrowd), "SLOT 5", "UNISON", true),
         "menu: moving Unison to slot 5 repaints the row with the new slot and the same value");
 }
 
@@ -777,7 +804,7 @@ void checkMenuUnisonCrowdClick() {
         "menu: the swap changes the layout when layoutValid accepts it and reports nothing when it does not");
   check(m.layout == (fits ? swapped : start), "menu: Unison becomes Mob in its slot with the other slots as they were, or stays");
   m.draw();
-  check(cursorRowIs(m.canvas, rowOnScreen(kUnisonCrowd), kUnisonCrowd, fits ? "MOB" : "UNISON"),
+  check(cursorRowIs(m.canvas, m.row(kUnisonCrowd), kUnisonCrowd, fits ? "MOB" : "UNISON"),
         "menu: the row shows the card the layout holds after the click");
   check(sameSettings(m.settings, Settings()), "menu: the swap touches no setting");
 
@@ -824,14 +851,14 @@ void checkMenuUnisonCrowdNoSlot() {
   m.layout.card[kUnisonSlot] = Card::Empty;
   m.openListAt(kUnisonCrowd);
   m.draw();
-  check(listRowIs(m.canvas, rowOnScreen(kUnisonCrowd), "SLOT -", "UNISON", true), "menu: the row reads SLOT - with no card to swap");
+  check(listRowIs(m.canvas, m.row(kUnisonCrowd), "SLOT -", "UNISON", true), "menu: the row reads SLOT - with no card to swap");
   const Layout before = m.layout;
   const UiAction a = m.step(0, true);
   check(a == UiAction::SwapUnisonCrowd && ui::applyAction(a, m.settings, m.layout) == ui::ApplyResult::None &&
             m.layout == before && sameSettings(m.settings, Settings()),
         "menu: a click on SLOT - changes nothing");
   m.draw();
-  check(listRowIs(m.canvas, rowOnScreen(kUnisonCrowd), "SLOT -", "UNISON", true), "menu: the row still reads SLOT - after the click");
+  check(listRowIs(m.canvas, m.row(kUnisonCrowd), "SLOT -", "UNISON", true), "menu: the row still reads SLOT - after the click");
 }
 
 // The slot 7 row reads the layout, so its label follows the slot that holds Gate, Formant, Lo-fi or
@@ -867,7 +894,7 @@ void checkMenuSlot7Value() {
     m.openListAt(kSlot7Card);
     m.draw();
     const std::string name = std::string("menu: the slot 7 row reads ") + c.label + " " + c.value + " for " + c.name;
-    check(listRowIs(m.canvas, rowOnScreen(kSlot7Card), c.label, c.value, true), name.c_str());
+    check(listRowIs(m.canvas, m.row(kSlot7Card), c.label, c.value, true), name.c_str());
   }
 }
 
@@ -875,19 +902,20 @@ void checkMenuSlot7Value() {
 // when only its value changes.
 void checkMenuSlot7Redraw() {
   MenuRig m;
+  m.layout.card[kSlot6Slot] = Card::Empty;  // no Distortion, so Gate moving to slot 6 keeps its place in the list
   m.openListAt(kSlot7Card);
   m.draw();
   clearAllDirty(m.canvas);
   m.draw();
   check(pagesClean(m.canvas), "menu: an unchanged slot 7 row is not redrawn");
-  std::swap(m.layout.card[kSlot7Slot], m.layout.card[kSlot7Slot - 1]);  // Gate to slot 6, Distortion to slot 7
+  std::swap(m.layout.card[kSlot7Slot], m.layout.card[kSlot7Slot - 1]);  // Gate to slot 6
   m.draw();
-  check(!pagesClean(m.canvas) && listRowIs(m.canvas, rowOnScreen(kSlot7Card), "SLOT 6", "GATE", true),
+  check(!pagesClean(m.canvas) && listRowIs(m.canvas, m.row(kSlot7Card), "SLOT 6", "GATE", true),
         "menu: moving Gate to slot 6 repaints the row with the new slot and the same value");
   clearAllDirty(m.canvas);
   m.layout.card[kSlot7Slot - 1] = Card::Bloom;
   m.draw();
-  check(!pagesClean(m.canvas) && listRowIs(m.canvas, rowOnScreen(kSlot7Card), "SLOT 6", "CHATTER", true),
+  check(!pagesClean(m.canvas) && listRowIs(m.canvas, m.row(kSlot7Card), "SLOT 6", "CHATTER", true),
         "menu: a new card in the same slot repaints the row with the new value");
 }
 
@@ -905,7 +933,7 @@ void checkMenuSlot7Click() {
     check(ui::applyAction(a, m.settings, m.layout) == ui::ApplyResult::LayoutChanged && m.layout.card[kSlot7Slot] == order[i],
           (std::string("menu: the cycle moves slot 7 on to ") + values[i]).c_str());
     m.draw();
-    check(cursorRowIs(m.canvas, rowOnScreen(kSlot7Card), kSlot7Card, values[i]),
+    check(cursorRowIs(m.canvas, m.row(kSlot7Card), kSlot7Card, values[i]),
           (std::string("menu: the row shows ") + values[i] + " after the click").c_str());
     RecordData saved;
     saved.settings = m.settings;
@@ -931,7 +959,7 @@ void checkMenuSlot7Click() {
             tight.layout.card[kSlot7Slot] == Card::Gate,
         "menu: the click passes over the card the layout refuses");
   tight.draw();
-  check(cursorRowIs(tight.canvas, rowOnScreen(kSlot7Card), kSlot7Card, "GATE"), "menu: and the row reads the card the cycle landed on");
+  check(cursorRowIs(tight.canvas, tight.row(kSlot7Card), kSlot7Card, "GATE"), "menu: and the row reads the card the cycle landed on");
 }
 
 // With none of the three placed the row reads SLOT - and a click asks for the cycle but changes nothing.
@@ -945,7 +973,7 @@ void checkMenuSlot7NoSlot() {
             m.layout == before && sameSettings(m.settings, Settings()),
         "menu: a click on SLOT - on the slot 7 row changes nothing");
   m.draw();
-  check(listRowIs(m.canvas, rowOnScreen(kSlot7Card), "SLOT -", "GATE", true), "menu: the slot 7 row still reads SLOT - GATE after the click");
+  check(listRowIs(m.canvas, m.row(kSlot7Card), "SLOT -", "GATE", true), "menu: the slot 7 row still reads SLOT - GATE after the click");
 }
 
 // The OLED BRIGHT row sits below TOP SWITCH and above DEBUG, shows HIGH by default, and each click
@@ -1010,6 +1038,76 @@ void checkMenuRowOrder() {
   check(inOrder && kRowCount == 13,
         "menu: the rows run INPUT PAD, SLOT 3, SLOT 4, SLOT 6, SLOT 7, SLOT 8, CLEANUP EQ, OUTPUT PAD, "
         "TOP SWITCH, OLED BRIGHT, DEBUG, UPDATE FIRMWARE, EXIT");
+}
+
+// A valid layout with the swappable families out of enum order: the reverb in slot 3, Unison in slot 4,
+// Gate in slot 7, Octave in slot 8 and no Distortion family card at all.
+Layout reorderedLayout() {
+  Layout l = defaultLayout();
+  std::swap(l.card[kOctaveSlot], l.card[kReverbSlot]);
+  l.card[kSlot6Slot] = Card::Empty;
+  return l;
+}
+
+// The five SLOT rows follow the slot that holds each family's card, lowest first, with SLOT - last, and
+// stay in the five positions after INPUT PAD.
+void checkMenuSlotRowsInSlotOrder() {
+  struct Row {
+    const char* label;
+    const char* value;
+    UiAction click;
+    int slot;  // zero-based slot the click must change, -1 when no slot holds the card
+    SwapSlot family;
+  };
+  const Row rows[] = {{"SLOT 3", "SPRING", UiAction::SwapReverb, kOctaveSlot, SwapSlot::Reverb},
+                      {"SLOT 4", "UNISON", UiAction::SwapUnisonCrowd, kUnisonSlot, SwapSlot::UnisonMob},
+                      {"SLOT 7", "GATE", UiAction::CycleSlot7Card, kSlot7Slot, SwapSlot::Slot7},
+                      {"SLOT 8", "OCTAVE", UiAction::SwapOctaveFormant, kReverbSlot, SwapSlot::OctaveFormant},
+                      {"SLOT -", "DISTORTION", UiAction::SwapDistortionGrowl, -1, SwapSlot::DistortionDeepthroat}};
+
+  check(layoutValid(reorderedLayout()).ok(), "menu: the reordered test layout passes the placement rules");
+
+  MenuRig walk;
+  walk.layout = reorderedLayout();
+  walk.step(0, true);
+  walk.draw();
+  check(listRowIs(walk.canvas, 0, "INPUT PAD", "OFF", true), "menu: on a reordered layout INPUT PAD still leads");
+  bool ordered = true;
+  for (int i = 0; i < 5; ++i) {
+    walk.step(1, false);
+    walk.draw();
+    ordered = ordered && listRowIs(walk.canvas, rowOnScreen(kOctaveFormant + i), rows[i].label, rows[i].value, true);
+    if (i == 3) writePgm(walk.canvas, "oled-menu-slot-order.pgm");
+  }
+  check(ordered, "menu: the SLOT rows read SLOT 3, 4, 7, 8, then SLOT -, in slot order");
+  walk.step(1, false);
+  walk.draw();
+  check(listRowIs(walk.canvas, rowOnScreen(kCleanupEq), "CLEANUP EQ", "OFF", true), "menu: CLEANUP EQ follows the five SLOT rows");
+
+  for (int i = 0; i < 5; ++i) {
+    MenuRig m;
+    m.layout = reorderedLayout();
+    m.step(0, true);
+    m.step(kOctaveFormant + i, false);  // list position i of the SLOT rows, not a family
+    const Layout before = m.layout;
+    const UiAction a = m.step(0, true);
+    const ui::ApplyResult r = ui::applyAction(a, m.settings, m.layout);
+    const std::string name = std::string("menu: a click on ") + rows[i].label + " acts on the family in that slot";
+    bool acted = a == rows[i].click;
+    if (rows[i].slot >= 0) {
+      bool othersSame = true;
+      for (int s = 0; s < kSlotCount; ++s) othersSame = othersSame && (s == rows[i].slot || m.layout.card[s] == before.card[s]);
+      acted = acted && r == ui::ApplyResult::LayoutChanged && m.layout.card[rows[i].slot] != before.card[rows[i].slot] && othersSame;
+    } else {
+      acted = acted && r == ui::ApplyResult::None && m.layout == before;
+    }
+    check(acted, name.c_str());
+    // The swap keeps the family in its slot, so the cursor stays on the same label.
+    m.draw();
+    const std::string stays = std::string("menu: after the click the cursor is still on ") + rows[i].label;
+    check(listRowIs(m.canvas, rowOnScreen(kOctaveFormant + i), rows[i].label, swapWord(m.layout, rows[i].family), true),
+          stays.c_str());
+  }
 }
 
 // The CLEANUP EQ row starts at OFF and steps OFF, LIGHT, STRONG and back to OFF. LIGHT runs the stage
@@ -1129,16 +1227,17 @@ void checkMenuSavedThroughStore() {
 // Until the face is on the panel, nobody can see the menu, so a click or a turn must do nothing.
 void checkMenuDeafUntilListening() {
   Menu menu;
+  const Layout layout = defaultLayout();
   UiInput click;
   click.click = true;
   UiInput turn;
   turn.detents = 3;
-  check(menu.update(click, 100) == UiAction::None && menu.update(turn, 110) == UiAction::None && !menu.open(),
+  check(menu.update(click, 100, layout) == UiAction::None && menu.update(turn, 110, layout) == UiAction::None && !menu.open(),
         "menu: before listen() a click and a turn open nothing");
-  check(menu.update(click, 120) == UiAction::None && !menu.open(), "menu: a second click before listen() flips no setting");
+  check(menu.update(click, 120, layout) == UiAction::None && !menu.open(), "menu: a second click before listen() flips no setting");
   menu.listen();
-  check(menu.update(click, 130) == UiAction::None && menu.open(), "menu: once listening, a click opens the list");
-  check(menu.update(click, 140) == UiAction::ToggleInputJack, "menu: and the list starts on its first row, untouched by the dropped turn");
+  check(menu.update(click, 130, layout) == UiAction::None && menu.open(), "menu: once listening, a click opens the list");
+  check(menu.update(click, 140, layout) == UiAction::ToggleInputJack, "menu: and the list starts on its first row, untouched by the dropped turn");
 }
 
 void checkMenuWrapAndCombo() {
@@ -1270,7 +1369,7 @@ void checkMenuHold() {
   Menu deaf;
   UiInput held;
   held.hold = true;
-  check(deaf.update(held, 100) == UiAction::None && !deaf.open(), "menu: before listen() a hold opens nothing");
+  check(deaf.update(held, 100, defaultLayout()) ==UiAction::None && !deaf.open(), "menu: before listen() a hold opens nothing");
 }
 
 void checkMenuTimeout() {
@@ -1307,7 +1406,7 @@ UiAction pressThrough(MenuRig& m, uint32_t downMs, uint32_t upMs, uint32_t endMs
     in.click = ev.click;
     in.hold = ev.hold;
     in.press = ev.press;
-    const UiAction a = m.menu.update(in, t);
+    const UiAction a = m.menu.update(in, t, m.layout);
     if (a != UiAction::None) last = a;
   }
   m.nowMs = endMs;
@@ -1522,6 +1621,7 @@ void checkMenu() {
   checkMenuBrightnessRow();
   checkMenuDebugRow();
   checkMenuRowOrder();
+  checkMenuSlotRowsInSlotOrder();
   checkMenuCleanupEqSavedAndPlayed();
   checkMenuClicksSavedAndPlayed();
   checkMenuSavedThroughStore();
