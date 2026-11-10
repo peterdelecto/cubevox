@@ -45,7 +45,7 @@ at a time in a Mac emulator that plays a loaded loop through the effect while th
 Use these words or a plain description. Never a coined label (owner 2026-10-24).
 - Enclosure: the box, lid, floor, front wall, rear wall (the back wall), beads, the TPU boot, coupon, solder jig.
 - Panel: slot, pot, bypass toggle, MUTE toggle, MENU (the one encoder), mux, K102 (mute relay), K103 (pad relay).
-- Effects: effect card (a library card), chain, layout, stage, engine, VOX EQ, output trim, soft ceiling.
+- Effects: effect card (a library card), chain, layout, stage, engine, CLEANUP EQ, output trim, soft ceiling.
 - Screens: splash, face, the scope (the voice screen's trace), readout and its value field, MUTED and BYPASS screens, menu, the update screens.
 - Update path: bootloader, update mode, the CUBEVOX drive, DIAG.TXT, boot block, boot report, image header, diag log, stall watch, boot-fail counter.
 - People: the owner, Adam (the singer).
@@ -67,5 +67,5 @@ Slots (Adam 2026-10-07, `docs/specs/2026-10-07-slots-design.md`): 8 effect slots
 Default layout, slot 1 to 8, each card's knobs as upper pot+lower pot; the amount knob (MIX, DEPTH, DRIVE) is the lower pot of every slot (owner 2026-10-30): Input Gain (analog, off the grid) · Input gate Threshold+Decay (-80..-30 dBFS, 20 ms..2 s, owner 2026-10-30) · Autotune Key+Response (NATURAL → MECHANICAL, no mix) · Harmony has no card (owner 2026-10-08) and no engine in the code since 2026-10-24 ·
 Octave Semitones (-12..+12, 25 positions, owner 2026-10-08)+Mix ·
 Unison Rate+Depth · Echo (was Slapback, owner 2026-11-01; id `slapback`) Time (60..250 ms)+Amount (level + repeats) · Distortion Tone+Drive · Gate Threshold+Decay ·
-Reverb Time (decay; replaced Dwell, owner 2026-10-07)+Mix: each engine is its own library card, "Spring Reverb" (SPRING B) in the default layout, "Chasm Reverb" available; the old Spring engine is removed (owner 2026-10-08; the SLOT 8 menu row, was REVERB, swaps Spring and Chasm, owner 2026-11-05) · VOX EQ (menu row) · Output (OUTPUT PAD menu row).
+Reverb Time (decay; replaced Dwell, owner 2026-10-07)+Mix: each engine is its own library card, "Spring Reverb" (SPRING B) in the default layout, "Chasm Reverb" available; the old Spring engine is removed (owner 2026-10-08; the SLOT 8 menu row, was REVERB, swaps Spring and Chasm, owner 2026-11-05) · CLEANUP EQ (menu row: OFF, LIGHT, STRONG) · Output (OUTPUT PAD menu row).
 Library cards that swap in from the SLOT rows of the menu (SLOT 3, 4, 6, 7, 8, in slot order): Formant (slot 3, with Octave), Mob (slot 4, with Unison), Lo-fi and Chatter (slot 7, with Gate), Chasm Reverb (slot 8, with Spring).

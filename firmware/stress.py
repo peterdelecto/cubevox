@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Autonomous CPU stress run for a cubevox box on a clip bench image. Nobody touches the panel.
 
-For each layout the script puts the layout on the box with VOX EQ set to ON+CUTS, its heaviest setting
-(set_layout carries settings.vox_eq "cuts"; the shipped default is off, where the stage's bucket reads
+For each layout the script puts the layout on the box with CLEANUP EQ set to STRONG, its heaviest setting
+(set_layout carries settings.cleanup_eq "strong"; the shipped default is off, where the stage's bucket reads
 near zero and its gate would measure nothing), forces every slot on (bench all_on), plays
 Adam's clip through the chain and measures the per-slot and per-block cycle counters in two passes.
 Pass 1 pins every knob at its top and reads the counters after --seconds. Pass 2 hands the knobs back
@@ -15,13 +15,13 @@ RANGE), both Deepthroat knobs (GROWL, MIX) and, when Crowd is placed, both Crowd
 knobs from 0 % to 100 % of travel in steps of 10 %, 1 s each, reading the counters after each sweep.
 It then flips the toggle of every Echo, Input gate, Gate, Unison, Chatter, Apraxia and Deepthroat
 slot ten times, 0.3 s apart, so the engine starts from reset five times, and reads the counters again. The last step flips BYPASS
-and VOX EQ the same way (bench ops bypass, vox_eq; each leaves the box as it found it) and reads the
-counters once more. The VOX EQ flips force the stage off and back on from ON+CUTS.
+and CLEANUP EQ the same way (bench ops bypass, cleanup_eq; each leaves the box as it found it) and reads the
+counters once more. The CLEANUP EQ flips force the stage off and back on from STRONG.
 
 Per slot the mean is pass 1's mean and the worst is the largest worst over both passes. Across runs
 the mean is the mean of the run means and the worst is the lowest run worst, which is the rule in
 core/costs.h, so a block that caught an interrupt does not count. The fixed path is read the same
-way. VOX EQ comes from the EQ bucket of the stats lines. The fixed path is the block total less the
+way. CLEANUP EQ comes from the EQ bucket of the stats lines. The fixed path is the block total less the
 slot sum for the mean, and for the worst the EQ bucket at its worst plus the rest of the fixed path
 (ceiling, BYPASS mix, conversion) at its mean.
 
@@ -29,21 +29,21 @@ Gates (each named in the output when it fails, exit 1 if any fails):
   1. late blocks, overruns and dry blocks are 0 for the whole run
   2. each placed card's mean % and worst % stay at or under its costs.h row
   3. each layout's block mean stays under 75 % and its block worst under 95 %
-  4. each layout's VOX EQ bucket (at ON+CUTS) stays at or under kVoxEq, and its fixed path mean %
-     and worst % at or under kFixed, the sum of kVoxEq, kSoftCeiling and kBypassMix
+  4. each layout's CLEANUP EQ bucket (at STRONG) stays at or under kCleanupEq, and its fixed path mean %
+     and worst % at or under kFixed, the sum of kCleanupEq, kSoftCeiling and kBypassMix
 Each card's slot is held to its own row. A slot that runs a tracker adds the tracker row: Autotune's slot,
 a Formant or Apraxia slot that does not sit directly behind Autotune, and a Mob or Deepthroat slot with no
 Autotune ahead of it.
 A layout the box refuses is a result row ("refused: <reason>") and is not measured.
 
---dry-run prints the layouts, the VOX EQ setting step, the sweeps, the toggle flips and the fixed-stage
+--dry-run prints the layouts, the CLEANUP EQ setting step, the sweeps, the toggle flips and the fixed-stage
 flips planned for each, with the time they take, and opens no port.
 
 Layouts, by name: default, crowd (Crowd in Unison's slot), chasm (the reverb slot runs Chasm),
 crowd-chasm, octave-alone (the default with Autotune's slot empty), formant (Formant in Octave's slot),
 formant-alone (Formant with Autotune's slot empty), chatter (Chatter in Gate's slot), lofi (Lo-fi in Gate's
 slot), apraxia (Apraxia in Octave's slot), throat (Deepthroat in Distortion's slot) and heaviest (Input gate, Formant, Unison and
-Crowd, Gate, Distortion, Chatter and the default reverb, with the reverb on Chasm). The saved layout and VOX EQ setting are read first and put back at the end,
+Crowd, Gate, Distortion, Chatter and the default reverb, with the reverb on Chasm). The saved layout and CLEANUP EQ setting are read first and put back at the end,
 together with slots_live,
 knobs_live, clip off and the reverb engine, even when the run fails.
 
@@ -90,12 +90,12 @@ FLIPPED_CARDS = ("slapback", "input_gate", "gate", "unison", "bloom", "formant_f
 # The fixed stages' levers, as (bench op, label, the line the box prints with the flag set, with it clear).
 FIXED_LEVERS = (
     ("bypass", "BYPASS", "[bench] BYPASS held on", "[bench] BYPASS follows the top switch"),
-    ("vox_eq", "VOX EQ", "[bench] VOX EQ forced off", "[bench] VOX EQ follows the menu"),
+    ("cleanup_eq", "CLEANUP EQ", "[bench] CLEANUP EQ forced off", "[bench] CLEANUP EQ follows the menu"),
 )
-# The words of the protocol's vox_eq setting, and the one every layout runs at: ON+CUTS is the heaviest
-# setting, and at the shipped default (off) the VOX EQ bucket reads near zero and gates nothing.
-VOX_EQ_WORDS = ("off", "on", "cuts")
-STRESS_VOX_EQ = "cuts"
+# The words of the protocol's cleanup_eq setting, and the one every layout runs at: STRONG is the heaviest
+# setting, and at the shipped default (off) the CLEANUP EQ bucket reads near zero and gates nothing.
+CLEANUP_EQ_WORDS = ("off", "light", "strong")
+STRESS_CLEANUP_EQ = "strong"
 SETTLE_S = 1.5       # the 50 ms fade out and in of a layout change, and the engine clears
 REPLY_WAIT_S = 5.0
 PORT_WAIT_S = 30.0
@@ -117,8 +117,8 @@ FORMANT_CARDS = ("formant", "formant_follow")  # Formant and Apraxia play one vo
 READERS = ("crowd", "growl")  # cards that read Autotune's tracker when one sits ahead and run their own otherwise
 NEEDED_OPS = ("slots_live", "all_on", "slot_off", "knobs_live", "pin_knobs", "set_knob", "reset_peaks", "stats",
               "clip", "chasm", *(lever[0] for lever in FIXED_LEVERS))
-# The fixed path's rows: VOX EQ is read from its bucket, and the three add to kFixed.
-FIXED_PARTS = ("kVoxEq", "kSoftCeiling", "kBypassMix")
+# The fixed path's rows: CLEANUP EQ is read from its bucket, and the three add to kFixed.
+FIXED_PARTS = ("kCleanupEq", "kSoftCeiling", "kBypassMix")
 FIXED_ROW = "kFixed"
 
 COST_ROW = re.compile(r"constexpr\s+Cost\s+(k\w+)\s*\{\s*(\d+)\s*,\s*(\d+)\s*,\s*(?:true|false)\s*\}")
@@ -374,20 +374,20 @@ class Box:
                 self.flip_lever(op)
 
     def get_layout(self):
-        """(name, slots, VOX EQ setting word) of the box's saved state."""
+        """(name, slots, CLEANUP EQ setting word) of the box's saved state."""
         reply = self.ask("get_layout")
         layout = reply.get("layout")
         if reply.get("ok") is not True or not isinstance(layout, dict) or "slots" not in layout:
             raise StressError(f"get_layout: {str(reply)[:160]}")
         settings = reply.get("settings")
-        vox_eq = settings.get("vox_eq") if isinstance(settings, dict) else None
-        if vox_eq not in VOX_EQ_WORDS:
-            raise StressError(f"get_layout: no vox_eq setting in the reply: {str(reply)[:160]}")
-        return layout["name"], layout["slots"], vox_eq
+        cleanup_eq = settings.get("cleanup_eq") if isinstance(settings, dict) else None
+        if cleanup_eq not in CLEANUP_EQ_WORDS:
+            raise StressError(f"get_layout: no cleanup_eq setting in the reply: {str(reply)[:160]}")
+        return layout["name"], layout["slots"], cleanup_eq
 
-    def set_layout(self, name, slots, vox_eq):
-        """Puts the layout and the VOX EQ setting on the box. None on success, else the box's reason for refusing."""
-        reply = self.ask("set_layout", name=name, slots=slots, settings={"vox_eq": vox_eq})
+    def set_layout(self, name, slots, cleanup_eq):
+        """Puts the layout and the CLEANUP EQ setting on the box. None on success, else the box's reason for refusing."""
+        reply = self.ask("set_layout", name=name, slots=slots, settings={"cleanup_eq": cleanup_eq})
         if reply.get("ok") is True:
             self.wait(SETTLE_S)
             return None
@@ -560,7 +560,7 @@ def run_layout(box, name, slots, chasm, runs, seconds):
     result = {"name": name, "slots": slots, "chasm": chasm}
     done = []
     try:
-        refusal = box.set_layout(f"stress {name}", slots, STRESS_VOX_EQ)
+        refusal = box.set_layout(f"stress {name}", slots, STRESS_CLEANUP_EQ)
         if refusal:
             result["refused"] = refusal
             return result
@@ -581,9 +581,9 @@ def run_layout(box, name, slots, chasm, runs, seconds):
 # -- gates and reports
 
 def judge_fixed(agg, rows, label, table, gates):
-    """Adds the fixed stages to the table and holds each to its row: the EQ bucket to kVoxEq, and the
+    """Adds the fixed stages to the table and holds each to its row: the EQ bucket to kCleanupEq, and the
     fixed path to kFixed, the sum of the three fixed rows."""
-    parts = (("VOX EQ", "eq", "kVoxEq"), ("fixed path", "fixed", FIXED_ROW))
+    parts = (("CLEANUP EQ", "eq", "kCleanupEq"),("fixed path", "fixed", FIXED_ROW))
     for name, key, row_name in parts:
         row_mean, row_worst = rows[row_name]
         over = []
@@ -742,7 +742,7 @@ def preflight(box):
     return hello
 
 
-def restore(port, box, name, slots, vox_eq):
+def restore(port, box, name, slots, cleanup_eq):
     """Puts the box back as it was and returns the steps that failed. A lost port gets one reopen."""
     try:
         box.ask("hello")
@@ -764,7 +764,7 @@ def restore(port, box, name, slots, vox_eq):
         ("fixed-stage flags", box.clear_levers),
         ("clip off", lambda: box.set_clip(False)),
         ("reverb engine", lambda: restore_chasm(box)),
-        ("saved layout and VOX EQ", lambda: restore_layout(box, name, slots, vox_eq)),
+        ("saved layout and CLEANUP EQ", lambda: restore_layout(box, name, slots, cleanup_eq)),
     ]
     for label, step in steps:
         try:
@@ -783,12 +783,12 @@ def restore_chasm(box):
     box.set_chasm(box.start_chasm)
 
 
-def restore_layout(box, name, slots, vox_eq):
+def restore_layout(box, name, slots, cleanup_eq):
     if name is None:
         return
-    if box.get_layout() == (name, slots, vox_eq):
+    if box.get_layout() == (name, slots, cleanup_eq):
         return
-    refusal = box.set_layout(name, slots, vox_eq)
+    refusal = box.set_layout(name, slots, cleanup_eq)
     if refusal:
         raise StressError(f"the box refused the saved layout: {refusal}")
 
@@ -801,7 +801,7 @@ def plan_lines(name, slots, chasm, runs, seconds, rows):
     for i, (card, bound) in enumerate(zip(slots, bounds)):
         if bound is not None:
             out.append(f"  bound: slot {i + 1} {card}{'*' if i in trackers else ''} mean {bound[0]} %, worst {bound[1]} %")
-    out.append(f'  setting: VOX EQ at ON+CUTS (vox_eq "{STRESS_VOX_EQ}") for the whole run; the box\'s own setting goes back after')
+    out.append(f'  setting: CLEANUP EQ at STRONG (cleanup_eq "{STRESS_CLEANUP_EQ}") for the whole run; the box\'s own setting goes back after')
     out.append(f"  pass 1: knobs at top, {seconds:g} s")
     for sweep in sweeps(slots):
         extra = f", partner knob {sweep.partner} stepped inside the glide" if sweep.partner else ""
@@ -848,7 +848,7 @@ def main():
     if a.dry_run:
         return dry_run(wanted, a.runs, a.seconds)
 
-    box = start_name = start_slots = start_vox_eq = hello = None
+    box = start_name = start_slots = start_cleanup_eq = hello = None
     results, failed_restore, code = [], [], 1
     try:
         rows = read_rows()
@@ -857,8 +857,8 @@ def main():
             flash(a.clip, a.port)
         box = open_box(a.port, PORT_WAIT_S)
         hello = preflight(box)
-        start_name, start_slots, start_vox_eq = box.get_layout()
-        say(f"box fw {hello.get('fw')}, saved layout {start_name!r}: {' '.join(start_slots)}, VOX EQ {start_vox_eq}")
+        start_name, start_slots, start_cleanup_eq = box.get_layout()
+        say(f"box fw {hello.get('fw')}, saved layout {start_name!r}: {' '.join(start_slots)}, CLEANUP EQ {start_cleanup_eq}")
         for name in wanted:
             slots, chasm = table[name]
             result = run_layout(box, name, slots, chasm, a.runs, a.seconds)
@@ -876,7 +876,7 @@ def main():
         print("[ERROR] interrupted", file=sys.stderr)
     finally:
         if box is not None and box.armed:
-            failed_restore = restore(a.port, box, start_name, start_slots, start_vox_eq)
+            failed_restore = restore(a.port, box, start_name, start_slots, start_cleanup_eq)
         for step in failed_restore:
             print(f"[ERROR] restore failed: {step}", file=sys.stderr)
         if box is not None:

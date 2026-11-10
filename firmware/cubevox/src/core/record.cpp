@@ -22,7 +22,7 @@ Card cardFromField(const uint8_t* field, bool& known) {
 // Reads the settings bytes. A v1 record carries only the first two, so the later settings keep
 // the defaults already in `s`. A v2 record written before the debug byte existed holds 0 there,
 // which reads as OFF, one written before the brightness byte holds 0 there, which reads as the
-// default level, and one written before the VOX EQ byte holds 0 there, which reads as OFF. The
+// default level, and one written before the CLEANUP EQ byte holds 0 there, which reads as OFF. The
 // retired bytes are not read. False when a byte is out of range.
 bool decodeSettings(const uint8_t* b, uint16_t schema, Settings& s) {
   const uint8_t output = b[kOffOutputLevel];
@@ -33,15 +33,15 @@ bool decodeSettings(const uint8_t* b, uint16_t schema, Settings& s) {
   s.inputJack = static_cast<InputJack>(jack);
   if (schema == kRecordSchemaV1) return true;
 
-  const uint8_t vox = b[kOffVoxEq];
+  const uint8_t eq = b[kOffCleanupEq];
   const uint8_t top = b[kOffTopSwitch];
   const uint8_t debug = b[kOffDebug];
   const uint8_t brightness = b[kOffBrightness];
   if (debug > 1) return false;
-  if (vox > static_cast<uint8_t>(VoxEq::Cuts)) return false;
+  if (eq > static_cast<uint8_t>(CleanupEq::Strong)) return false;
   if (top > static_cast<uint8_t>(TopSwitch::Bypass)) return false;
   if (brightness > kBrightnessLevels.size()) return false;
-  s.voxEq = static_cast<VoxEq>(vox);
+  s.cleanupEq = static_cast<CleanupEq>(eq);
   s.topSwitch = static_cast<TopSwitch>(top);
   s.debug = debug != 0;
   if (brightness != 0) s.brightness = static_cast<Brightness>(brightness - 1);
@@ -65,7 +65,7 @@ RecordBytes encodeRecord(const RecordData& rec) {
   b[kOffTopSwitch] = static_cast<uint8_t>(rec.settings.topSwitch);
   b[kOffDebug] = rec.settings.debug ? 1 : 0;
   b[kOffBrightness] = static_cast<uint8_t>(static_cast<uint8_t>(rec.settings.brightness) + 1);
-  b[kOffVoxEq] = static_cast<uint8_t>(rec.settings.voxEq);
+  b[kOffCleanupEq] = static_cast<uint8_t>(rec.settings.cleanupEq);
   put32(b.data() + kOffCrc, crc32(b.data(), kOffCrc));
   return b;
 }

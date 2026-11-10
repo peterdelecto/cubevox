@@ -15,7 +15,7 @@
 // runs, so interrupt time landing in a block does not count. Chasm is costed in the reverb slot.
 // The tail after the slots (EQ, ceiling, BYPASS mix, conversion) has its own rows, read from the
 // kStatEq bucket and the block total minus the slots. The kStatEq bucket holds both halves of
-// VOX EQ, the front half ahead of the slots and the back half after them.
+// CLEANUP EQ, the front half ahead of the slots and the back half after them.
 //
 // A host figure converts to a board estimate at 50.4k board cycles per host microsecond, which is
 // 7.875 % of a block. The pitch slot's code runs at fewer cycles per host microsecond, 24k to 29k
@@ -26,7 +26,7 @@
 // against the stress run.
 //
 // A row marked false is an estimate. firmware/stress.py turns one true: it reads the card's slot
-// counters across its sweeps and toggle flips, and the fixed path across its BYPASS and VOX EQ
+// counters across its sweeps and toggle flips, and the fixed path across its BYPASS and CLEANUP EQ
 // flips, and gates each against its row. The row then takes the stress run's mean and its
 // lowest run worst, rounded up, with the date and the layouts in its comment.
 //
@@ -129,15 +129,15 @@ constexpr Cost kBloom{2, 4, true};     // 11.7k to 12.0k / 22.9k to 23.4k, stres
 // and pays a tracker of its own with no Autotune ahead. Its row is the card's slot measured on the box.
 constexpr Cost kGrowl{5, 8, true};  // 24.5k / 46.4k, stress run 2026-11-10 (v2.01.85, throat layout: mean 3.8 %, worst 7.26 %, lowest of two runs, which the old worst of 7 failed); the 2026-11-05 run (v2.01.51-bench) read 25.7k / 42.7k
 
-// What every block spends whatever the layout: VOX EQ's front half ahead of the slots, and the
-// tail after them. stress.py gates the VOX EQ bucket, at ON+CUTS (both halves), against kVoxEq. The
+// What every block spends whatever the layout: CLEANUP EQ's front half ahead of the slots, and the
+// tail after them. stress.py gates the CLEANUP EQ bucket, at STRONG (both halves), against kCleanupEq. The
 // stress run of 2026-11-05 read the rest of the fixed path, SOFT CEILING and BYPASS mix, at about
 // 0.9 % mean combined. Those two rows stay estimates. stress.py gates the whole fixed path against
 // kFixed, the sum of the three rows.
-constexpr Cost kVoxEq{3, 4, true};       // 13.5k to 13.9k / 20.9k to 21.1k, stress run 2026-11-10 (v2.01.85, all 13 layouts: mean 2.11 to 2.17 %, worst 3.26 to 3.29 %; the 40 Hz subsonic high-pass of v2.01.59 added the rise from the 2026-11-05 run, v2.01.40: 10.9k / 15.0k to 15.1k)
+constexpr Cost kCleanupEq{3, 4, true};   // 13.5k to 13.9k / 20.9k to 21.1k, stress run 2026-11-10 (v2.01.85, all 13 layouts: mean 2.11 to 2.17 %, worst 3.26 to 3.29 %; the 40 Hz subsonic high-pass of v2.01.59 added the rise from the 2026-11-05 run, v2.01.40: 10.9k / 15.0k to 15.1k)
 constexpr Cost kSoftCeiling{1, 1, false};  // est.: a compare per sample; tanh only past -2 dBFS
 constexpr Cost kBypassMix{1, 1, false};    // est.: the dry copy, the input energy sum, the BYPASS fade
-constexpr Cost kFixed = kVoxEq + kSoftCeiling + kBypassMix;
+constexpr Cost kFixed = kCleanupEq + kSoftCeiling + kBypassMix;
 
 constexpr uint8_t kBudgetAvgPercent = 75;
 constexpr uint8_t kBudgetWorstPercent = 95;

@@ -107,7 +107,7 @@ includes are tier-qualified (`core/registry.h`, `board/pins.h`, `ui/menu.h`). Mo
    `panel_test`, `bench_ops` (the op table), `timing.h` (switch, relay and mute times, `Every`),
    `loop_policy.h` (`PublishGate`, `FallingEdge` with its `CanvasHandoff` name, `ResetWait`).
 3. Sound path: `compose` (`ChainSnapshot` from layout, panel, settings and bench overrides), `chain_run` (the
-   VOX EQ's two halves, the slot walk, the NaN guard and the BYPASS mix, over the engines and buffers the board hands in),
+   CLEANUP EQ's two halves, the slot walk, the NaN guard and the BYPASS mix, over the engines and buffers the board hands in),
    `output_stage` (the NaN guard and the output gain ramp), `audio_recovery` (when a faulted stream restarts: at
    most 3 times in 60 s; the next fault, or a restart that fails, resets the box).
 4. Display: `canvas` (128 x 64 page-layout frame buffer with dirty pages, ordered dissolve), `fonts` (the font
@@ -302,7 +302,7 @@ DrumSynthV3 are references to read, and nothing in `firmware/` is copied from th
      the release image does not contain the code): `slot_off`, `slots_on`, `slot_on`, `all_on`, `slots_live`,
      `pin_knobs`, `set_knob`, `knobs_live`, `chasm`, `clip`, `reset_peaks`, `stop_audio`, `fault`, `spin`,
      `record_save`, `record_erase`, `panel_test`, `panel_summary`, `panel_dump`, `panel_jack`, `panel_mute`,
-     `panel_oled`, `bypass`, `vox_eq`, `stream_fault`, `fail_restart`. `stream_fault` stops the
+     `panel_oled`, `bypass`, `cleanup_eq`, `stream_fault`, `fail_restart`. `stream_fault` stops the
      RX stream and reports a DMA error through the HAL's error callback, the way a DMA error that stops the
      stream arrives, so `audioPoll` restarts the stream or, past the budget, resets the box. `fail_restart`
      flips whether the next restart is refused as a failed DMA start (`[bench] the next stream restart fails`

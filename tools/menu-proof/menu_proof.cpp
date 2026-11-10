@@ -99,7 +99,7 @@ struct Settings {
 
 std::string rowText(int row, const Settings& s) {
   switch (row) {
-    case 0: return std::string("VOX EQ ") + (s.eq ? "ON" : "OFF");
+    case 0: return std::string("CLEANUP EQ ") + (s.eq ? "LIGHT" : "OFF");
     case 1: return std::string("OUT ") + (s.out ? "INSTRUMENT" : "LINE");
     case 2: return std::string("INPUT ") + (s.in ? "PEDAL" : "MIC");
     case 3: return std::string("TOP SWITCH ") + (s.top ? "BYPASS" : "MUTE");
@@ -205,7 +205,7 @@ std::vector<Scene> buildScenes() {
 
   Settings a = s, b = s;
   a.eq = false;
-  scenes.push_back(toggleScene("R1", "vox-eq", "R1  VOX EQ", 0, a, b, "CLICK, ON TO OFF", "CLICK, OFF TO ON"));
+  scenes.push_back(toggleScene("R1", "cleanup-eq", "R1  CLEANUP EQ", 0, a, b, "CLICK, LIGHT TO OFF", "CLICK, OFF TO LIGHT"));
   a = s; a.out = 1;
   scenes.push_back(toggleScene("R2", "out", "R2  OUT", 1, a, b, "CLICK, TO INSTRUMENT", "CLICK, TO LINE"));
   a = s; a.in = 1;

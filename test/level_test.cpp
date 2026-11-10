@@ -868,8 +868,8 @@ bool slotRows(const Signal& in) {
   return ok;
 }
 
-// VOX EQ's two halves in series, as the box runs them around the slots. `cuts` picks ON+CUTS (true)
-// or ON (false).
+// CLEANUP EQ's two halves in series, as the box runs them around the slots. `cuts` picks STRONG (true)
+// or LIGHT (false).
 struct EqHalves {
   cv::Polish eq;
   cv::PolishParams params;
@@ -885,7 +885,7 @@ struct EqHalves {
   }
 };
 
-// VOX EQ (both halves) at ON and at ON+CUTS on Adam's clips. Each holds the mid band per clip and the
+// CLEANUP EQ (both halves) at LIGHT and at STRONG on Adam's clips. Each holds the mid band per clip and the
 // rule on the mean.
 bool tailClipRows() {
   double mean = 0.0;
@@ -898,14 +898,14 @@ bool tailClipRows() {
   };
   bool ok = true;
   for (const bool cuts : {false, true}) {
-    const std::string eqName = cuts ? "vox EQ ON+CUTS" : "vox EQ ON";
+    const std::string eqName = cuts ? "cleanup EQ STRONG" : "cleanup EQ LIGHT";
     ok &= clipRows(eqName.c_str(), eqOnly(cuts), kMidLoDb, kMidHiDb, mean, count);
     if (count > 0) ok &= verdict((eqName + " mean").c_str(), mean, kLoDb, kHiDb);
   }
   return ok;
 }
 
-// The two EQ halves in series on the -18 dBFS program, at ON and at ON+CUTS. The trim in the tuning
+// The two EQ halves in series on the -18 dBFS program, at LIGHT and at STRONG. The trim in the tuning
 // is set for the pair.
 bool tailRows(const Signal& in) {
   bool ok = true;
@@ -913,7 +913,7 @@ bool tailRows(const Signal& in) {
     cv::PolishParams eq;
     eq.cuts = cuts;
     auto polish = std::make_unique<Stage<cv::Polish>>();
-    ok &= check(cuts ? "vox EQ ON+CUTS defaults" : "vox EQ ON defaults", in, [&](const float* i, float* o, int n) {
+    ok &= check(cuts ? "cleanup EQ STRONG defaults" : "cleanup EQ LIGHT defaults", in, [&](const float* i, float* o, int n) {
       float tmp[cv::kBlock];
       polish->fx.processFront(i, tmp, n, eq);
       polish->fx.processBack(tmp, o, n, eq);

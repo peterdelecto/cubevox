@@ -354,15 +354,15 @@ bool parseTopSwitch(const char*& p, Fields& f) {
                            "top_switch must be \"mute\" or \"bypass\"");
 }
 
-bool parseVoxEq(const char*& p, Fields& f) {
-  static constexpr SettingsWord<VoxEq> kWords[] = {
-      {"off", VoxEq::Off}, {"on", VoxEq::On}, {"cuts", VoxEq::Cuts}};
-  return parseSettingsWord(p, f, kWords, f.req.settings.voxEq, kGivenVoxEq,
-                           "vox_eq must be \"off\", \"on\" or \"cuts\"");
+bool parseCleanupEq(const char*& p, Fields& f) {
+  static constexpr SettingsWord<CleanupEq> kWords[] = {
+      {"off", CleanupEq::Off}, {"light", CleanupEq::Light}, {"strong", CleanupEq::Strong}};
+  return parseSettingsWord(p, f, kWords, f.req.settings.cleanupEq, kGivenCleanupEq,
+                           "cleanup_eq must be \"off\", \"light\" or \"strong\"");
 }
 
 bool parseSettingsField(const char*& p, const char* key, Fields& f) {
-  if (strcmp(key, "vox_eq") == 0) return parseVoxEq(p, f);
+  if (strcmp(key, "cleanup_eq") == 0) return parseCleanupEq(p, f);
   if (strcmp(key, "top_switch") == 0) return parseTopSwitch(p, f);
   return skipValue(p, 1);
 }
@@ -569,16 +569,16 @@ void writeLayout(Writer& w, const char* name, const Layout& layout) {
   w.write("]}", 2);
 }
 
-const char* voxEqWord(VoxEq v) {
+const char* cleanupEqWord(CleanupEq v) {
   switch (v) {
-    case VoxEq::On: return "on";
-    case VoxEq::Cuts: return "cuts";
+    case CleanupEq::Light: return "light";
+    case CleanupEq::Strong: return "strong";
     default: return "off";
   }
 }
 
 void writeSettings(Writer& w, const Settings& s) {
-  w.format("{\"vox_eq\":\"%s\",\"top_switch\":\"%s\"}", voxEqWord(s.voxEq),
+  w.format("{\"cleanup_eq\":\"%s\",\"top_switch\":\"%s\"}", cleanupEqWord(s.cleanupEq),
            s.topSwitch == TopSwitch::Bypass ? "bypass" : "mute");
 }
 
@@ -699,7 +699,7 @@ bool parseRequest(const char* line, Request& req, char* err, size_t errSize, boo
 }
 
 void applySettings(const Request& req, Settings& current) {
-  if (req.settingsGiven & kGivenVoxEq) current.voxEq = req.settings.voxEq;
+  if (req.settingsGiven & kGivenCleanupEq) current.cleanupEq = req.settings.cleanupEq;
   if (req.settingsGiven & kGivenTopSwitch) current.topSwitch = req.settings.topSwitch;
 }
 

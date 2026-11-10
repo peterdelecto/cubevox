@@ -43,7 +43,7 @@ enum class Item : uint8_t {
   DistortionGrowl,
   Slot7Card,
   Reverb,
-  VoxEq,
+  CleanupEq,
   Output,
   TopSwitch,
   Brightness,
@@ -106,7 +106,7 @@ const char* itemLabel(Item it, const Layout& layout, char* buf, size_t size) {
     case Item::UnisonCrowd:
     case Item::DistortionGrowl:
     case Item::Slot7Card: return slotLabel(swapSlotOf(layout, swapSlotOfItem(it)), buf, size);
-    case Item::VoxEq: return "VOX EQ";
+    case Item::CleanupEq: return "CLEANUP EQ";
     case Item::Debug: return "DEBUG";
     case Item::UpdateFirmware: return "UPDATE FIRMWARE";
     case Item::Exit: return "EXIT";
@@ -117,10 +117,10 @@ const char* itemLabel(Item it, const Layout& layout, char* buf, size_t size) {
 
 const char* onOff(bool on) { return on ? "ON" : "OFF"; }
 
-const char* voxEqValue(VoxEq v) {
+const char* cleanupEqValue(CleanupEq v) {
   switch (v) {
-    case VoxEq::On: return "ON";
-    case VoxEq::Cuts: return "ON+CUTS";
+    case CleanupEq::Light: return "LIGHT";
+    case CleanupEq::Strong: return "STRONG";
     default: return "OFF";
   }
 }
@@ -137,7 +137,7 @@ const char* itemValue(Item it, const UiContext& ctx) {
     case Item::UnisonCrowd:
     case Item::DistortionGrowl:
     case Item::Slot7Card: return swapWord(ctx.layout, swapSlotOfItem(it));
-    case Item::VoxEq: return voxEqValue(s.voxEq);
+    case Item::CleanupEq: return cleanupEqValue(s.cleanupEq);
     case Item::Debug: return onOff(s.debug);
     case Item::UpdateFirmware: return ">";
     default: return "";
@@ -222,7 +222,7 @@ UiAction Menu::onClick() {
         case Item::UnisonCrowd: return UiAction::SwapUnisonCrowd;
         case Item::DistortionGrowl: return UiAction::SwapDistortionGrowl;
         case Item::Slot7Card: return UiAction::CycleSlot7Card;
-        case Item::VoxEq: return UiAction::CycleVoxEq;
+        case Item::CleanupEq: return UiAction::CycleCleanupEq;
         case Item::Debug: return UiAction::ToggleDebug;
         case Item::UpdateFirmware: mode_ = Mode::ConfirmDfu; break;
         case Item::Exit: mode_ = Mode::Idle; break;

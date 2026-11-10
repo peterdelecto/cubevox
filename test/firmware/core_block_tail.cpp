@@ -1,5 +1,5 @@
 // Checks the audio block's tail on the host: the output gain ramp, the soft ceiling ahead of the trim,
-// the loop that shapes a block for the DAC, the guard in front of VOX EQ's back half, and the block
+// the loop that shapes a block for the DAC, the guard in front of CLEANUP EQ's back half, and the block
 // flow the board and the host share (the late block's dry pass and its blends, the runaway block that
 // the guard cuts, and the engines that restart clean after it).
 
@@ -234,13 +234,13 @@ struct StillClock {
   uint32_t operator()() { return 0; }
 };
 
-// Every knob at 0.5 and every toggle on, with VOX EQ (at ON+CUTS) and OUTPUT PAD as given.
+// Every knob at 0.5 and every toggle on, with CLEANUP EQ (at STRONG) and OUTPUT PAD as given.
 ChainSnapshot snapshotOf(const Layout& layout, bool eq, bool mic) {
   PanelReading panel;
   panel.toggle.fill(true);
   for (auto& slot : panel.knob) slot.fill(0.5f);
   Settings settings;
-  settings.voxEq = eq ? VoxEq::Cuts : VoxEq::Off;
+  settings.cleanupEq = eq ? CleanupEq::Strong : CleanupEq::Off;
   if (mic) settings.outputLevel = OutputLevel::Mic;
   return composeSnapshot(layout, panel, settings, BenchOverrides());
 }
@@ -370,7 +370,7 @@ Block runWithPoison(const ChainSnapshot& snap, int blocks, int poisonAt, const B
 }
 
 // A slot's runaway block, whatever its shape, is cut and counted, and the box then plays exactly what
-// a clean box plays. VOX EQ is off, because the poison enters at the input and would reach its front
+// a clean box plays. CLEANUP EQ is off, because the poison enters at the input and would reach its front
 // half, which the ADC cannot do.
 void checkRunawayRecovers() {
   const ChainSnapshot snap = snapshotOf(emptyLayout(), false, false);
@@ -476,7 +476,7 @@ void checkScopeAheadOfTrim() {
   check(same && outputsDiffer, "scope ring: an OUTPUT PAD setting that changes the output leaves the ring the same");
 }
 
-// The default layout with every knob at 0.5 and the toggles as given, VOX EQ off.
+// The default layout with every knob at 0.5 and the toggles as given, CLEANUP EQ off.
 ChainSnapshot defaultWith(const Layout& layout, const std::array<bool, kSlotCount>& on) {
   PanelReading panel;
   panel.toggle = on;

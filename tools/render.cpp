@@ -1,5 +1,5 @@
-// cubevox-render: loop in, the front half of VOX EQ, gates + autotune + formant + octave + crowd +
-// unison + slapback + growl + distortion + gate + lofi + bloom + reverb, then the back half of VOX EQ
+// cubevox-render: loop in, the front half of CLEANUP EQ, gates + autotune + formant + octave + crowd +
+// unison + slapback + growl + distortion + gate + lofi + bloom + reverb, then the back half of CLEANUP EQ
 // and the output ceiling like the box, processed mono 48 kHz f32 WAV out.
 
 #include <cmath>
@@ -83,7 +83,7 @@ int usage() {
                "       [--ingate <-80..-30 dB>] [--gate <-70..-10 dB>]\n"
                "       [--lofi <0..1>, the AMOUNT pot] [--lofi-tone <0..1>, the TONE pot]\n"
                "       [--amount <0..1>] [--length <20..3000 ms>]\n"
-               "       [--vox-eq off|on|cuts] [--ceiling-stats]\n"
+               "       [--cleanup-eq off|light|strong] [--ceiling-stats]\n"
                "       [--eqdip <150..600 hz>,<-6..0 db>] [--eqpres <2000..6000 hz>,<0..6 db>]\n"
                "  autotune runs with --autotune, formant with --formant, octave with --octave, in that order, each on the\n"
                "  output of the one before it\n"
@@ -111,10 +111,10 @@ int usage() {
                "  its own input, which is also its dry path\n"
                "  the box's output ceiling, bit-exact below -2 dBFS, always runs after the last stage\n"
                "  ingate and gate run only with their flag; a flag enables that gate at that threshold\n"
-               "  VOX EQ's front half (40 Hz subsonic high-pass, de-esser, and with cuts the 70 Hz high-pass and 6 kHz low-pass) runs ahead of every\n"
+               "  CLEANUP EQ's front half (40 Hz subsonic high-pass, de-esser, and at strong the 70 Hz high-pass and 6 kHz low-pass) runs ahead of every\n"
                "  stage and its back half (300 Hz dip, 3.5 kHz presence, trim) runs after the last stage\n"
-               "  the eq runs by default at cuts (the box's menu default is off); --vox-eq off switches both halves out\n"
-               "  for A/B listening, --vox-eq on runs the eq without the cuts\n"
+               "  the eq runs by default at strong (the box's menu default is off); --cleanup-eq off switches both halves out\n"
+               "  for A/B listening, --cleanup-eq light runs the eq without the 70 Hz high-pass and 6 kHz low-pass\n"
                "  --ceiling-stats prints the output ceiling's peaks in and out and the samples past its knee\n"
                "  k: baseDelayMs0 baseDelayMs1 lfoHz0 lfoHz1 swingMinMs swingMaxMs wetMaxDb trimDb\n"
                "     topFrom topSwingGain topWetDb\n"
@@ -546,12 +546,12 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
       haveBloom = true;
     } else if (std::strcmp(a, "--ceiling-stats") == 0) {
       rp.ceilingStats = true;
-    } else if (std::strcmp(a, "--vox-eq") == 0 && i + 1 < argc) {
+    } else if (std::strcmp(a, "--cleanup-eq") == 0 && i + 1 < argc) {
       const char* v = argv[++i];
-      if (std::strcmp(v, "cuts") == 0) {
+      if (std::strcmp(v, "strong") == 0) {
         rp.eqOn = true;
         rp.eq.cuts = true;
-      } else if (std::strcmp(v, "on") == 0) {
+      } else if (std::strcmp(v, "light") == 0) {
         rp.eqOn = true;
         rp.eq.cuts = false;
       } else if (std::strcmp(v, "off") == 0) {

@@ -97,13 +97,13 @@ Layout layoutOf(std::initializer_list<Card> cards) {
   return layout;
 }
 
-// Turns every toggle on, puts every knob at `knob` and sets VOX EQ to ON+CUTS when `eq`, else OFF.
+// Turns every toggle on, puts every knob at `knob` and sets CLEANUP EQ to STRONG when `eq`, else OFF.
 ChainSnapshot snapshotFor(const Layout& layout, float knob, bool eq) {
   PanelReading panel;
   panel.toggle.fill(true);
   for (auto& slot : panel.knob) slot.fill(knob);
   Settings settings;
-  settings.voxEq = eq ? VoxEq::Cuts : VoxEq::Off;
+  settings.cleanupEq = eq ? CleanupEq::Strong : CleanupEq::Off;
   return composeSnapshot(layout, panel, settings, BenchOverrides());
 }
 
@@ -123,7 +123,7 @@ Run runBlock(Rig& rig, const ChainSnapshot& snap, const Block& in, Clock clock) 
 }
 
 // Runs the chain by hand on `rig`'s own engines, with a fresh buffer per stage and a plain copy in
-// between. The front half of VOX EQ goes first, then the slots, then the back half of VOX EQ.
+// between. The front half of CLEANUP EQ goes first, then the slots, then the back half of CLEANUP EQ.
 Block byHand(Rig& rig, const ChainSnapshot& snap, const Block& in) {
   Block cur = in;
   Block next{};
@@ -195,7 +195,7 @@ void checkEmptyAndPitchCards() {
 }
 
 // The walk equals the chain run by hand, whichever side the last writing stage left the block on.
-// VOX EQ is on, so a finished block left in the scratch buffer would miss the back half's dip,
+// CLEANUP EQ is on, so a finished block left in the scratch buffer would miss the back half's dip,
 // presence and trim and differ by much more than the tolerance.
 void checkWalkAgainstHand() {
   constexpr float kTolerance = 1e-5f;
@@ -222,7 +222,7 @@ void checkWalkAgainstHand() {
   }
 }
 
-// With nothing in the slots and VOX EQ off, the block passes bit for bit.
+// With nothing in the slots and CLEANUP EQ off, the block passes bit for bit.
 void checkEmptyChain() {
   const ChainSnapshot snap = snapshotFor(layoutOf({}), 0.5f, false);
   auto rig = newRig();
@@ -231,10 +231,10 @@ void checkEmptyChain() {
     const Block in = tone(b, 0.3f);
     same = same && runBlock(*rig, snap, in, StillClock()).out == in;
   }
-  check(same, "chain: an empty layout with VOX EQ off passes the block untouched");
+  check(same, "chain: an empty layout with CLEANUP EQ off passes the block untouched");
 }
 
-// With VOX EQ off, nothing runs between the guard and the end of the chain, so the chain's output is
+// With CLEANUP EQ off, nothing runs between the guard and the end of the chain, so the chain's output is
 // the block the guard passed, bit for bit, whichever buffer the last writing slot left it in.
 void checkOffTailIsGuardedBlock() {
   const std::initializer_list<std::initializer_list<Card>> layouts = {
@@ -256,7 +256,7 @@ void checkOffTailIsGuardedBlock() {
       same = same && out == guarded && !allZero(out);
     }
   }
-  check(same, "chain: with VOX EQ off the output is the block the guard passed, bit for bit");
+  check(same, "chain: with CLEANUP EQ off the output is the block the guard passed, bit for bit");
 }
 
 // Autotune and Octave in one layout each run their own engine on the block the slot ahead hands them: the
@@ -335,10 +335,10 @@ void checkNanGuard() {
     clean = clean && run.finite && allFinite(run.out);
     sound = sound || !allZero(run.out);
   }
-  check(clean && sound, "chain: VOX EQ plays on after a discarded block");
+  check(clean && sound, "chain: CLEANUP EQ plays on after a discarded block");
 }
 
-// The clock reads twice around the front half of VOX EQ, twice around each slot, then twice around
+// The clock reads twice around the front half of CLEANUP EQ, twice around each slot, then twice around
 // the back half. Each slot gets its own pair of reads, and the EQ bucket adds the front half's pair
 // to the back half's.
 void checkStageTiming() {
@@ -353,12 +353,12 @@ void checkStageTiming() {
   check(slots, "chain: each slot is timed by its own pair of reads");
   const uint32_t first = 2 + 2 * static_cast<uint32_t>(kSlotCount);  // read index of the back half's first read
   check(run.cycles.eq == 1 + (first + 1) * (first + 1) - first * first,
-        "chain: VOX EQ is timed by the first pair of reads and the last pair");
+        "chain: CLEANUP EQ is timed by the first pair of reads and the last pair");
 }
 
-// The front half of VOX EQ runs ahead of slot 1 in the caller's buffer. With the slots empty, the
+// The front half of CLEANUP EQ runs ahead of slot 1 in the caller's buffer. With the slots empty, the
 // chain's output is the front half then the back half, and a 40 Hz tone loses
-// level to the 70 Hz high-pass while the same tone with VOX EQ OFF passes untouched.
+// level to the 70 Hz high-pass while the same tone with CLEANUP EQ OFF passes untouched.
 void checkFrontHead() {
   constexpr double kPi = 3.14159265358979323846;
   const auto lowTone = [&](int block) {
@@ -372,9 +372,9 @@ void checkFrontHead() {
   PanelReading panel;
   panel.toggle.fill(true);
   Settings eqOnly;
-  eqOnly.voxEq = VoxEq::Cuts;
+  eqOnly.cleanupEq = CleanupEq::Strong;
   Settings noCuts = eqOnly;
-  noCuts.voxEq = VoxEq::On;
+  noCuts.cleanupEq = CleanupEq::Light;
   const ChainSnapshot on = composeSnapshot(layoutOf({}), panel, eqOnly, BenchOverrides());
   const ChainSnapshot onNoCuts = composeSnapshot(layoutOf({}), panel, noCuts, BenchOverrides());
   const ChainSnapshot off = snapshotFor(layoutOf({}), 0.5f, false);
@@ -401,13 +401,13 @@ void checkFrontHead() {
     inRms = rms(in);
   }
   check(same, "chain: the front half runs ahead of slot 1 and the back half after the last slot, in the caller's buffer");
-  check(passes, "chain: with VOX EQ OFF both halves pass the block bit for bit");
-  check(outRms < 0.2 * inRms, "chain: at ON+CUTS the 70 Hz high-pass takes a 40 Hz tone down by more than 14 dB");
+  check(passes, "chain: with CLEANUP EQ OFF both halves pass the block bit for bit");
+  check(outRms < 0.2 * inRms, "chain: at STRONG the 70 Hz high-pass takes a 40 Hz tone down by more than 14 dB");
   check(uncutRms > 0.7 * inRms && uncutRms > 3.0 * outRms,
-        "chain: at ON the 40 Hz tone loses only the subsonic high-pass's 3 dB, and stands well above its ON+CUTS level");
+        "chain: at LIGHT the 40 Hz tone loses only the subsonic high-pass's 3 dB, and stands well above its STRONG level");
 }
 
-// Runs the shipped layout with every toggle on, the knobs at mid travel and VOX EQ at ON+CUTS.
+// Runs the shipped layout with every toggle on, the knobs at mid travel and CLEANUP EQ at STRONG.
 void checkDefaultChain() {
   const ChainSnapshot snap = snapshotFor(defaultLayout(), 0.5f, true);
   auto first = newRig();
@@ -545,14 +545,14 @@ Toggles allToggles(bool on) {
   return t;
 }
 
-// Every knob at `knob` and each slot's toggle as given, with VOX EQ off, so a slot's
+// Every knob at `knob` and each slot's toggle as given, with CLEANUP EQ off, so a slot's
 // block is the only thing between the input and the output.
 ChainSnapshot snapshotToggles(const Layout& layout, float knob, const Toggles& on) {
   PanelReading panel;
   panel.toggle = on;
   for (auto& slot : panel.knob) slot.fill(knob);
   Settings settings;
-  settings.voxEq = VoxEq::Off;
+  settings.cleanupEq = CleanupEq::Off;
   return composeSnapshot(layout, panel, settings, BenchOverrides());
 }
 
@@ -1051,7 +1051,7 @@ void checkPitchCardSwitchOnFromRest() {
               for (auto& k : panel.knob) k.fill(0.5f);
               panel.knob[static_cast<size_t>(slot)] = {knobUpper, knobLower};
               Settings settings;
-                          settings.voxEq = VoxEq::Off;
+                          settings.cleanupEq = CleanupEq::Off;
               return composeSnapshot(layout, panel, settings, BenchOverrides());
             };
             const ChainSnapshot snapOff = snapWith(off);
@@ -1525,7 +1525,7 @@ void checkGrainPairRule() {
       for (auto& k : panel.knob) k.fill(0.5f);
       panel.knob[1][1] = mixKnob;
       Settings settings;
-          settings.voxEq = VoxEq::Off;
+          settings.cleanupEq = CleanupEq::Off;
       ChainSnapshot snap = composeSnapshot(pair, panel, settings, BenchOverrides());
       snap.params.pitchCards.formant.shiftSt = shift;
       snap.params.pitchCards.autotune.key = 0;
@@ -1756,7 +1756,7 @@ void checkAutotuneTrackerForReaders() {
   for (auto& k : panel.knob) k.fill(0.5f);
   panel.knob[1][1] = 0.0f;
   Settings settings;
-  settings.voxEq = VoxEq::Off;
+  settings.cleanupEq = CleanupEq::Off;
   const ChainSnapshot mixZero = composeSnapshot(layout, panel, settings, BenchOverrides());
   auto quiet = newRig();
   quiet->fades.settle(mixZero.slotOn);
@@ -1868,7 +1868,7 @@ void checkBloomKey() {
 
 // What the Chatter card cut from a run of the chain: how many finished slices it holds, whether every
 // one equals its slot's input at the cut clock, and how many of their samples differ from the chain's
-// own input after the front half of VOX EQ.
+// own input after the front half of CLEANUP EQ.
 struct SourceRun {
   int slices = 0;
   bool matchesSlotInput = true;

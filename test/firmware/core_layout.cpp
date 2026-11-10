@@ -516,21 +516,21 @@ void checkComposeBench() {
   snap = composeSnapshot(layout, panelWithToggles(true), Settings(), bench);
   check(snap.params.reverb.engine == cv::kReverbChasm, "reverbChasm selects the chasm engine");
 
-  // The eqOff flag forces VOX EQ off against a menu that says on, and leaves it on when clear.
-  Settings voxOn;
-  voxOn.voxEq = VoxEq::On;
-  Settings voxCuts;
-  voxCuts.voxEq = VoxEq::Cuts;
+  // The eqOff flag forces CLEANUP EQ off against a menu that says STRONG, and leaves it on when clear.
+  Settings eqLight;
+  eqLight.cleanupEq = CleanupEq::Light;
+  Settings eqStrong;
+  eqStrong.cleanupEq = CleanupEq::Strong;
   snap = composeSnapshot(layout, panelWithToggles(true), Settings(), BenchOverrides());
-  check(!snap.params.eq.on, "the default settings leave VOX EQ off");
-  snap = composeSnapshot(layout, panelWithToggles(true), voxOn, BenchOverrides());
-  check(snap.params.eq.on && !snap.params.eq.cuts, "VOX EQ ON runs the stage without the cuts");
-  snap = composeSnapshot(layout, panelWithToggles(true), voxCuts, BenchOverrides());
-  check(snap.params.eq.on && snap.params.eq.cuts, "VOX EQ ON+CUTS runs the stage with the cuts");
+  check(!snap.params.eq.on, "the default settings leave CLEANUP EQ off");
+  snap = composeSnapshot(layout, panelWithToggles(true), eqLight, BenchOverrides());
+  check(snap.params.eq.on && !snap.params.eq.cuts, "CLEANUP EQ LIGHT runs the stage without the cuts");
+  snap = composeSnapshot(layout, panelWithToggles(true), eqStrong, BenchOverrides());
+  check(snap.params.eq.on && snap.params.eq.cuts, "CLEANUP EQ STRONG runs the stage with the cuts");
   bench = BenchOverrides();
   bench.eqOff = true;
-  snap = composeSnapshot(layout, panelWithToggles(true), voxCuts, bench);
-  check(!snap.params.eq.on, "eqOff forces VOX EQ off");
+  snap = composeSnapshot(layout, panelWithToggles(true), eqStrong, bench);
+  check(!snap.params.eq.on, "eqOff forces CLEANUP EQ off");
 
   // Octave semitones (stepped, slot index 2) and Unison depth (continuous, index 3) read the top position.
   PanelReading low;
@@ -748,7 +748,7 @@ void checkSwapUnisonCrowd() {
         "action: SwapUnisonCrowd changes nothing when the other card would repeat");
 
   check(s.outputLevel == before.outputLevel && s.inputJack == before.inputJack &&
-            s.voxEq == before.voxEq && s.topSwitch == before.topSwitch && s.debug == before.debug,
+            s.cleanupEq == before.cleanupEq && s.topSwitch == before.topSwitch && s.debug == before.debug,
         "action: SwapUnisonCrowd changes no setting");
 }
 
@@ -833,7 +833,7 @@ void checkSwapOctaveFormant() {
         "action: SwapOctaveFormant leaves a layout the box would not load as it is");
 
   check(s.outputLevel == before.outputLevel && s.inputJack == before.inputJack &&
-            s.voxEq == before.voxEq && s.topSwitch == before.topSwitch && s.debug == before.debug,
+            s.cleanupEq == before.cleanupEq && s.topSwitch == before.topSwitch && s.debug == before.debug,
         "action: SwapOctaveFormant changes no setting");
 }
 
@@ -905,7 +905,7 @@ void checkCycleSlot7Card() {
     check(changed && layout.card[6] == want, "action: CycleSlot7Card moves slot 7 on round Gate, Lo-fi, Chatter and back");
   }
   check(others && s.outputLevel == before.outputLevel && s.inputJack == before.inputJack &&
-            s.voxEq == before.voxEq && s.topSwitch == before.topSwitch &&
+            s.cleanupEq == before.cleanupEq && s.topSwitch == before.topSwitch &&
             s.debug == before.debug,
         "action: CycleSlot7Card touches no other slot and no setting");
 
