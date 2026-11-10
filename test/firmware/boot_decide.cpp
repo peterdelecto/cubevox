@@ -682,6 +682,17 @@ void checkBootMarkUpdated() {
         "boot: an update clears the old application's summary");
   check(decided(decide(b, false, CvImageValid), CvActionRunApp, CvReasonNone),
         "boot: after an update the next start runs the application");
+
+  // A torn log word DIAG.TXT faulted on, then an update in the same update mode.
+  constexpr uint32_t kLogWord = CV_DIAG_LOG_ADDR + 0x1230u;
+  b = bootBlock();
+  decide(b, true, CvImageValid);
+  recordFault(b, kLogWord, false, true);
+  decide(b, false, CvImageValid);
+  cvBootMarkUpdated(&b);
+  check(b.faultAddress == kLogWord, "boot: an update keeps a bank 2 fault address for the new application");
+  decide(b, false, CvImageValid);
+  check(b.faultAddress == kLogWord, "boot: and the start into the new image still carries it");
 }
 
 // BOR level 3 and sector 0 write protection, programmed once per power-on at most.
@@ -722,25 +733,37 @@ void checkUf2Filter() {
     uint32_t family;
     uint32_t address;
     uint32_t length;
+    uint32_t blockNo;
+    uint32_t numBlocks;
     bool accepted;
     const char* what;
   };
+  constexpr uint32_t kFull = (CV_APP_END - CV_APP_START) / 256u;  // 3584 blocks fill the region
+  constexpr uint32_t kBlock5 = CV_APP_START + 5u * 256u;
   const Case cases[] = {
-      {CV_UF2_FAMILY_CUBEVOX, CV_APP_START, 256u, true, "the first block"},
-      {CV_UF2_FAMILY_CUBEVOX, CV_APP_END - 256u, 256u, true, "the last block of the region"},
-      {0x6DB66082u, CV_APP_START, 256u, false, "the generic STM32H7 family"},
-      {CV_UF2_FAMILY_CUBEVOX, CV_APP_START - 256u, 256u, false, "the bootloader sector"},
-      {CV_UF2_FAMILY_CUBEVOX, CV_APP_END, 256u, false, "bank 2"},
-      {CV_UF2_FAMILY_CUBEVOX, CV_APP_END - 32u, 256u, false, "a block that runs past the region"},
-      {CV_UF2_FAMILY_CUBEVOX, CV_APP_START + 16u, 256u, false, "half a flash word"},
-      {CV_UF2_FAMILY_CUBEVOX, CV_APP_START, 100u, false, "a payload of part words"},
-      {CV_UF2_FAMILY_CUBEVOX, CV_APP_START, 0u, false, "an empty payload"},
-      {CV_UF2_FAMILY_CUBEVOX, 0xFFFFFF00u, 0x200u, false, "an address that wraps"},
+      {CV_UF2_FAMILY_CUBEVOX, CV_APP_START, 256u, 0u, 700u, true, "the first block"},
+      {CV_UF2_FAMILY_CUBEVOX, kBlock5, 256u, 5u, 700u, true, "a block in its place"},
+      {CV_UF2_FAMILY_CUBEVOX, CV_APP_END - 256u, 256u, kFull - 1u, kFull, true,
+       "the last block of a file that fills the region"},
+      {0x6DB66082u, CV_APP_START, 256u, 0u, 700u, false, "the generic STM32H7 family"},
+      {CV_UF2_FAMILY_CUBEVOX, CV_APP_START - 256u, 256u, 0u, 700u, false, "the bootloader sector"},
+      {CV_UF2_FAMILY_CUBEVOX, CV_APP_END, 256u, kFull, kFull + 1u, false, "bank 2"},
+      {CV_UF2_FAMILY_CUBEVOX, CV_APP_END - 32u, 256u, 0u, 1u, false, "a block that runs past the region"},
+      {CV_UF2_FAMILY_CUBEVOX, CV_APP_START + 16u, 256u, 0u, 1u, false, "half a flash word"},
+      {CV_UF2_FAMILY_CUBEVOX, CV_APP_START, 100u, 0u, 1u, false, "a payload of part words"},
+      {CV_UF2_FAMILY_CUBEVOX, CV_APP_START, 0u, 0u, 1u, false, "an empty payload"},
+      {CV_UF2_FAMILY_CUBEVOX, 0xFFFFFF00u, 0x200u, 0u, 1u, false, "an address that wraps"},
+      {CV_UF2_FAMILY_CUBEVOX, kBlock5, 256u, 0x80u + 5u, 700u, false,
+       "an in-region block of a file based at 0x08018000"},
+      {CV_UF2_FAMILY_CUBEVOX, kBlock5, 256u, 4u, 700u, false, "a block of a file based past the region start"},
+      {CV_UF2_FAMILY_CUBEVOX, kBlock5, 256u, 5u, kFull + 1u, false, "a block of a file larger than the region"},
+      {CV_UF2_FAMILY_CUBEVOX, kBlock5, 256u, 5u, 5u, false, "a block numbered past its file's count"},
+      {CV_UF2_FAMILY_CUBEVOX, kBlock5, 256u, 5u, 0x01000001u, false, "a block count whose size overflows"},
   };
-  char message[96];
+  char message[112];
   for (const Case& c : cases) {
     std::snprintf(message, sizeof message, "uf2: %s is %s", c.what, c.accepted ? "accepted" : "refused");
-    check(cvUf2BlockAccepted(c.family, c.address, c.length) == c.accepted, message);
+    check(cvUf2BlockAccepted(c.family, c.address, c.length, c.blockNo, c.numBlocks) == c.accepted, message);
   }
 }
 
@@ -769,6 +792,214 @@ void checkUf2Session() {
     std::snprintf(message, sizeof message, "uf2: %s", c.what);
     check(cvUf2SessionRestart(&c.in) == c.restart, message);
   }
+}
+
+void checkUpdateStalled() {
+  constexpr uint32_t kLast = 1000u;
+  check(!cvUpdateStalled(true, false, kLast + CV_WRITE_IDLE_MS - 1u, kLast),
+        "stall: a copy 1 ms short of the idle limit is still writing");
+  check(cvUpdateStalled(true, false, kLast + CV_WRITE_IDLE_MS, kLast),
+        "stall: a truncated file, no block for 5 s, has stopped");
+  check(!cvUpdateStalled(true, true, kLast + 60000u, kLast), "stall: a complete write never stalls");
+  check(!cvUpdateStalled(false, false, kLast + 60000u, kLast),
+        "stall: a host session with no accepted block never stalls");
+  check(cvUpdateStalled(true, false, 0x00000388u, 0xFFFFF000u), "stall: the idle time counts across the wrap");
+  check(!cvUpdateStalled(true, false, 0x00000387u, 0xFFFFF000u), "stall: and is not cut short by it");
+}
+
+// Update mode as board_hooks.c drives it, with ghostfat's write count and no USB or flash. File
+// blocks are 256 bytes from CV_APP_START, so a short file sits in sector 1.
+struct Bench {
+  CvUpdateSession s{};
+  CvBootBlock block = bootBlock();
+  uint32_t now = 1000u;
+  // ghostfat's WriteState: the transfer's block count and the blocks written, and whether the
+  // board heard of the last one.
+  uint32_t transferBlocks = 0u;
+  uint32_t written = 0u;
+  bool notified = false;
+  bool imageGood = true;
+  bool marked = false;
+
+  explicit Bench(bool menuHeld = true) {
+    const CvBootDecision d = decide(block, menuHeld, CvImageValid);
+    cvSessionStart(&s, d.reason, true, now);
+    cvSessionCable(&s, true, now);
+  }
+
+  void writeStateReset() {
+    transferBlocks = 0u;
+    written = 0u;
+    notified = false;
+  }
+
+  // patch 08: every mount forgets the last session's copy.
+  void mount(bool mounted) {
+    if (mounted) writeStateReset();
+    cvSessionMount(&s, mounted);
+  }
+
+  CvBlockVerdict send(uint32_t no, uint32_t count, bool otherData = false, bool writeOk = true,
+                      uint32_t family = CV_UF2_FAMILY_CUBEVOX) {
+    const CvUf2BlockInfo info = {family, CV_APP_START + no * 256u, 256u, no, count, transferBlocks};
+    const bool erased = cvSessionSectorErased(&s, info.targetAddr, transferBlocks);
+    const CvBlockVerdict verdict = cvSessionBlock(&s, &info, erased && otherData);
+    if (verdict == CvBlockRefused) return verdict;
+    if (verdict == CvBlockRestarted) writeStateReset();
+    cvSessionBlockWritten(&s, writeOk, now);
+    if (!writeOk) return verdict;
+    transferBlocks = count;
+    ++written;
+    if (written >= transferBlocks && !notified) {
+      notified = true;
+      if (cvSessionLastBlock(&s, imageGood)) {
+        cvBootMarkUpdated(&block);
+        marked = true;
+      }
+    }
+    return verdict;
+  }
+
+  void sendFile(uint32_t from, uint32_t to, uint32_t count) {
+    for (uint32_t no = from; no < to; ++no) send(no, count);
+  }
+
+  bool armed() const { return cvSessionTimeoutArmed(&s, &block, CvImageValid); }
+
+  CvTickAction tick(uint32_t ms) {
+    now += ms;
+    return cvSessionTick(&s, armed(), now);
+  }
+
+  // The cable reading held long enough for the debounce, and what the board must do.
+  CvCableAction cable(bool in) {
+    cvSessionCable(&s, in, now);
+    now += CV_VBUS_DEBOUNCE_MS;
+    return cvSessionCable(&s, in, now);
+  }
+
+  CvScreen screen() const { return cvSessionScreen(&s, true, armed()); }
+};
+
+void checkSessionStall() {
+  Bench b;
+  b.mount(true);
+  b.sendFile(0u, 699u, 700u);
+  check(b.tick(CV_WRITE_IDLE_MS - 1u) == CvTickNone && b.screen() == CvScreenWriting,
+        "session: a truncated file shows Writing until the idle limit");
+  b.tick(1u);
+  check(b.screen() == CvScreenWaitNoImage && !b.marked, "session: then the update stopped, the block unmarked");
+  b.send(699u, 700u);
+  check(b.screen() == CvScreenDone && b.marked, "session: a late last block still completes the copy");
+
+  Bench pulled;
+  pulled.mount(true);
+  pulled.sendFile(0u, 10u, 700u);
+  check(pulled.cable(false) == CvCableUnplugged, "session: a pull mid-copy posts the unplug");
+  pulled.mount(false);
+  pulled.tick(CV_WRITE_IDLE_MS);
+  check(pulled.screen() == CvScreenCableOut, "session: a pulled cable keeps its screen past the idle limit");
+}
+
+void checkSessionEject() {
+  Bench early;
+  early.mount(true);
+  early.sendFile(0u, 10u, 700u);
+  cvSessionEjected(&early.s, early.now);
+  check(early.tick(CV_EJECT_SETTLE_MS - 1u) == CvTickNone, "session: an eject mid-copy waits for its status");
+  check(early.tick(1u) == CvTickRestart && !early.marked,
+        "session: then restarts unmarked, so the next start offers the drive again");
+
+  Bench idle;
+  idle.mount(true);
+  cvSessionEjected(&idle.s, idle.now);
+  check(idle.tick(1000u) == CvTickNone && idle.screen() == CvScreenWaitMenu,
+        "session: an eject with nothing written changes nothing");
+
+  Bench done;
+  done.mount(true);
+  done.sendFile(0u, 4u, 4u);
+  check(done.screen() == CvScreenDone && done.marked, "session: the last block of a good image shows Done");
+  cvSessionEjected(&done.s, done.now);
+  check(done.tick(CV_EJECT_SETTLE_MS - 1u) == CvTickNone && done.tick(1u) == CvTickRestart,
+        "session: an eject after Done restarts 20 ms later");
+
+  Bench cable;
+  cable.mount(true);
+  cable.sendFile(0u, 4u, 4u);
+  check(cable.cable(false) == CvCableRestart, "session: a pull after Done restarts into the new image");
+}
+
+void checkSessionAfterDone() {
+  Bench second;
+  second.mount(true);
+  second.sendFile(0u, 4u, 4u);
+  check(second.send(0u, 4u, true) == CvBlockRestarted && second.screen() == CvScreenWriting,
+        "session: a second file of the same count on other data restarts and clears Done");
+
+  Bench refused;
+  refused.mount(true);
+  refused.sendFile(0u, 4u, 4u);
+  check(refused.send(0u, 4u, false, true, 0x6DB66082u) == CvBlockRefused && refused.screen() == CvScreenDone,
+        "session: a refused block after Done keeps Done");
+}
+
+void checkSessionFailures() {
+  Bench failed;
+  failed.mount(true);
+  failed.sendFile(0u, 4u, 700u);
+  failed.send(4u, 700u, false, false);
+  check(failed.screen() == CvScreenWaitNoImage, "session: a failed write stops the update");
+  check(failed.send(5u, 700u) == CvBlockJoined && failed.screen() == CvScreenWaitNoImage,
+        "session: the rest of that file joins and the update stays stopped");
+  check(failed.send(0u, 700u) == CvBlockRestarted && failed.screen() == CvScreenWriting && failed.written == 1u,
+        "session: the same file again restarts on fresh erases");
+
+  Bench corrupt;
+  corrupt.imageGood = false;
+  corrupt.mount(true);
+  corrupt.sendFile(0u, 4u, 4u);
+  check(!corrupt.marked && corrupt.screen() == CvScreenWaitNoImage,
+        "session: a complete file that fails the image check stops the update, the block unmarked");
+  corrupt.imageGood = true;
+  check(corrupt.send(0u, 4u) == CvBlockRestarted, "session: and the file dropped again restarts");
+  corrupt.sendFile(1u, 4u, 4u);
+  check(corrupt.marked && corrupt.screen() == CvScreenDone, "session: a good copy then completes");
+
+  Bench wrong;
+  wrong.mount(true);
+  cvSessionWrongFile(&wrong.s, true);
+  check(wrong.screen() == CvScreenWrongFile && wrong.s.diagDirty, "session: a wrong file name shows the wrong file");
+  wrong.send(0u, 700u);
+  check(wrong.screen() == CvScreenWriting, "session: then a good file writes");
+}
+
+void checkSessionTimeout() {
+  Bench before;
+  check(before.armed(), "session: a menu entry with no computer counts down");
+  before.mount(true);
+  check(!before.armed() && before.screen() == CvScreenWaitMenu, "session: a host stops the countdown");
+  check(before.cable(false) == CvCableUnplugged, "session: the pull posts the unplug");
+  before.mount(false);
+  check(before.armed() && before.tick(CV_UPDATE_TIMEOUT_MS - 1u) == CvTickNone,
+        "session: a pull with nothing written counts 60 s again");
+  check(before.tick(1u) == CvTickTimeout, "session: from the pull");
+
+  Bench after;
+  after.mount(true);
+  after.send(0u, 700u);
+  after.cable(false);
+  after.mount(false);
+  check(!after.armed() && after.tick(CV_UPDATE_TIMEOUT_MS) == CvTickNone && after.screen() == CvScreenCableOut,
+        "session: a pull after a write never times out and shows the cable");
+  check(after.cable(true) == CvCableConnect && after.screen() == CvScreenWaitNoImage,
+        "session: the cable back shows that the update stopped");
+
+  CvBootDecision d = {CvActionUpdateMode, CvReasonImageUnreadable, 0x08040000u, true};
+  check(cvRegionReadAllowed(&d, false) && !cvRegionReadAllowed(&d, true),
+        "session: the region read is skipped when the erase failed");
+  d.imageReadable = false;
+  check(!cvRegionReadAllowed(&d, false), "session: and when the decision says the image is unreadable");
 }
 
 // A root directory sector as the host writes it.
@@ -982,6 +1213,12 @@ void checkBootDecide() {
   checkOptionBytes();
   checkUf2Filter();
   checkUf2Session();
+  checkUpdateStalled();
+  checkSessionStall();
+  checkSessionEject();
+  checkSessionAfterDone();
+  checkSessionFailures();
+  checkSessionTimeout();
   checkDirScan();
   checkDirScanSkips();
   checkUpdateScreens();

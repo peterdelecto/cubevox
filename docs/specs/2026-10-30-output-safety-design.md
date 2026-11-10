@@ -13,6 +13,9 @@ in `core/chain_run`).
 During the fade the engine runs and both paths mix; at the end of a fade out the engine stops
 running (no CPU for a bypassed slot, as today); on a fade in the engine is cleared first, so a
 re-engaged reverb or delay starts from silence and not from a tail it held while bypassed. A
+toggle flipped on while a layout change fades out takes effect at the swap with no fade, and
+`BlockFlow::adopt` clears that slot's engine in the silent blocks after the swap, so it starts
+from silence too (`core_block_tail`). A
 flip during a fade turns the fade round from where it is. The per-slot fade level lives in the
 audio interrupt's state, advanced per block; the main loop only publishes the toggle. Host test:
 `core_chain_run` drives a slot flip on a steady tone and checks the output has no step larger
@@ -82,6 +85,8 @@ counted from `setup()`; the bootloader's time is not counted, so the cap has had
 mute (the MUTE toggle, a jack change) keeps the same order without the 6 s wait: XSMT high,
 output at zero, MUTE_N high, 20 ms, fade up. The mute order stays XSMT low, 5 ms, MUTE_N low,
 so a wanted mute has no relay click. The 500 ms hold after the SAI clocks start is subsumed.
+The 6.0 s wait runs once per `reset()`, so a release after the millisecond counter wraps
+(49.7 days on) does not wait again.
 
 The face shows the splash through the power-on wait (owner 2026-11-10). `MuteSequence::powerOnWait()`
 is true from reset until the sequence is Unmuted, or until 6.0 s have passed with something else
@@ -89,8 +94,8 @@ is true from reset until the sequence is Unmuted, or until 6.0 s have passed wit
 stays up while it is true, so MUTED shows only for the MUTE toggle or a fault.
 
 Host test in the mute sequence's test: the power-on release steps in this order with the
-6.0 s wait and the fade after the relay, the later releases without the wait, the mute steps
-unchanged. The emulator is unaffected.
+6.0 s wait and the fade after the relay, the later releases without the wait (also across a
+counter wrap), the mute steps unchanged. The emulator is unaffected.
 
 Board, next revision (not this change): R on the jack side of the output cap 100 kΩ → 10 kΩ,
 time constant 0.1 s, settled in 0.6 s; the OPA2197 drives 10 kΩ in parallel with the PA's input

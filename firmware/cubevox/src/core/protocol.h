@@ -72,6 +72,16 @@ class Framer {
   uint32_t stray_ = 0;
 };
 
+// Bytes the serial reader takes in one loop() pass when no line event comes first.
+constexpr size_t kPollByteBudget = kMaxLine + 1;
+
+// True when the serial reader ends its loop() pass: after one line event (a line, a line too long or
+// a NUL) or after kPollByteBudget bytes. A host that keeps sending then cannot hold loop() in the
+// reader, and each reply drains before the next line is handled.
+constexpr bool pollPassDone(Framer::Kind kind, size_t bytesRead) {
+  return kind != Framer::Kind::None || bytesRead >= kPollByteBudget;
+}
+
 enum class Command : uint8_t { Hello, GetLayout, SetLayout, Status, EnterDfu, Bench };
 
 struct Request {
@@ -127,8 +137,7 @@ struct Status {
   uint32_t nanBlocks = 0;   // blocks discarded before the polish stages for a NaN or an infinity
   uint32_t powerTrips = 0;  // power-fail mutes, 5VA under its trip level
   float floorDbfs = -120.0f;  // the Input gate's detector peak over the status interval, in dBFS
-  bool stalled = false;       // the stall watch latched the mute
-  bool audioLatched = false;  // a fault past the restart budget latched the mute
+  bool stalled = false;       // the stall watch muted the output and started the reset
 
   explicit Status() = default;
 };

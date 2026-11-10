@@ -11,8 +11,8 @@ constexpr uint32_t kAudioStallMs = 100;
 
 class AudioStallWatch {
  public:
-  // One look per loop pass. `running` is false before the stream starts and once the audio module
-  // has latched its own mute. `restarts` counts the stream's restarts. The watch arms on the first
+  // One look per loop pass. `running` is false before the stream starts and once a planned reset
+  // is pending. `restarts` counts the stream's restarts. The watch arms on the first
   // look at each start, so neither the time setup() spends before the stream starts nor the gap a
   // restart leaves counts as a stall. Returns true on the one look that finds the counter still for
   // kAudioStallMs, and the watch stays stalled from then on.

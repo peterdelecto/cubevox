@@ -13,9 +13,14 @@ flat requests, replies built with `snprintf`, no ArduinoJson.
 3. Lines longer than 768 bytes are dropped with an error reply (`id` 0).
 4. Output never blocks `loop()`. Replies, the boot report and bench prints go through a bounded
    transmit queue drained with non-blocking writes each pass, so a host that stops reading can't
-   stall the loop into the watchdog. Overflow drops whole lines and counts them.
+   stall the loop into the watchdog. Overflow drops whole lines and counts them. The queue holds
+   16 kB. Log lines stop 6 kB short of full, so the largest reply (a bench build's `hello`, about
+   5.3 kB) always fits behind them; `core_tx_queue` measures it against the reserve.
 5. The layout `name` is 1 to 31 printable ASCII characters; anything else is rejected. Replies
    escape every string they carry.
+6. Input never holds `loop()` either. Each pass reads bytes until one line event (a line, a line
+   too long, a NUL) or 769 bytes, then drains the queue (`protocol::pollPassDone`). A host that
+   keeps sending gets one line handled per pass, and each reply drains before the next line.
 
 ## Commands
 | cmd | Request fields | Reply |
@@ -23,7 +28,7 @@ flat requests, replies built with `snprintf`, no ArduinoJson.
 | `hello` | — | `proto` 1, `fw` version, `serial` (24 uppercase hex characters of the MCU's 96-bit unique id, the text the update drive serves as its USB serial), `build` (`release` or `bench`), `bench_ops` (ops this build accepts), `cards` (registry: id, name, group, cost avg/worst, measured, knobs: name, kind, positions, min, max, unit, curve), `layout`, `settings` (the box always sends it; the host tool that has no board leaves it out) |
 | `get_layout` | — | `layout`: `name`, `slots` (8 card ids); `settings` |
 | `set_layout` | `name`, `slots` (8 card ids), optional `settings` | `ok`, or an error |
-| `status` | — | CPU load % mean and worst since the last status (own baseline; never resets the shared peaks), `late` (blocks past their budget or written after the DMA began reading their half), `dry_blocks` (blocks that passed the dry input because the one before was late; `2026-10-30-output-safety-design.md` item 4), `muted`, record `seq` and write errors, serial lines dropped, `stray_bytes`, `boot_fails` (earlier starts that never reported healthy, read at boot), the audio faults since boot (`overruns`, `sai_errors`, `restarts`, `nan_blocks`, `stalled` for the stall watch, true from a stall until the reset it starts, `audio_latched` for a fault past the restart budget), `power_trips` (power-fail mutes), `reply_overflows` (reply pieces lost to the format buffer), `floor_dbfs` (the Input gate detector's highest level since the previous status, in dBFS, -120 when no block ran the Input gate; `2026-10-30-input-conditioning-design.md`), `update_reason` (why the bootloader last stayed in update mode: `none`, `MenuHeld`, `AppRequest`, `ImageInvalid`, `ImageUnreadable` or `BootFailed`) |
+| `status` | — | CPU load % mean and worst since the last status (own baseline; never resets the shared peaks), `late` (blocks past their budget or written after the DMA began reading their half), `dry_blocks` (blocks that passed the dry input because the one before was late; `2026-10-30-output-safety-design.md` item 4), `muted`, record `seq` and write errors, serial lines dropped, `stray_bytes`, `boot_fails` (earlier starts that never reported healthy, read at boot), the audio faults since boot (`overruns`, `sai_errors`, `restarts`, `nan_blocks`, `stalled` for the stall watch, true from a stall until the reset it starts), `power_trips` (power-fail mutes), `reply_overflows` (reply pieces lost to the format buffer), `floor_dbfs` (the Input gate detector's highest level since the previous status, in dBFS, -120 when no block ran the Input gate; `2026-10-30-input-conditioning-design.md`), `update_reason` (why the bootloader last stayed in update mode: `none`, `MenuHeld`, `AppRequest`, `ImageInvalid`, `ImageUnreadable` or `BootFailed`) |
 | `enter_dfu` | — | `ok`, sent and flushed before the box mutes and reboots into the UF2 update drive (the `CUBEVOX` volume, spec `2026-10-24-field-update-design.md`) |
 | `bench` | `op`, plus `slot` (1 to 8) for `slot_off` | `ok` after the op runs, or an error; diagnostic text goes to the log lines |
 

@@ -127,7 +127,7 @@ void cvBootMarkUpdated(struct CvBootBlock* block) {
   cvBootFailsSet(block, 0u);
   block->request = 0u;
   block->lastReason = (uint32_t)CvReasonNone;
-  block->faultAddress = 0u;
+  if (!inBank2(block->faultAddress)) block->faultAddress = 0u;
   clearSummary(block);
   clearBootFault(block);
   cvBootBlockSeal(block);
@@ -153,11 +153,19 @@ uint32_t cvOptionsWpsn(uint32_t wpsnPrg1) {
 
 // ---- Update mode --------------------------------------------------------------------------
 
-bool cvUf2BlockAccepted(uint32_t familyId, uint32_t address, uint32_t length) {
+bool cvUf2BlockAccepted(uint32_t familyId, uint32_t address, uint32_t length, uint32_t blockNo,
+                        uint32_t numBlocks) {
   const bool inRegion = address >= CV_APP_START && address < CV_APP_END && length <= CV_APP_END - address;
   const bool wholeWords =
       length != 0u && address % CV_FLASH_WORD_BYTES == 0u && length % CV_FLASH_WORD_BYTES == 0u;
-  return familyId == CV_UF2_FAMILY_CUBEVOX && inRegion && wholeWords;
+  if (familyId != CV_UF2_FAMILY_CUBEVOX || !inRegion || !wholeWords || blockNo >= numBlocks) return false;
+  const uint64_t fileBytes = (uint64_t)numBlocks * length;
+  const bool basedAtStart = (uint64_t)blockNo * length == (uint64_t)(address - CV_APP_START);
+  return basedAtStart && fileBytes <= CV_APP_END - CV_APP_START;
+}
+
+bool cvUpdateStalled(bool sessionAccepted, bool updateWritten, uint32_t nowMs, uint32_t lastBlockMs) {
+  return sessionAccepted && !updateWritten && nowMs - lastBlockMs >= CV_WRITE_IDLE_MS;
 }
 
 bool cvUf2SessionRestart(const CvUf2SessionInputs* in) {
@@ -251,4 +259,140 @@ bool cvDebounceUpdate(CvDebounce* debounce, bool sample, uint32_t nowMs, uint32_
   debounce->level = sample;
   debounce->pending = false;
   return true;
+}
+
+// ---- Update session -----------------------------------------------------------------------
+
+static void sessionClear(CvUpdateSession* s) {
+  s->sessionAccepted = false;
+  s->sessionRefused = false;
+  s->sessionFailed = false;
+  s->sessionStalled = false;
+}
+
+void cvSessionStart(CvUpdateSession* s, uint32_t reason, bool cableIn, uint32_t nowMs) {
+  memset(s, 0, sizeof *s);
+  s->reason = reason;
+  s->timeoutFromMs = nowMs;
+  cvDebounceReset(&s->vbus, cableIn);
+}
+
+// A self-powered device holds its D+ pull-up only while the cable carries VBUS. A pull leaves
+// the USB stack mounted, so the board posts the unplug event VBUS sensing would. Without a write
+// the timeout counts again from the pull. After a complete write the pull restarts the box.
+CvCableAction cvSessionCable(CvUpdateSession* s, bool cableIn, uint32_t nowMs) {
+  const bool first = !s->cableTracked;
+  const bool changed = cvDebounceUpdate(&s->vbus, cableIn, nowMs, CV_VBUS_DEBOUNCE_MS);
+  s->cableTracked = true;
+  if (!first && !changed) return CvCableNone;
+  if (s->vbus.level) {
+    s->cableOut = false;
+    return CvCableConnect;
+  }
+  if (first) return CvCableDisconnect;
+  if (s->updateWritten) return CvCableRestart;
+  s->cableOut = s->hostSeen;
+  if (!s->writeBegun) {
+    s->hostSeen = false;
+    s->timeoutFromMs = nowMs;
+  }
+  return CvCableUnplugged;
+}
+
+bool cvSessionMount(CvUpdateSession* s, bool mounted) {
+  if (mounted == s->mounted) return false;
+  s->mounted = mounted;
+  sessionClear(s);
+  if (mounted) s->hostSeen = true;
+  return mounted;
+}
+
+static uint32_t sectorBit(uint32_t address) {
+  return 1u << ((address - CV_APP_START) / CV_FLASH_SECTOR_SIZE);
+}
+
+bool cvSessionSectorErased(const CvUpdateSession* s, uint32_t address, uint32_t sessionBlocks) {
+  return sessionBlocks != 0u && address >= CV_APP_START && address < CV_APP_END &&
+         (s->sessionSectors & sectorBit(address)) != 0u;
+}
+
+CvBlockVerdict cvSessionBlock(CvUpdateSession* s, const CvUf2BlockInfo* block, bool targetHoldsOtherData) {
+  if (!cvUf2BlockAccepted(block->familyId, block->targetAddr, block->payloadSize, block->blockNo,
+                          block->numBlocks)) {
+    if (s->sessionAccepted) {
+      s->sessionFailed = true;
+    } else {
+      s->sessionRefused = true;
+    }
+    s->diagDirty = true;
+    return CvBlockRefused;
+  }
+  const bool erased = cvSessionSectorErased(s, block->targetAddr, block->sessionBlocks);
+  if (block->sessionBlocks == 0u) s->sessionSectors = 0u;
+  const CvUf2SessionInputs in = {block->sessionBlocks, block->numBlocks,  block->blockNo,
+                                 erased,               erased && targetHoldsOtherData, s->sessionFailed};
+  const bool restart = cvUf2SessionRestart(&in);
+  if (restart) {
+    s->updateWritten = false;
+    s->ejectPending = false;
+    s->sessionSectors = 0u;
+    s->sessionRefused = false;
+    s->sessionFailed = false;
+  }
+  s->sessionSectors |= sectorBit(block->targetAddr);
+  s->sessionStalled = false;
+  s->writeBegun = true;
+  s->sessionAccepted = true;
+  return restart ? CvBlockRestarted : CvBlockJoined;
+}
+
+void cvSessionBlockWritten(CvUpdateSession* s, bool written, uint32_t nowMs) {
+  s->lastBlockMs = nowMs;
+  if (written) return;
+  s->sessionFailed = true;
+  s->diagDirty = true;
+}
+
+void cvSessionWrongFile(CvUpdateSession* s, bool newName) {
+  if (newName) s->diagDirty = true;
+  if (!s->sessionAccepted) s->sessionRefused = true;
+}
+
+bool cvSessionLastBlock(CvUpdateSession* s, bool imageGood) {
+  s->diagDirty = true;
+  if (!imageGood) {
+    s->sessionFailed = true;
+    return false;
+  }
+  s->updateWritten = true;
+  return true;
+}
+
+void cvSessionEjected(CvUpdateSession* s, uint32_t nowMs) {
+  if (!s->writeBegun || s->ejectPending) return;
+  s->ejectPending = true;
+  s->ejectedMs = nowMs;
+}
+
+bool cvSessionTimeoutArmed(const CvUpdateSession* s, const struct CvBootBlock* block, CvImageStatus image) {
+  return cvBootTimeoutAllowed(block, image, s->hostSeen, s->writeBegun);
+}
+
+CvTickAction cvSessionTick(CvUpdateSession* s, bool timeoutArmed, uint32_t nowMs) {
+  if (s->ejectPending && nowMs - s->ejectedMs >= CV_EJECT_SETTLE_MS) return CvTickRestart;
+  if (cvUpdateStalled(s->sessionAccepted, s->updateWritten, nowMs, s->lastBlockMs)) s->sessionStalled = true;
+  if (timeoutArmed && nowMs - s->timeoutFromMs >= CV_UPDATE_TIMEOUT_MS) return CvTickTimeout;
+  return CvTickNone;
+}
+
+CvScreen cvSessionScreen(const CvUpdateSession* s, bool imageValid, bool timeoutArmed) {
+  if (s->updateWritten) return CvScreenDone;
+  const CvScreenInputs in = {s->reason,          imageValid,        s->writeBegun,
+                             s->sessionAccepted, s->sessionRefused, s->sessionFailed || s->sessionStalled,
+                             s->cableOut,        timeoutArmed};
+  return cvUpdateScreen(&in);
+}
+
+bool cvRegionReadAllowed(const CvBootDecision* decision, bool eraseFailed) {
+  return decision->imageReadable && !eraseFailed;
 }

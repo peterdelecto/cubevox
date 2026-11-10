@@ -114,8 +114,8 @@ reset and is random after power-on, so every field is validated before use.
    (bootloader v0.04, found on board 1 2026-10-29). It has to read first because the HAL's
    `HAL_RCC_DeInit()`, which the HSI fallback and the jump into the application both call, clears
    every flag; before v0.04 the application read the register after the jump and its boot report
-   showed no reset cause. The application reads the cause from the block (OR'd with the live
-   register) and still clears the register. A pure power-on (PORRSTF or BORRSTF, with none of
+   showed no reset cause. The application reads the cause from the block alone and never touches
+   the register, which the bootloader owns. A pure power-on (PORRSTF or BORRSTF, with none of
    SFTRSTF, IWDG1RSTF and WWDG1RSTF) clears the whole block, so power cycles and brown-outs never
    count as failed starts. Each start sees only its own reset's flags, so a reset the bootloader
    makes shows SFTRSTF alone and never reads as a power-on. A block without the seal is cleared
@@ -281,11 +281,14 @@ A 32-byte header sits at application offset 0x400, after the 0x298-byte vector t
    and the OLED replaces the HTML page. Both are dropped by a board define, patched and sent
    upstream.
 4. Writes. Each UF2 block passes the board's filter first (patch 04): this family, inside
-   [0x08020000, 0x08100000), whole 32-byte flash words. A refused block is counted and never
-   written. A sector is erased before its first block. A block the flash fails to take is counted
-   as failed and never toward the end of the transfer (patch 09), so the update cannot complete over
-   it. After the last block, `bootFails` is zeroed, `lastReason` cleared, the D-cache cleaned, and
-   the box resets with no wait.
+   [0x08020000, 0x08100000), whole 32-byte flash words, from a file based at 0x08020000 that fits
+   the region. The block's number and address give the file's base and its block count the file's
+   size, so no block of a file based elsewhere or too large is written. A refused block is counted
+   and never written. A sector is erased before its first block. A block the flash fails to take is
+   counted as failed and never toward the end of the transfer (patch 09), so the update cannot
+   complete over it. After the last block the written image gets the start's header and CRC check.
+   A good image has `bootFails` zeroed and `lastReason` cleared, and the Done screen shows (item 7).
+   A bad one shows `The update stopped.` and the boot block stays unmarked.
 5. A second file in one host session restarts the transfer: a block with another block count, or
    one landing on other data in a sector the transfer already erased. A copy cancelled in Finder
    therefore never stops the next one. After a failed write or a refusal, the file's first block
@@ -298,10 +301,16 @@ A 32-byte header sits at application offset 0x400, after the 0x298-byte vector t
 7. Finder's `.fseventsd`, `.Spotlight-V100` and `._*` files are expected and harmless. The box does
    not reset inside the last block's write; it marks the boot block for the new image, shows the
    Done screen and keeps the drive mounted until the host ejects it (START STOP UNIT with the
-   eject bit) or the cable comes out (the VBUS pin), then resets. An eject before the last block
-   changes nothing. The restart on eject waits 20 ms so the eject command's status reaches the
-   host. `flash.sh` and `bringup.py` eject the drive themselves after a complete copy; the
-   bring-up drills that copy part of a file or a refused file do not. Bootloader v0.06, patch 12.
+   eject bit) or the cable comes out (the VBUS pin), then resets. The restart on eject waits 20 ms
+   so the eject command's status reaches the host. `flash.sh` and `bringup.py` eject the drive
+   themselves after a complete copy; the bring-up drills that copy part of a file or a refused file
+   do not. Bootloader v0.06, patch 12.
+8. A copy that stops short of its last block (a truncated file, a copy cancelled in Finder) shows
+   `The update stopped.` once no block has arrived for 5 s, and a later block takes the screen back
+   to the write. An eject once a write has begun restarts the box as after Done; the boot block is
+   unmarked, so the start finds the image invalid and offers the drive again. An eject with nothing
+   written changes nothing. The cable, host and transfer state is `CvUpdateSession` in
+   `boot_decide.c`, stepped by the host tests. Bootloader v0.07.
 
 ## OLED in update mode
 The bootloader drives the SH1106 over I2C2 (PB10/PB11) through `firmware/cubevox/src/board/sh1106.c`,
@@ -316,12 +325,10 @@ lines of 21 characters; the extension `uf2` never appears on screen because the 
 
 | State | Rows 0 / 2 / 4 / 6 |
 |---|---|
-| State | Rows 0 / 2 / 4 / 6 |
-|---|---|
 | Waiting, from the menu, the app or after a bootloader fault, valid image | `Drop the firmware on` / `the CUBEVOX drive.` / `You have vX.YY.ZZ.` / `Wait 60 s to cancel.` |
-| Waiting, no valid image; a failed write or a refusal after accepted blocks | `The update stopped.` / `Drop the firmware on` / `the CUBEVOX drive.` / (blank) |
+| Waiting, no valid image; a failed write, a refusal after accepted blocks, a copy stopped for 5 s, an image that fails its check after the last block | `The update stopped.` / `Drop the firmware on` / `the CUBEVOX drive.` / (blank) |
 | Waiting, three failed boots | `Startup failed.` / `Drop the firmware on` / `the CUBEVOX drive.` / (blank) |
-| Host connected | row 6 becomes `Computer connected.` on every waiting screen |
+| Host connected | row 6 becomes `Unplug USB to cancel.` on the menu screen (the host stops the timeout and a pull starts it again), `Computer connected.` on the other two waiting screens |
 | Writing | `Writing the firmware.` / `Do not unplug.` |
 | Wrong file: refused blocks or a non-UF2 file | `That is not a cubevox` / `firmware file.` / `Drop the firmware on` / `the CUBEVOX drive.` |
 | Cable pulled after a host connected, when the 60 s timeout cannot run | `The cable came out.` / `Plug it back in and` / `drop the firmware on` / `the CUBEVOX drive.` |
@@ -330,7 +337,8 @@ lines of 21 characters; the extension `uf2` never appears on screen because the 
 
 1. The screens get a numbered proof set and the owner approves per number, as for every OLED
    screen. The wording above is the approved source; the code matches it. The cable and clock
-   screens (proofs 08 and 09) await approval.
+   screens (proofs 08 and 09), the menu screen's `Unplug USB to cancel.` (proof 04, 2026-11-10)
+   and the stopped screen with a computer connected (proof 10) await approval.
 2. The application's confirm screen is `Update the firmware?` / `You have vX.YY.ZZ.` /
    `Click to start.` / `Turn to cancel.` on rows 0, 2, 4, 6. Same proof rule.
 3. The application's boot splash shows the version for 2 s so Adam can confirm an update without a
@@ -347,7 +355,10 @@ lines of 21 characters; the extension `uf2` never appears on screen because the 
 | Non-UF2 file dragged (`.bin`, `.zip`) | nothing written, image intact | `That is not a cubevox firmware file.` | `wrong file: NAME.BIN` |
 | Flash write fails | not counted, the update cannot complete | `The update stopped.`; dropping the file again retries on erased sectors | `blocks: ... N failed, first failure at X` |
 | Second file, or a copy cancelled in Finder | the transfer restarts | `Writing the firmware.` | the block counts |
-| Corrupt download | CRC fails, update mode | `The update stopped.` | `reason ImageInvalid` |
+| Truncated download, or a copy cancelled with no second one | no block for 5 s, the drive stays | `The update stopped.`, drive | the block counts |
+| Drive ejected mid-copy | restart, image invalid, update mode | `The update stopped.`, drive returns | `reason ImageInvalid` |
+| Corrupt download, every block arrives | the image check after the last block fails, boot block unmarked | `The update stopped.`, drive | `installed: invalid` after a remount |
+| `.uf2` based off 0x08020000 or larger than the region | every block refused, image intact | `That is not a cubevox firmware file.` | `blocks: 0 written, N refused` |
 | New firmware crashes at start | 3 resets, update mode | `Startup failed.` | `reason BootFailed`, fault record |
 | New firmware hangs in `setup()` | the 16 s watchdog resets, 3 of those, update mode | `Startup failed.` | `reason BootFailed` |
 | New firmware works but sounds wrong | — | — | Adam drags the previous release file; every release stays downloadable |
@@ -378,8 +389,8 @@ lines of 21 characters; the extension `uf2` never appears on screen because the 
    across erases. The two share one flash controller, so each waits while the other erases.
    1. The application queues one entry at boot whenever the reset cause is not power-on alone, a
       fault record is present, or the option byte step failed. It queues one entry (`update`) when
-      it requests update mode, and one (`audio`) for every audio fault: a stream restart, a mute
-      the audio module latched, or a stall.
+      it requests update mode, and one (`audio`) for every audio fault: a stream restart, a fault
+      past the restart budget, a failed restart, or a stall. Its fault text names which.
    2. An entry carries the firmware version, the uptime (unknown at boot), the reset flags, the
       fault record as kind, pc, lr, cfsr and bfar (or the clock step that failed), the boot-fail
       count, the bootloader's last reason and fault address, the option byte step's result, and
@@ -448,9 +459,9 @@ firmware/bootloader/
   README.md                 pin, toolchain, build, flash, drills, licences
   build.sh                  clones adafruit/tinyuf2 at the pin into build/tinyuf2, applies patches/, make BOARD=cubevox; --selftest, --proofs
   flash.sh                  ROM DFU of the bootloader at 0x08000000 (BOOT0 held), clears sector 0 protection first, reads back; shop only
-  patches/                  01-11: flash bound and NOINIT origin, optional CURRENT.UF2 and INDEX.HTM, board files, block filter,
+  patches/                  01-12: flash bound and NOINIT origin, optional CURRENT.UF2 and INDEX.HTM, board files, block filter,
                             DFU task hook, weak dfu_complete, double-tap default, write state reset, failed write not counted,
-                            root directory hook, 1 ms SysTick; sent upstream
+                            root directory hook, 1 ms SysTick, complete on eject; sent upstream
   tools/                    imagecheck, drivetext, proof (host programs for --selftest and --proofs), option_bytes.py (flash.sh)
   boards/cubevox/           board.h, board.mk, board_hooks.c (TinyUF2 hooks, fault entry, option bytes, cable, watchdog),
                             boot_decide.c (pure policy), clock.c, oled.c, screens.c, diag.c, image_check.c, text.h, fonts.cpp
@@ -515,12 +526,12 @@ firmware/bootloader/
 | # | Drill | Expected |
 |---|---|---|
 | 1 | Send `enter_dfu` over serial | CDC port gone, `/Volumes/CUBEVOX` mounted within 5 s, OLED `Drop the firmware on the CUBEVOX drive.`; `DIAG.TXT` option bytes shows `BOR level 3` and `sector 0 protected` |
-| 2 | Copy the bench `.uf2` to the volume | Volume unmounts, CDC port back within 10 s, `hello` says `bench` |
+| 2 | Copy the bench `.uf2` to the volume, then eject it | OLED `The update is done.` after the copy; on the eject the volume leaves, CDC port back within 10 s, `hello` says `bench` |
 | 3 | Operator pulls USB at about 30 % of a copy | OLED `The cable came out.`, box stays in update mode; a full copy then succeeds |
 | 4 | Operator cuts 9 V at about 30 % of a copy | Next power-on shows `The update stopped.`; `DIAG.TXT` says `ImageInvalid` or `ImageUnreadable` with an address; a full copy then succeeds |
 | 5 | Copy a `.uf2` made with `stamp_image.py uf2 --base 0x08100000` | Every block refused, OLED `That is not a cubevox firmware file.`, layout record intact (`get_layout` after reboot) |
 | 6 | Copy a `.uf2` made with `stamp_image.py uf2 --family-id 0x00000000` from the bench image | Every block refused (family), installed image intact |
-| 7 | Copy a `.uf2` with one payload byte flipped | Box resets into update mode, `INFO_UF2.TXT` `Installed: invalid` |
+| 7 | Copy a `.uf2` with one payload byte flipped | No reset; OLED `The update stopped.`; after a remount `INFO_UF2.TXT` `Installed: invalid` |
 | 8 | Bench op `f` (bus fault) three times inside 5 s of boot | Third reset lands in update mode, `DIAG.TXT` carries the fault record |
 | 9 | `set_layout`, update, `get_layout` | Same layout |
 | 10 | Operator holds MENU, cycles power | OLED `Drop the firmware on the CUBEVOX drive.`, `DIAG.TXT` reason `MenuHeld` |

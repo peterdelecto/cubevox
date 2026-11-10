@@ -339,9 +339,10 @@ void checkStreamRecovery() {
         "recovery: the stream restarts once the output is muted");
   check(r.update(20000, true, true) == Action::Restart && r.update(40000, true, true) == Action::Restart,
         "recovery: an already muted output restarts in the same pass");
-  check(r.update(60015, true, true) == Action::Latch && r.latched() && r.restarts() == 3,
-        "recovery: a fourth fault inside a minute of three restarts latches");
-  check(r.update(200000, true, true) == Action::None && r.latched(), "recovery: nothing restarts after a latch");
+  check(r.update(60015, true, true) == Action::Reset && !r.holdMute() && r.restarts() == 3,
+        "recovery: a fourth fault inside a minute of three restarts resets the box");
+  check(r.update(200000, true, true) == Action::None && r.restarts() == 3,
+        "recovery: nothing restarts while the box waits for its reset");
 
   StreamRecovery edge;
   edge.update(0, true, true);
@@ -349,15 +350,22 @@ void checkStreamRecovery() {
   edge.update(40000, true, true);
   check(edge.update(60000, true, true) == Action::Restart, "recovery: the window slides, a minute after the first");
 
+  StreamRecovery refilled;
+  refilled.update(0, true, true);
+  refilled.update(1000, true, true);
+  refilled.update(2000, true, true);
+  check(refilled.update(90000, true, true) == Action::Restart && refilled.restarts() == 4,
+        "recovery: a fault after the minute has passed restarts the stream as usual");
+
   StreamRecovery spaced;
-  bool latched = false;
-  for (uint32_t i = 0; i < 10; ++i) latched = latched || spaced.update(i * 25000, true, true) == Action::Latch;
-  check(!latched && spaced.restarts() == 10, "recovery: faults further apart restart every time");
+  bool reset = false;
+  for (uint32_t i = 0; i < 10; ++i) reset = reset || spaced.update(i * 25000, true, true) == Action::Reset;
+  check(!reset && spaced.restarts() == 10, "recovery: faults further apart restart every time");
 
   StreamRecovery failed;
   failed.update(0, true, true);
-  failed.fail();
-  check(failed.latched() && failed.update(1, true, true) == Action::None, "recovery: a failed restart latches");
+  check(failed.fail() == Action::Reset && !failed.holdMute(), "recovery: a restart that fails resets the box");
+  check(failed.update(1, true, true) == Action::None, "recovery: nothing restarts after a failed restart");
 }
 
 }  // namespace

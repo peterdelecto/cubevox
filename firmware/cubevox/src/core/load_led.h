@@ -26,8 +26,8 @@ constexpr uint32_t kLoadLedFlashMs = 100;
 constexpr uint32_t kLoadLedNoTrouble = UINT32_MAX;
 
 // The LED level, 0 to 1. `meanPercent` is the mean block time as a percent of the block budget and
-// `limitPercent` the load that reads full. `audioLive` is false while audio is stopped, stalled or
-// latched, and the LED is dark whatever else is true. `msSinceTrouble` is the time since the last
+// `limitPercent` the load that reads full. `audioLive` is false while audio is stopped or stalled,
+// and the LED is dark whatever else is true. `msSinceTrouble` is the time since the last
 // late, dry or overrun block, or kLoadLedNoTrouble.
 inline float loadLedLevel(int meanPercent, int limitPercent, bool audioLive, uint32_t msSinceTrouble) {
   if (!audioLive) return 0.0f;
@@ -41,10 +41,12 @@ inline float loadLedLevel(int meanPercent, int limitPercent, bool audioLive, uin
 }
 
 // Turns a running count of late, dry and overrun blocks into the time since it last changed. The
-// first count only sets the baseline, so blocks counted before the first pass do not flash.
+// first count only sets the baseline, so blocks counted before the first pass do not flash. Once the
+// flash has run the clock reads none, so a millisecond counter that wraps never flashes it again.
 class BlockTroubleClock {
  public:
   void note(uint32_t count, uint32_t nowMs) {
+    if (flagged_ && nowMs - lastMs_ >= kLoadLedFlashMs) flagged_ = false;
     if (seen_ && count != count_) {
       lastMs_ = nowMs;
       flagged_ = true;
@@ -53,7 +55,8 @@ class BlockTroubleClock {
     seen_ = true;
   }
 
-  // The time since the count last changed, or kLoadLedNoTrouble if it never has.
+  // The time since the count last changed, or kLoadLedNoTrouble if it never has or the last note()
+  // came kLoadLedFlashMs or more after it.
   uint32_t sinceMs(uint32_t nowMs) const { return flagged_ ? nowMs - lastMs_ : kLoadLedNoTrouble; }
 
  private:

@@ -6,6 +6,18 @@ constexpr uint32_t kAllEngines = (1u << kEngineCount) - 1u;
 
 }  // namespace
 
+void BlockFlow::adopt(const ChainSnapshot& from, const ChainSnapshot& to) {
+  uint32_t mask = enginesToReset(from.layout, to.layout);
+  for (int s = 0; s < kSlotCount; ++s) {
+    const Engine e = engineOf(to.layout.card[static_cast<size_t>(s)]);
+    if (e != kNoEngine && slots_.level(s) == 0 && to.slotOn[static_cast<size_t>(s)]) {
+      mask |= 1u << static_cast<int>(e);
+    }
+  }
+  queueReset(mask);
+  slots_.settle(to.slotOn);
+}
+
 void BlockFlow::discard(ChainEngines& engines, const ChainSnapshot& held) {
   resetMask_ = kAllEngines;
   fade_.cut();

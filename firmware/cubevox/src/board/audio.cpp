@@ -210,14 +210,12 @@ void syncSnapshot() {
   if (first) gFlow.settleSlots(gHeld.slotOn);
 }
 
-// At the zero point of the fade: adopts the newest snapshot, resets the engines whose slot changed
-// card and settles every slot's toggle, since the output is at zero and nothing needs a crossfade.
+// At the zero point of the fade: adopts the newest snapshot (BlockFlow::adopt).
 void swapSnapshot() {
   gSeenSeq = gPublished.load(std::memory_order_acquire);
   const ChainSnapshot& pub = gSnapshots[gSeenSeq & 1];
-  gFlow.queueReset(enginesToReset(gHeld.layout, pub.layout));
+  gFlow.adopt(gHeld, pub);
   gHeld = pub;
-  gFlow.settleSlots(gHeld.slotOn);
   gLayoutPending = false;
   gSwapStarted = true;
 }
@@ -649,13 +647,6 @@ void printFaultCause(Print& out) {
   out.print(gSaiErrorCodes, HEX);
 }
 
-void latchAfterFault(const char* why) {
-  muteLatch();
-  serialOut().print("[ERROR] audio: ");
-  serialOut().print(why);
-  serialOut().println("; output muted until reset");
-}
-
 AudioEvent restartAfterFault() {
   Print& out = serialOut();
   out.print("[WARN] audio: restarting the stream after ");
@@ -664,8 +655,10 @@ AudioEvent restartAfterFault() {
   if (!restartStream()) {
     gStreamUp = false;
     gRecovery.fail();
-    latchAfterFault(gError);
-    return AudioEvent::Latched;
+    out.print("[ERROR] audio: ");
+    out.print(gError);
+    out.println("; resetting");
+    return AudioEvent::RestartFailed;
   }
   muteTripClear(MuteReason::Audio);
   muteClocksRunning();  // the release runs in the usual order: XSMT, zero output, relay, fade up
@@ -691,9 +684,9 @@ AudioEvent audioPoll(uint32_t nowMs) {
   switch (action) {
     case StreamRecovery::Action::None: break;
     case StreamRecovery::Action::Restart: return restartAfterFault();
-    case StreamRecovery::Action::Latch:
-      latchAfterFault("another fault inside a minute of three restarts");
-      return AudioEvent::Latched;
+    case StreamRecovery::Action::Reset:
+      serialOut().println("[ERROR] audio: another fault inside a minute of three restarts; resetting");
+      return AudioEvent::OutOfRestarts;
   }
   return AudioEvent::None;
 }
@@ -723,7 +716,6 @@ void audioReport(Print& out) {
     out.print(h.nanBlocks);
     out.println(" NaN blocks since boot");
   }
-  if (h.latched) out.println("[ERROR] audio: a fault past the restart budget latched the mute");
 }
 
 AudioErrors audioErrors() {
@@ -741,7 +733,6 @@ AudioHealth audioHealth() {
   h.nanBlocks = gCounts.nanBlocks;
   NVIC_EnableIRQ(SWPMI1_IRQn);
   h.restarts = gRecovery.restarts();
-  h.latched = gRecovery.latched();
   return h;
 }
 

@@ -60,7 +60,7 @@ Every gStats{kStatsMs};
 Every gLoadRefresh{kUiTickMs};  // the load figures move once a second; the UI tick reads them
 int gLoadPercent = 0;
 int gMeanLoadPercent = 0;
-bool gAudioLive = false;  // audio running, not stalled, not latched; the LED's gate
+bool gAudioLive = false;  // audio running and not stalled; the LED's gate
 BlockTroubleClock gTrouble;  // time since the last late, dry or overrun block, for the LED's flash
 int gLedDuty = -1;  // the last PWM duty written, so an unchanged level costs no timer write
 
@@ -142,7 +142,6 @@ void replyStatus(uint32_t id) {
   status.saiErrors = health.errors.count;
   status.restarts = health.restarts;
   status.nanBlocks = health.nanBlocks;
-  status.audioLatched = health.latched;
   status.stalled = faultAudioStalled();
   status.powerTrips = powerSenseTrips();
   status.floorDbfs = peakDbfs(audioTakeGatePeak());
@@ -242,12 +241,12 @@ void refreshLoad(uint32_t nowMs) {
   if (!gLoadRefresh.due(nowMs)) return;
   gLoadPercent = gSettings.debug ? audioWorstLoadPercent() : 0;
   gMeanLoadPercent = audioMeanLoadPercent();
-  gAudioLive = gAudioRunning && !faultAudioStalled() && !audioHealth().latched;
+  gAudioLive = gAudioRunning && !faultAudioStalled();
 }
 
 // Sets the user LED's brightness from the mean audio load (core/load_led.h). A high level lights
 // it (the bootloader board file's LED_STATE_ON), so the duty is the brightness. The LED is dark
-// while audio is not running, has stalled or is latched. The timer is written only when the duty
+// while audio is not running or has stalled. The timer is written only when the duty
 // changes, because every analogWrite reloads the timer's period.
 void driveLoadLed(uint32_t nowMs) {
   gTrouble.note(audioTroubleBlocks(), nowMs);
@@ -301,8 +300,7 @@ void setup() {
 void loop() {
   const uint32_t nowMs = millis();
   faultWatchdogKick();
-  faultAudioWatch(nowMs, gAudioRunning);
-  if (audioPoll(nowMs) != AudioEvent::None) diagNoteAudioFault();
+  faultAudioWatch(nowMs, gAudioRunning, audioPoll(nowMs));
   bootHealthPoll(nowMs);
 
   usbLinkPoll(nowMs);
@@ -318,7 +316,7 @@ void loop() {
   mutePoll(nowMs, gSettings.topSwitch);
 
   const UiInput input = menuInput(nowMs);
-  if (input.detents != 0 || input.click || input.hold) gDim.noteActivity(nowMs);
+  if (input.detents != 0 || input.click || input.hold || input.press) gDim.noteActivity(nowMs);
   const bool settingsChanged = applyAction(gMenu.update(input, nowMs), nowMs);
   saveSettings(settingsChanged, nowMs);
   recordPoll(nowMs);

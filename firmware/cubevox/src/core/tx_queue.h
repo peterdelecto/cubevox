@@ -15,8 +15,10 @@ enum class TxClass : uint8_t { Log, Reply };
 
 class TxQueue {
  public:
-  static constexpr size_t kCapacity = 8192;
-  static constexpr size_t kReplyReserve = 1024;
+  // The reserve holds the largest reply, a bench build's hello of about 5.3 kB (core_tx_queue
+  // measures it), and the whole queue holds two of them.
+  static constexpr size_t kCapacity = 16384;
+  static constexpr size_t kReplyReserve = 6144;
 
   // Appends text of one class. A line ends at '\n'; bytes after the last '\n' are held back from
   // draining until their line ends. A line is written by one producer, so it keeps one class.

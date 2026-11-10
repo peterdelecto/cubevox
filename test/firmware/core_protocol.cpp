@@ -386,7 +386,7 @@ void checkStatusReply() {
             w.out == "{\"id\":15,\"ok\":true,\"cpu_mean\":54.66,\"cpu_worst\":71,\"late\":0,\"dry_blocks\":0,\"muted\":true,\"seq\":9,"
                      "\"rec_errors\":2,\"serial_dropped\":5,\"stray_bytes\":8,\"boot_fails\":0,"
                      "\"overruns\":0,\"sai_errors\":0,\"restarts\":0,\"nan_blocks\":0,"
-                     "\"power_trips\":0,\"stalled\":false,\"audio_latched\":false,\"reply_overflows\":0,"
+                     "\"power_trips\":0,\"stalled\":false,\"reply_overflows\":0,"
                      "\"floor_dbfs\":-120,\"update_reason\":\"none\"}\n",
         "proto: status reply");
 
@@ -414,7 +414,7 @@ void checkStatusReply() {
         "proto: status carries the boot fails and the update reason");
 }
 
-// The audio fault counters, the power trips, the latches and the reply pieces lost to overflow.
+// The audio fault counters, the power trips, the stall and the reply pieces lost to overflow.
 void checkStatusFaults() {
   StringWriter w;
   protocol::Status s;
@@ -424,11 +424,10 @@ void checkStatusFaults() {
   s.nanBlocks = 4;
   s.powerTrips = 5;
   s.stalled = true;
-  s.audioLatched = true;
   protocol::replyStatus(w, 18, s);
   check(JsonReader(w.out).valid() &&
             has(w.out, "\"overruns\":3,\"sai_errors\":1,\"restarts\":2,\"nan_blocks\":4,\"power_trips\":5,"
-                       "\"stalled\":true,\"audio_latched\":true,"),
+                       "\"stalled\":true,\"reply_overflows\":0,"),
         "proto: status carries the audio faults and the power trips");
 
   w = StringWriter();
@@ -445,7 +444,7 @@ void checkStatusWidest() {
   s.cpuWorstPercent = 100.0f;
   s.late = s.seq = s.recordErrors = s.serialDropped = s.strayBytes = s.bootFails = 0xFFFFFFFFu;
   s.overruns = s.saiErrors = s.restarts = s.nanBlocks = s.powerTrips = 0xFFFFFFFFu;
-  s.stalled = s.audioLatched = true;
+  s.stalled = true;
   s.floorDbfs = -123.456f;
   s.updateReason = "ImageUnreadable";
   protocol::replyStatus(w, 0xFFFFFFFFu, s);
@@ -661,12 +660,61 @@ void checkFramerStray() {
   check(f.strayBytes() == 8, "framer: the line added no stray bytes");
 }
 
+// One loop() pass of the serial reader over `in` from `at`, as board/serial_link.cpp runs it. Counts
+// the line events and returns the bytes it read.
+size_t readerPass(protocol::Framer& f, const std::string& in, size_t at, int& events) {
+  size_t bytesRead = 0;
+  protocol::Framer::Kind kind = protocol::Framer::Kind::None;
+  while (!protocol::pollPassDone(kind, bytesRead) && at + bytesRead < in.size()) {
+    kind = f.feed(static_cast<uint8_t>(in[at + bytesRead]));
+    ++bytesRead;
+    if (kind != protocol::Framer::Kind::None) ++events;
+  }
+  return bytesRead;
+}
+
+// A host that keeps sending gets one line handled per loop() pass, so the reader always returns.
+void checkReaderBudget() {
+  std::string flood;
+  for (int i = 0; i < 200; ++i) flood += "{\"id\":1,\"cmd\":\"hello\"}\n";
+  protocol::Framer f;
+  size_t at = 0;
+  int passes = 0;
+  int lines = 0;
+  bool oneEach = true;
+  while (at < flood.size()) {
+    int events = 0;
+    at += readerPass(f, flood, at, events);
+    oneEach = oneEach && events <= 1;
+    lines += events;
+    ++passes;
+  }
+  check(oneEach && lines == 200 && passes == 200, "reader: a flood of lines is handled one line a pass");
+
+  const std::string stray(5000, 'x');
+  protocol::Framer g;
+  int events = 0;
+  check(readerPass(g, stray, 0, events) == protocol::kPollByteBudget && events == 0,
+        "reader: bytes that never make a line stop the pass at the byte budget");
+
+  std::string tooLong = "{" + std::string(protocol::kMaxLine + 10, 'a') + "\n{\"id\":2}\n";
+  protocol::Framer h;
+  events = 0;
+  const size_t first = readerPass(h, tooLong, 0, events);
+  check(first == protocol::kMaxLine + 1 && events == 1, "reader: a line too long ends the pass");
+  events = 0;
+  const size_t second = readerPass(h, tooLong, first, events);
+  check(events == 1 && first + second == tooLong.size() && std::strcmp(h.line(), "{\"id\":2}") == 0,
+        "reader: the next pass drops the rest of that line and frames the one after");
+}
+
 void checkFramer() {
   checkFramerBasics();
   checkFramerLimits();
   checkFramerReset();
   checkFramerNul();
   checkFramerStray();
+  checkReaderBudget();
 }
 
 // ---- bench ops -----------------------------------------------------------------------------
