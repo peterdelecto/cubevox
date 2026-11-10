@@ -20,5 +20,9 @@ void powerSensePoll(uint32_t nowMs);
 // Power-fail trips since boot.
 uint32_t powerSenseTrips();
 
+// True from a trip, the interrupt's included, until the rail has held for kPowerHoldMs. The flash
+// stores start no erase or program word while it holds.
+bool powerSenseTripped();
+
 // The "[boot] power sense ..." line, or "[ERROR] power sense: ..." when powerSenseInit failed.
 void powerSenseReport(Print& out);

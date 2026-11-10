@@ -10,8 +10,10 @@
 #include "core/settings.h"
 
 // Boot-time load. First recovers from a bank 2 double ECC fault, whether the last run hit it or the
-// bootloader reported its address, in a record sector or in the diagnostic log's sector. The
-// recovery waits on flash erases, so call it after faultInit() and before faultWatchdogStart().
+// bootloader reported its address, in a record sector or in the diagnostic log's sector. A
+// recovery from the last run's own fault that learned a bad word takes one off the bootloader's
+// failed-start count. The recovery waits on flash erases, so call it after faultInit() and before
+// faultWatchdogStart().
 // Then loads the newest valid record into `layout` and `settings`. A record whose layout fails
 // validation gives the default layout and a save that rewrites it. Leaves both untouched when
 // there is no usable record.

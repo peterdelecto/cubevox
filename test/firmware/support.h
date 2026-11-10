@@ -49,6 +49,7 @@ void checkLoadWindow();        // core_load.cpp
 void checkCanvas();            // core_canvas.cpp
 void checkPanelTest();         // core_panel_test.cpp
 void checkRecords();           // core_record.cpp
+void checkRecordCuts();        // core_record_cut.cpp
 void checkEntryLog();          // core_entry_log.cpp
 void checkCrc32();             // core_crc32.cpp
 void checkBootHealth();        // core_boot_health.cpp

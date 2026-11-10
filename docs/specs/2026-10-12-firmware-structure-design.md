@@ -29,7 +29,7 @@ getters behind the sketch's back.
 | Tier | Module | Owns |
 |---|---|---|
 | core | `layout` | `Layout` (card per slot), `defaultLayout()`, `layoutValid()` |
-| core | `settings` | `Settings` (output level, input jack), `outputTrimDb()` |
+| core | `settings` | `Settings` (output level, input jack, POLISH COMP, VOX EQ, top switch, brightness, debug), `outputTrimDb()` |
 | core | `knob_filter` | `DebouncedInput`, `steppedPosition`, `KnobFilter` (smoothing, stepping, move detect, re-seed on step-count change) |
 | core | `panel` | `PanelReading` (knob values, toggles, last moved), the value the board hands up |
 | core | `compose` | `ChainSnapshot composeSnapshot(Layout, PanelReading, Settings, BenchOverrides)` |

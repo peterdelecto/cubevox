@@ -1,6 +1,7 @@
 // Checks the layout record codec and the flash record store on the host. Covers encoding, the
 // save debounce and the skipped save of an unchanged state, recovery after torn writes and
-// interrupted erases, the boot-time ECC recovery, sector switches and flash errors.
+// interrupted erases, the boot-time ECC recovery and its read limits, sector switches, flash errors
+// and the retry, the sequence floor, and the boot load.
 
 #include "support.h"
 
@@ -376,16 +377,43 @@ void checkStoreTornTail() {
   RecordStore store(f);
   RecordData out;
   check(store.begin(out) && out.sequence == 2, "store: torn tail is skipped, previous record loads");
-  check(store.status().nextEntry == 3, "store: append goes after the torn entry");
+  check(store.status().nextEntry == kEntriesPerSector, "store: a sector with a torn entry takes no more appends");
   check(store.bootNotes().tornEntries == 1 && store.bootNotes().dirtySectors == 0 && !store.bootNotes().unknownCard,
         "store: boot notes count the torn entry");
+  check(!store.status().busy, "store: a torn tail past the newest record starts no save");
   store.request(defaultLayout(), Settings{}, 0);
   uint32_t t = kSaveDebounceMs;
   runToIdle(store, f, t);
   const uint8_t* views[2] = {f.read(0), f.read(1)};
   RecordFound found;
-  check(newestRecord(views, 2, kRecordSectorBytes, found) && found.rec.sequence == 3 && found.entry == 3,
-        "store: record lands in entry 3 with sequence 3");
+  check(newestRecord(views, 2, kRecordSectorBytes, found) && found.rec.sequence == 3 && found.sector == 1 && found.entry == 0,
+        "store: the next save moves the log, sequence 3 in entry 0 of the other sector");
+  check(f.erases[0] == 0 && f.erases[1] == 0, "store: the blank sector takes it without an erase");
+}
+
+// Earlier firmware appended past a torn entry. The boot moves the newest record at once, so the torn
+// word faulting later costs nothing.
+void checkStoreRecordsPastTear() {
+  FakeFlash f;
+  for (int e = 0; e < 4; ++e) f.put(0, e, makeRec(1 + static_cast<uint32_t>(e)));
+  f.put(0, 4, makeRec(5));
+  std::memset(&f.mem[0][4 * kRecordBytes + 3 * kFlashWordBytes], 0x00, 4);  // part-written, reads clean
+  for (int e = 5; e < 8; ++e) f.put(0, e, makeRec(10 + static_cast<uint32_t>(e), OutputLevel::Mic));
+  RecordStore store(f);
+  RecordData out;
+  check(store.begin(out) && out.sequence == 17 && store.status().busy,
+        "store: newer records past a torn entry load, and a save of the newest is queued");
+  uint32_t t = kSaveDebounceMs;
+  runToIdle(store, f, t);
+  RecordData moved;
+  check(decodeRecord(f.mem[1].data(), moved) && moved.sequence == 18 && moved.settings.outputLevel == OutputLevel::Mic,
+        "store: the newest record is written again in the other sector");
+
+  const uint32_t fault = f.tear(0, 4, 3);  // the torn word now reads as a double ECC error
+  RecordStore reboot(f);
+  reboot.recover(0, fault);
+  check(reboot.begin(out) && out.sequence == 18 && out.settings.outputLevel == OutputLevel::Mic,
+        "store: a later fault on the torn word loses no record");
 }
 
 void fillSector(FakeFlash& f, int sector, uint32_t firstSeq) {
@@ -462,25 +490,78 @@ void checkStoreEraseAll() {
         "store: erase-all clears both sectors");
 }
 
+// Polls until the store is idle, the clock jumping a debounce at a time so a queued retry runs.
+void runOutRetries(RecordStore& store, uint32_t& t) {
+  for (int i = 0; i < 200 && store.status().busy; ++i) {
+    store.poll(t);
+    t += kSaveDebounceMs / 4;
+  }
+}
+
 void checkStoreProgramFailure() {
   FakeFlash f;
   RecordStore store(f);
   RecordData out;
   store.begin(out);
   f.failNextProgram = true;
-  store.request(defaultLayout(), Settings{}, 0);
+  store.request(defaultLayout(), micOutput(), 0);
   uint32_t t = kSaveDebounceMs;
-  runToIdle(store, f, t);
-  check(store.status().errors == 1 && store.status().sequence == 0 && !store.status().busy,
-        "store: a failed program counts an error and keeps the old sequence");
+  store.poll(t);  // sets up the write
+  store.poll(t);  // the failed first word
+  check(store.status().errors == 1 && store.status().sequence == 0 && store.status().busy,
+        "store: a failed program counts an error, keeps the old sequence and queues a retry");
   check(store.takeSaveFailed() && !store.takeSaveFailed(), "store: a failed save is reported once");
-  check(store.status().nextEntry == 1, "store: the part-written entry is skipped");
-
-  store.request(defaultLayout(), Settings{}, t);
+  check(store.status().nextEntry == kEntriesPerSector, "store: the sector with the part-written entry takes no more appends");
+  store.poll(t + kSaveDebounceMs - 1);
+  check(f.programs == 1, "store: the retry waits a debounce");
   t += kSaveDebounceMs;
-  runToIdle(store, f, t);
-  check(store.status().errors == 1 && store.status().sequence == 1 && store.status().nextEntry == 2 && !store.takeSaveFailed(),
-        "store: the next save lands after the skipped entry");
+  runOutRetries(store, t);
+  check(store.status().errors == 1 && store.status().sequence == 1 && !store.takeSaveFailed() && f.erases[0] == 1,
+        "store: the retry erases the sector it failed in, there being no record to protect, and lands");
+
+  FakeFlash again;  // a start on what that left
+  again.mem[0] = f.mem[0];
+  RecordStore reboot(again);
+  check(reboot.begin(out) && out.sequence == 1 && out.settings.outputLevel == OutputLevel::Mic,
+        "store: the retried save loads at the next start");
+  check(reboot.bootNotes().dirtySectors == 0 && reboot.bootNotes().tornEntries == 0, "store: and that start reports nothing wrong");
+}
+
+// A failed program with a record in flash: the retry goes to the other sector. A second failure is
+// left alone until the next request.
+void checkStoreRetry() {
+  FakeFlash f;
+  f.put(0, 0, makeRec(4));
+  RecordStore store(f);
+  RecordData out;
+  store.begin(out);
+  f.failNextProgram = true;
+  store.request(defaultLayout(), micOutput(), 0);
+  uint32_t t = kSaveDebounceMs;
+  runOutRetries(store, t);
+  RecordData back;
+  check(store.status().sequence == 5 && store.status().sector == 1 && decodeRecord(f.mem[1].data(), back) &&
+            back.sequence == 5 && back.settings.outputLevel == OutputLevel::Mic && f.erases[0] == 0,
+        "store: a failed save is retried once in the other sector, and the newest record stays");
+
+  FakeFlash g;
+  RecordStore twice(g);
+  twice.begin(out);
+  g.failNextProgram = true;
+  twice.request(defaultLayout(), micOutput(), 0);
+  t = kSaveDebounceMs;
+  twice.poll(t);
+  twice.poll(t);
+  g.failNextProgram = true;  // the retry fails too
+  t += kSaveDebounceMs;
+  runOutRetries(twice, t);
+  const int programs = g.programs;
+  check(twice.status().errors == 2 && twice.status().sequence == 0 && !twice.status().busy,
+        "store: a retry that fails as well leaves the bank alone");
+  twice.request(defaultLayout(), micOutput(), t);
+  t += kSaveDebounceMs;
+  runOutRetries(twice, t);
+  check(g.programs > programs && twice.status().sequence == 1, "store: the next request saves again");
 }
 
 void checkStoreEraseFailure() {
@@ -640,16 +721,12 @@ void checkStoreRewritesV1() {
         "store: the same state over a v1 record is written again as v2");
 }
 
-// Records firstSeq onward in entries 0 to records - 1 of `sector`, the next record torn at its
-// fourth word, and a valid record past the tear that only a read beyond the faulted word could
-// find. Returns the offset of the faulted word.
+// Records firstSeq onward in entries 0 to records - 1 of `sector` and the next record torn at its
+// fourth word, the last entry the log wrote. Returns the offset of the faulted word.
 uint32_t tornTail(FakeFlash& f, int sector, uint32_t firstSeq, int records) {
   for (int i = 0; i < records; ++i) f.put(sector, i, makeRec(firstSeq + static_cast<uint32_t>(i), OutputLevel::Mic));
-  const uint32_t next = firstSeq + static_cast<uint32_t>(records);
-  f.put(sector, records, makeRec(next));
-  const uint32_t fault = f.tear(sector, records, 3);
-  f.put(sector, records + 1, makeRec(next + 50));
-  return fault;
+  f.put(sector, records, makeRec(firstSeq + static_cast<uint32_t>(records)));
+  return f.tear(sector, records, 3);
 }
 
 void checkRecoverTornTail() {
@@ -659,8 +736,8 @@ void checkRecoverTornTail() {
   const uint32_t newest = 1000 + 36;
   RecordStore store(f);
   const RecordRecovery r = store.recover(0, fault);
-  check(r.carried && !r.carryFailed && !r.eraseFailed && r.sequence == newest,
-        "recover: the newest record below the faulted word is carried, never one past it");
+  check(r.learned && r.carried && !r.carryFailed && !r.eraseFailed && r.sequence == newest,
+        "recover: the newest record below the faulted word is carried");
   check(f.erases[1] == 1 && f.erases[0] == 1, "recover: the other sector is erased for the copy, then the faulted one");
   RecordData out;
   check(store.begin(out) && out.sequence == newest && out.settings.outputLevel == OutputLevel::Mic,
@@ -725,6 +802,156 @@ void checkRecoverCopyFails() {
         "recover: the next save erases the other sector and lands there");
 }
 
+// A fault in the very first word, and an offset past the sector, which the clamp reads as the end.
+void checkRecoverEdges() {
+  FakeFlash f;
+  for (int e = 0; e < 3; ++e) f.put(1, e, makeRec(1 + static_cast<uint32_t>(e)));
+  const uint32_t first = f.tear(0, 0, 0);
+  RecordStore store(f);
+  const RecordRecovery r = store.recover(0, first);
+  check(first == 0 && r.learned && !r.carried && f.erases[0] == 1 && f.reads[1] == 0,
+        "recover: a fault in word 0 of entry 0 erases the sector without reading the other");
+  RecordData out;
+  check(store.begin(out) && out.sequence == 3, "recover: and the box boots on the other sector");
+
+  FakeFlash g;
+  for (int e = 0; e < 5; ++e) g.put(0, e, makeRec(10 + static_cast<uint32_t>(e)));
+  RecordStore past(g);
+  const RecordRecovery p = past.recover(0, static_cast<uint32_t>(kRecordSectorBytes) + 64);
+  check(!p.learned && p.carried && p.sequence == 14 && g.erases[0] == 1,
+        "recover: an offset past the sector reads the whole sector, carries its newest and erases it");
+  check(past.begin(out) && out.sequence == 14 && past.status().sector == 1, "recover: and the box boots on the copy");
+}
+
+// The read limits outlive a fault reset and start over at a power-on or when their seal fails.
+void checkReadLimits() {
+  FakeFlash f;
+  fillSector(f, 1, 1);
+  const uint32_t fault = tornTail(f, 0, 1000, 4);  // newest readable: 1003 in entry 3
+  f.put(0, 6, makeRec(1100));                      // only a read past the fault could find it
+  RecordReadLimits limits;
+  std::memset(&limits, 0x5A, sizeof limits);  // DTCM after a power-on
+  RecordStore first(f);
+  first.useReadLimits(limits, false);
+  check(limits.bytes[0] == kRecordSectorBytes && limits.bytes[1] == kRecordSectorBytes,
+        "limits: unsealed limits start over with both sectors whole");
+  f.failNextErase = true;  // the copy cannot make room, so the faulted sector stays
+  const RecordRecovery r = first.recover(0, fault);
+  check(r.carryFailed && limits.bytes[0] == 4 * kRecordBytes && limits.bytes[1] == 0,
+        "limits: the fault lowers its sector's limit, and a failed copy closes the other sector");
+
+  RecordStore second(f);  // the next start, after a fault reset
+  second.useReadLimits(limits, false);
+  RecordData out;
+  const int readsOther = f.reads[1];
+  check(second.begin(out) && out.sequence == 1003 && f.reads[1] == readsOther,
+        "limits: the next start reads the faulted sector only below the fault, and the closed one not at all");
+  second.request(defaultLayout(), Settings{}, 0);
+  uint32_t t = kSaveDebounceMs;
+  runToIdle(second, f, t);
+  check(second.status().sector == 1 && second.status().sequence == 1004 && limits.bytes[1] == kRecordSectorBytes,
+        "limits: the save erases the closed sector, which opens it again");
+
+  RecordStore cold(f);
+  cold.useReadLimits(limits, true);
+  check(limits.bytes[0] == kRecordSectorBytes, "limits: a power-on opens every sector again");
+  limits.bytes[0] = 4 * kRecordBytes;  // changed without its seal
+  RecordStore stale(f);
+  stale.useReadLimits(limits, false);
+  check(limits.bytes[0] == kRecordSectorBytes, "limits: limits that fail their seal start over");
+}
+
+// The failed-start count after a start that recovered from its own bank 2 ECC fault.
+void checkFailsGiveBack() {
+  check(failsAfterEccRecovery(2, true) == 1 && failsAfterEccRecovery(2, false) == 2 && failsAfterEccRecovery(0, true) == 0,
+        "limits: a recovery that learned a bad word gives its start back, never below zero");
+}
+
+// A later build wrote a record this one cannot decode. The next save still goes past its sequence.
+void checkSequenceFloor() {
+  for (const bool schema : {true, false}) {
+    FakeFlash f;
+    for (int e = 0; e < 3; ++e) f.put(0, e, makeRec(1 + static_cast<uint32_t>(e)));
+    RecordBytes later = encodeRecord(makeRec(9));
+    if (schema) {
+      later[kOffSchema] = 3;
+    } else {
+      later[kOffVoxEq] = 3;  // a VOX EQ value this build does not have
+    }
+    reseal(later);
+    std::memcpy(&f.mem[0][3 * kRecordBytes], later.data(), kRecordBytes);
+    RecordStore store(f);
+    RecordData out;
+    check(store.begin(out) && out.sequence == 3, "floor: the newest record this build decodes loads");
+    store.request(defaultLayout(), micOutput(), 0);
+    uint32_t t = kSaveDebounceMs;
+    runToIdle(store, f, t);
+    check(store.status().sequence == 10,
+          schema ? "floor: the save after a schema 3 record takes sequence 10, past it"
+                 : "floor: the save after a record with VOX EQ 3 takes sequence 10, past it");
+    RecordStore reboot(f);
+    check(reboot.begin(out) && out.sequence == 10 && out.settings.outputLevel == OutputLevel::Mic,
+          "floor: and that save loads at the next start");
+  }
+}
+
+// A cut erase after a carried record leaves the same sequence in both sectors.
+void checkEqualSequences() {
+  FakeFlash f;
+  f.put(0, 5, makeRec(7, OutputLevel::Mic));  // the first entries blanked, the rest as it was
+  f.put(1, 0, makeRec(7, OutputLevel::Mic));  // the carried copy
+  RecordStore store(f);
+  RecordData out;
+  check(store.begin(out) && out.sequence == 7 && store.status().sector == 1 && store.status().nextEntry == 1,
+        "store: on equal sequences the copy in the clean sector wins, and the log goes on there");
+  check(store.bootNotes().dirtySectors == 1, "store: the cut erase is reported");
+  store.request(defaultLayout(), Settings{}, 0);
+  uint32_t t = kSaveDebounceMs;
+  runToIdle(store, f, t);
+  check(store.status().sequence == 8 && f.erases[0] + f.erases[1] == 0, "store: the next save appends without an erase");
+}
+
+// The boot load: a record whose only reverb id is unknown boots the default layout with the
+// record's settings and rewrites the record once.
+void checkLoadNewest() {
+  FakeFlash f;
+  RecordStore none(f);
+  Layout layout = defaultLayout();
+  layout.card[0] = Card::Empty;
+  const Layout before = layout;
+  Settings settings;
+  check(!loadNewestRecord(none, layout, settings, 0).loaded && layout == before, "load: blank flash leaves the layout alone");
+
+  const Layout def = defaultLayout();
+  int reverb = -1;
+  for (int s = 0; s < kSlotCount; ++s) {
+    if (cardDesc(def.card[s]).group == Group::Reverb) reverb = s;
+  }
+  RecordBytes b = encodeRecord(makeRec(3, OutputLevel::Mic));
+  char* id = reinterpret_cast<char*>(&b[kOffSlots + static_cast<size_t>(reverb) * kRecordCardFieldBytes]);
+  std::memset(id, 0, kCardIdBytes);
+  std::memcpy(id, "no_such_reverb", 14);
+  reseal(b);
+  std::memcpy(f.mem[0].data(), b.data(), kRecordBytes);
+  RecordStore store(f);
+  layout = before;
+  const RecordLoad load = loadNewestRecord(store, layout, settings, 0);
+  check(load.loaded && load.sequence == 3 && load.layout.replaced && load.layout.why.error == LayoutError::NoReverb,
+        "load: a record whose reverb id is unknown fails the reverb check");
+  check(layout == def && settings.outputLevel == OutputLevel::Mic && store.status().busy,
+        "load: the default layout boots with the record's settings, and a save is queued");
+  uint32_t t = kSaveDebounceMs;
+  runToIdle(store, f, t);
+  RecordData back;
+  check(store.status().sequence == 4 && decodeRecord(f.mem[0].data() + kRecordBytes, back) && back.layout == def &&
+            back.settings.outputLevel == OutputLevel::Mic && !store.status().busy,
+        "load: one save rewrites the record with the default layout");
+
+  RecordStore again(f);
+  check(!loadNewestRecord(again, layout, settings, 0).layout.replaced && !again.status().busy,
+        "load: a valid record queues no save");
+}
+
 }  // namespace
 
 void checkRecords() {
@@ -741,10 +968,12 @@ void checkRecords() {
   checkStoreClockSkew();
   checkStoreName();
   checkStoreTornTail();
+  checkStoreRecordsPastTear();
   checkStoreSectorSwitch();
   checkStoreInterruptedErase();
   checkStoreEraseAll();
   checkStoreProgramFailure();
+  checkStoreRetry();
   checkStoreEraseFailure();
   checkStoreWhileBusy();
   checkStoreUnknownCard();
@@ -756,4 +985,10 @@ void checkRecords() {
   checkRecoverOtherNewer();
   checkRecoverEraseFails();
   checkRecoverCopyFails();
+  checkRecoverEdges();
+  checkReadLimits();
+  checkFailsGiveBack();
+  checkSequenceFloor();
+  checkEqualSequences();
+  checkLoadNewest();
 }
