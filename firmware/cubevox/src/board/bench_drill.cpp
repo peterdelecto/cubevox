@@ -77,6 +77,16 @@ void stopAudio() {
   audioStopForBench();
 }
 
+void raiseStreamFault() {
+  serialOut().println("[bench] raising a stream fault");
+  audioStreamFaultForBench();
+}
+
+void toggleFailRestart() {
+  serialOut().println(audioBenchToggleFailRestart() ? "[bench] the next stream restart fails"
+                                                    : "[bench] stream restarts run as usual");
+}
+
 }  // namespace
 
 const BenchOverrides& benchOverrides() { return gBench; }
@@ -127,6 +137,8 @@ BenchResult benchDrillRun(BenchOp op, const BenchArgs& args) {
     case BenchOp::Clip: r.error = toggleClip(); break;
     case BenchOp::ResetPeaks: resetPeaks(); break;
     case BenchOp::StopAudio: stopAudio(); break;
+    case BenchOp::StreamFault: raiseStreamFault(); break;
+    case BenchOp::FailRestart: toggleFailRestart(); break;
     case BenchOp::Fault: faultForceBusFault(); break;
     case BenchOp::Spin: faultSpinForWatchdog(); break;
     case BenchOp::RecordSave: recordSaveNow(); break;

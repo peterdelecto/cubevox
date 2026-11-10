@@ -28,8 +28,8 @@
 // ---- DTCM ----------------------------------------------------------------------------------
 
 // The top 256 bytes of DTCM are shared by both programs. struct CvBootBlock takes the first 192
-// and the fault record (.cv_noinit) the last 64. A system reset keeps them and power-on leaves
-// them random.
+// and .cv_noinit the last 64: the fault record, then the record sectors' read limits. A system
+// reset keeps them and power-on leaves them random.
 #define CV_DTCM_END           0x20020000u
 #define CV_BOOT_BLOCK_ADDR    0x2001FF00u
 #define CV_BOOT_BLOCK_SIZE    256u
@@ -473,7 +473,8 @@ static inline bool cvImageHeaderVersionOk(uint32_t headerVersion) {
 enum CvDiagKind {
   CvDiagKindBoot = 1,
   CvDiagKindUpdateRequest = 2,
-  // The audio stream restarted after a fault, latched its mute, or stalled.
+  // The audio stream restarted after a fault, ran past its restart budget, failed to restart, or
+  // stalled. The entry's fault field names which.
   CvDiagKindAudioFault = 3
 };
 
@@ -500,7 +501,8 @@ struct CvDiagEntry {
   uint32_t overruns;
   // Release name, the CUBEVOX_FW_VERSION string.
   char firmware[32];
-  // Fault record summary as faultSummaryText prints it, or empty.
+  // Fault record summary as faultSummaryText prints it, or empty. An audio entry holds the audio
+  // fault's cause instead.
   char fault[64];
   // The previous run's CvBootBlock::appSummary, or empty.
   char summary[64];

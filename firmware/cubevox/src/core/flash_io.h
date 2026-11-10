@@ -15,9 +15,17 @@ constexpr size_t kFlashSectorBytes = 128 * 1024;
 class FlashIo {
  public:
   virtual ~FlashIo() = default;
-  // Read-only view of one sector. A store reads it only in begin(), because the same bank
-  // stalls reads while it programs or erases.
+  // Read-only view of one sector. The stores read only at boot (begin(), and the record store's
+  // recover()), because the same bank stalls reads while it programs or erases.
   virtual const uint8_t* read(int sector) const = 0;
+
+  // Read-only view of `bytes` at `offset` into a sector. The record store reads every entry through
+  // it, so a test flash can fault on the entry that holds a bad word, as the board bus-faults.
+  virtual const uint8_t* view(int sector, uint32_t offset, size_t bytes) const {
+    (void)bytes;
+    return read(sector) + offset;
+  }
+
   virtual void eraseStart(int sector) = 0;
   // True while the erase runs. An implementation gives up on its own when the flash hangs.
   virtual bool eraseBusy() = 0;

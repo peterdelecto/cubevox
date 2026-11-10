@@ -42,9 +42,12 @@ void checkMenuButton() {
   MenuButton b;
   b.reset(false);
   uint32_t t = 1000;
-  check(!b.update(true, t).click && !b.update(true, t + 5).hold, "menu button: the press itself is not a click");
-  MenuButtonEvent ev = b.update(false, t + 100);
-  check(ev.click && !ev.hold, "menu button: a short press is a click on the release");
+  MenuButtonEvent ev = b.update(true, t);
+  check(ev.press && !ev.click, "menu button: the down edge is a press, not a click");
+  ev = b.update(true, t + 5);
+  check(!ev.press && !ev.hold, "menu button: the press comes once while the button stays down");
+  ev = b.update(false, t + 100);
+  check(ev.click && !ev.hold && !ev.press, "menu button: a short press is a click on the release");
   ev = b.update(false, t + 200);
   check(!ev.click && !ev.hold, "menu button: and the click comes once");
 
@@ -81,10 +84,11 @@ void checkMenuButton() {
   MenuButton down;
   down.reset(true);
   ev = down.update(true, 100000);
-  check(!ev.hold && !ev.click, "menu button: a button already down at start reports no hold");
+  check(!ev.hold && !ev.click && !ev.press, "menu button: a button already down at start reports no hold and no press");
   ev = down.update(false, 100010);
-  check(!ev.click, "menu button: and no click when it is released");
-  down.update(true, 100100);
+  check(!ev.click && !ev.press, "menu button: and no click when it is released");
+  ev = down.update(true, 100100);
+  check(ev.press, "menu button: the next press reports its down edge");
   ev = down.update(false, 100150);
   check(ev.click, "menu button: and the next press is a click");
 }

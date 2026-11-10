@@ -1,7 +1,15 @@
 #include "core/flash_io.h"
 
+#include <string.h>
+
 bool isErased(const uint8_t* data, size_t len) {
-  for (size_t i = 0; i < len; ++i) {
+  size_t i = 0;
+  for (; i + sizeof(uint32_t) <= len; i += sizeof(uint32_t)) {
+    uint32_t word;
+    memcpy(&word, data + i, sizeof word);
+    if (word != 0xFFFFFFFFu) return false;
+  }
+  for (; i < len; ++i) {
     if (data[i] != 0xFF) return false;
   }
   return true;

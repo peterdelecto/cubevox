@@ -487,11 +487,36 @@ void checkRingStress() {
 
 }  // namespace
 
+// A constant frame draws a flat line off the horizon. At -30 dBFS the value is the frame's peak and
+// its scale, so the line sits 22 rows up, on row 10. At -50 dBFS the scale stops at kScopeMinScale,
+// so the line sits 7 rows up, on row 25. This records today's picture; the horizon is the owner's
+// call.
+void checkConstantFrame() {
+  struct Case {
+    float level;
+    int rowsUp;
+    const char* what;
+  };
+  const Case cases[] = {
+      {0.031622777f, 22, "scope constant: a frame held at -30 dBFS draws a flat line 22 rows up, on row 10"},
+      {0.0031622777f, 7, "scope constant: a frame held at -50 dBFS draws a flat line 7 rows up, on row 25"},
+  };
+  for (const Case& c : cases) {
+    Samples flat;
+    flat.fill(c.level);
+    const ScopeFrame f = scopeFrame(flat.data(), 0.0f);
+    bool ok = f.scale > 0.0f;
+    for (const ScopeRun& run : f.column) ok = ok && run.lo == -c.rowsUp && run.hi == -c.rowsUp;
+    check(ok, c.what);
+  }
+}
+
 void checkScope() {
   checkTriggerSteady();
   checkTriggerEdges();
   checkColumns();
   checkScale();
+  checkConstantFrame();
   checkTail();
   checkRingOrder();
   checkRingStress();

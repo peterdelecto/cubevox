@@ -31,6 +31,19 @@ wins over `pin_knobs`. `stats` prints both masks. Letters in `bench_ops.py`: `n`
 JSON. The three flags are bench overrides only: they never touch the saved settings, and `stress.py`
 flips each back before it ends.
 
+## Fault levers (bench ops)
+
+| Op | Arguments | Does |
+|---|---|---|
+| `stream_fault` | | stops the RX stream and reports a DMA error through the HAL's error callback, the way a DMA error that stops the stream arrives; prints `[bench] raising a stream fault`, then the box restarts the stream or, past three restarts in a minute, resets |
+| `fail_restart` | | flips whether the next stream restart is refused as a failed DMA start (`[bench] the next stream restart fails` or `[bench] stream restarts run as usual`); a failed restart clears it |
+
+Both go as JSON, with no letter. `firmware/bringup.py --stream-faults` drives them with nothing by
+hand, each drill from a fresh start past the 5 s healthy window. Four faults inside 20 s give three
+restarts and then the reset with `repeated stream faults` in DIAG.TXT. A fourth fault after the
+minute restarts plainly. A failed restart resets with `stream restart failed`. The verdict comes
+from the port and from DIAG.TXT on the update drive (checklist AU20, AU21).
+
 ## The run: `firmware/stress.py`
 
 1. Needs a bench image with the clip baked: `CLIP=../samples/adam_vox_sample3_5s.wav BENCH=1

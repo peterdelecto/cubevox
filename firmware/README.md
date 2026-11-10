@@ -109,7 +109,7 @@ includes are tier-qualified (`core/registry.h`, `board/pins.h`, `ui/menu.h`). Mo
 3. Sound path: `compose` (`ChainSnapshot` from layout, panel, settings and bench overrides), `chain_run` (the
    slot walk, the NaN guard, the polish tail and the BYPASS mix, over the engines and buffers the board hands in),
    `output_stage` (the NaN guard and the output gain ramp), `audio_recovery` (when a faulted stream restarts: at
-   most 3 times in 60 s, then the mute latches).
+   most 3 times in 60 s; the next fault, or a restart that fails, resets the box).
 4. Display: `canvas` (128 x 64 page-layout frame buffer with dirty pages, ordered dissolve), `fonts` (the font
    editor's export as `FontDesc`), `display.h` (backend interface, `flushStep` and `setContrast`, and
    `PanelLink`, the restart rule for a panel that is missing or stops answering), `brightness.h` (the OLED BRIGHT
@@ -141,7 +141,7 @@ and dissolves between them).
 2. Audio: `audio` (SAI, DMA, the audio IRQ, the engines and the published snapshot, fade and engine reset on a
    layout change, per-stage cycle counts, SAI and DMA error handling with the stream restart).
 3. Panel: `controls` (mux scan on ADC3, toggles), `adc_setup` (one ADC brought up once, for `controls` and
-   `power_sense`), `input` (encoder, click and hold to `UiInput`), `mute`, `input_jack` (PAD_EN for relay K103).
+   `power_sense`), `input` (encoder, click, hold and press to `UiInput`), `mute`, `input_jack` (PAD_EN for relay K103).
 4. Display: `sh1106.c` (the SH1106 driver the bootloader compiles too) and `display_sh1106` (the bus from
    `pins.h`, boot starts with bus recovery, one page per loop pass under `PanelLink`).
 5. USB and protocol: `usb_link` (CDC gated on VBUS), `serial_link` (CDC bytes to JSON lines, reply writer, output
@@ -232,11 +232,12 @@ DrumSynthV3 are references to read, and nothing in `firmware/` is copied from th
   and reset 20 ms after that. The next boot report prints `[ERROR] last reset: fault ...` or `[boot] fault: none`,
   plus the decoded `RCC->RSR` reset cause. A stack pointer outside RAM stores zero for PC and LR. `faultInit()`
   paints the free stack, and the boot report prints how much was never used. The stall watch arms at each stream
-  start. If the block counter then stops for 100 ms while the stream runs and the audio module has not latched,
-  the mute latches, an `audio` entry goes to the diagnostic log, and a planned reset brings the sound back. SAI and
+  start. If the block counter then stops for 100 ms while the stream runs and no planned reset is pending,
+  the output mutes, an `audio` entry goes to the diagnostic log, and a planned reset brings the sound back. SAI and
   DMA transfer errors are counted in `audio.cpp` and reported at most once a second. `SAI1_IRQn` delivers `OVRUDR`,
   `AFSDET`, `LFSDET` and `WCKCFG`. A stream-stopping error or 8 overruns in a row mutes; `audioPoll` restarts at
-  most 3 times a minute, then latches. TX halves are zeroed once read.
+  most 3 times a minute. The next fault, or a restart that fails, takes the stall's path in `faultAudioWatch`,
+  with the cause in the entry's fault text. TX halves are zeroed once read.
 - `board/dfu.cpp`: `enterDfu()` is the only way into update mode, where the bootloader serves the `CUBEVOX` drive.
   It writes a summary of this run into the boot block (version, uptime, reset cause, last fault kind), queues a
   diagnostic log entry and starts the planned reset (`board/planned_reset.cpp`). `loop()` keeps running until a
@@ -277,7 +278,7 @@ DrumSynthV3 are references to read, and nothing in `firmware/` is copied from th
   window; the bench peaks are untouched), cumulative `late` and `dry_blocks` (the blocks that skipped the chain and
   passed the dry input after a late one), `muted`, the record `seq` and `rec_errors`,
   `serial_dropped`, `stray_bytes`, `boot_fails`, `update_reason`, the audio counters `overruns`, `sai_errors`,
-  `restarts` and `nan_blocks`, and `power_trips`, `stalled`, `audio_latched` and `reply_overflows`. All output
+  `restarts` and `nan_blocks`, and `power_trips`, `stalled` and `reply_overflows`. All output
   (replies, boot report, bench prints) goes through `serialOut()`, a bounded queue (`core/tx_queue`) that
   `serialLinkPoll` drains each pass with non-blocking writes sized by `Serial.availableForWrite()`; a line that does not fit is dropped whole and counted, and with no host connected
   the queue is discarded. `enter_dfu` and the bench fault and spin ops give the queue 100 ms (`serialFlush`) before
@@ -286,7 +287,7 @@ DrumSynthV3 are references to read, and nothing in `firmware/` is copied from th
   block and the worst block through the last fade-in. `python3 -I tools/protocol_check.py` (repo root `tools/`, no
   pyserial needed) runs the checks against a box and prints PASS or FAIL per check; `--no-reset` skips the reset-and-reload
   check, which uses the bench `spin` op (so a release build skips it). On a release build it also checks that bench
-  `fault`, `record_erase`, `stop_audio`, `slot_on`, `all_on`, `set_knob` and `knobs_live` are refused; on both builds it sends raw `faewdx1k` outside a line and
+  `fault`, `record_erase`, `stop_audio`, `stream_fault`, `fail_restart`, `slot_on`, `all_on`, `set_knob` and `knobs_live` are refused; on both builds it sends raw `faewdx1k` outside a line and
   checks that nothing acts and `stray_bytes` grows by 8.
 - Bench operations (spec `2026-10-12-serial-protocol-design.md`, "Bench operations"): the box takes no single-byte
   commands. A byte outside a JSON line is ignored and counted (`stray_bytes` in `status`). Every bench action is a
@@ -300,7 +301,11 @@ DrumSynthV3 are references to read, and nothing in `firmware/` is copied from th
      the release image does not contain the code): `slot_off`, `slots_on`, `slot_on`, `all_on`, `slots_live`,
      `pin_knobs`, `set_knob`, `knobs_live`, `chasm`, `clip`, `reset_peaks`, `stop_audio`, `fault`, `spin`,
      `record_save`, `record_erase`, `panel_test`, `panel_summary`, `panel_dump`, `panel_jack`, `panel_mute`,
-     `panel_oled`.
+     `panel_oled`, `bypass`, `polish_comp`, `vox_eq`, `stream_fault`, `fail_restart`. `stream_fault` stops the
+     RX stream and reports a DMA error through the HAL's error callback, the way a DMA error that stops the
+     stream arrives, so `audioPoll` restarts the stream or, past the budget, resets the box. `fail_restart`
+     flips whether the next restart is refused as a failed DMA start (`[bench] the next stream restart fails`
+     or `stream restarts run as usual`). `bringup.py --stream-faults` drills both (AU20, AU21).
   3. Panel levers (bench image only, hands-free stress runs). A slot is on when its panel toggle reads on or the
      bench forces it on, and no bench force-off holds it off. `slot_off` N and `slot_on` N each flip one bit of
      their force mask. `slots_on` clears the force-off mask. `all_on` forces all eight slots on. `slots_live`

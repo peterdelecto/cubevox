@@ -1,5 +1,6 @@
 #include "board/fault.h"
 
+#include <stddef.h>
 #include <unistd.h>
 
 #include <array>
@@ -20,6 +21,7 @@
 #include "board/print_hex.h"
 #include "board/serial_link.h"
 #include "core/audio_stall.h"
+#include "core/record_store.h"
 #include "core/timing.h"
 
 // faultCapture's own stack, so a fault from an overflowed main stack still records. The trampolines
@@ -48,9 +50,18 @@ constexpr uint32_t kStackPaint = 0xC5A5C5A5u;
 // Left unpainted below the stack pointer, for the frames of the calls that paint.
 constexpr uintptr_t kPaintMarginBytes = 256;
 
-// Written by the fault handler, read on the next boot. .cv_noinit (firmware/cubevox.ld) sits at
-// the top of DTCM, above the boot block and .dtcm_bss, and survives a system reset.
-__attribute__((section(".cv_noinit"))) CvFaultRecord gStored;
+// .cv_noinit (firmware/cubevox.ld) sits at the top of DTCM, above the boot block and .dtcm_bss, and
+// survives a system reset. The fault handler writes the fault record, read on the next boot, at its
+// start, where the bootloader reads it too. The record store's read limits follow it.
+struct NoInit {
+  CvFaultRecord fault;
+  RecordReadLimits recordLimits;
+};
+static_assert(offsetof(NoInit, fault) == 0, "the fault record sits at CV_FAULT_RECORD_ADDR");
+static_assert(sizeof(NoInit) <= CV_FAULT_RECORD_SIZE, "the fault record and the read limits fit the slot");
+
+__attribute__((section(".cv_noinit"))) NoInit gNoInit;
+CvFaultRecord& gStored = gNoInit.fault;
 
 CvFaultRecord gLast = {};  // copy taken at boot, printed by every report this run
 uint32_t gResetFlags = 0;
@@ -271,6 +282,8 @@ void faultInit() {
 
 bool faultInitDone() { return gInitDone; }
 
+RecordReadLimits& faultRecordReadLimits() { return gNoInit.recordLimits; }
+
 uint32_t faultResetFlags() { return gResetFlags; }
 
 bool faultResetWasPowerOn() {
@@ -306,20 +319,35 @@ void faultWatchdogStart() {
 
 void faultWatchdogKick() { LL_IWDG_ReloadCounter(IWDG1); }
 
-// A stream the audio module latched has stopped on purpose and is not a stall; a restart arms the
-// watch afresh, and a restart that failed leaves the watch armed on a stream that is down. A stall mutes at once and resets once the flash is idle, so DIAG.TXT gets the entry
-// and the sound comes back about a second later.
-void faultAudioWatch(uint32_t nowMs, bool audioRunning) {
+namespace {
+
+// The one way an audio fault ends the run: mute at once, an audio entry naming the cause, and a
+// planned reset once the flash is idle. The box comes back on the power-on path.
+void resetForAudio(uint32_t nowMs, const char* cause) {
+  muteLatch();
+  diagNoteAudioFault(cause);
+  plannedResetStart(PlannedReset::AudioStall, nowMs);
+}
+
+}  // namespace
+
+// A restart arms the stall watch afresh. Once a reset is pending the watch stands down, so one
+// fault writes one entry.
+void faultAudioWatch(uint32_t nowMs, bool audioRunning, AudioEvent event) {
+  switch (event) {
+    case AudioEvent::None: break;
+    case AudioEvent::Restarted: diagNoteAudioFault("stream restarted"); break;
+    case AudioEvent::OutOfRestarts: resetForAudio(nowMs, "repeated stream faults"); break;
+    case AudioEvent::RestartFailed: resetForAudio(nowMs, "stream restart failed"); break;
+  }
   if (!audioRunning) return;
   reportTransferErrors(nowMs);
   const AudioHealth health = audioHealth();
-  if (!gStallWatch.update(nowMs, !health.latched, health.restarts, audioBlockCount())) return;
-  muteLatch();
+  if (!gStallWatch.update(nowMs, !plannedResetPending(), health.restarts, audioBlockCount())) return;
   serialOut().print("[ERROR] audio stalled after ");
   serialOut().print(gStallWatch.blocks());
   serialOut().println(" blocks, output muted; resetting");
-  diagNoteAudioFault();
-  plannedResetStart(PlannedReset::AudioStall, nowMs);
+  resetForAudio(nowMs, "audio stalled");
 }
 
 bool faultAudioStalled() { return gStallWatch.stalled(); }

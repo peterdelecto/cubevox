@@ -21,6 +21,7 @@ struct UiInput {
   int32_t detents = 0;  // signed turn steps
   bool click = false;   // the button went up after a press shorter than kMenuHoldMs
   bool hold = false;    // the button has been down for kMenuHoldMs; sent once per press
+  bool press = false;   // the button went down; counts as activity
 };
 
 // What the sketch must do after an update. The menu never edits settings itself.

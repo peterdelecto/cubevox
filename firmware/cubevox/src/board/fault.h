@@ -6,6 +6,7 @@
 
 #include <Arduino.h>
 
+#include "board/audio.h"
 #include "board/boot_block.h"
 #include "board/build_kind.h"
 
@@ -16,6 +17,12 @@ void faultInit();
 
 // True once faultInit() has run. The ECC recovery reads the fault record faultInit() loads.
 bool faultInitDone();
+
+struct RecordReadLimits;
+
+// The record store's read limits, kept in .cv_noinit beside the fault record so they outlive a
+// reset. A power-on leaves them random; RecordStore::useReadLimits() checks their seal.
+RecordReadLimits& faultRecordReadLimits();
 
 // The reset flags (RCC->RSR bits) of this boot, as the bootloader stored them in the boot block
 // (CvBootBlock::resetFlags, block version 2 and up). The bootloader reads and clears the register
@@ -38,12 +45,14 @@ bool faultLastWasBank2Ecc(uint32_t& address);
 void faultWatchdogStart();
 void faultWatchdogKick();
 
-// Call every loop pass. New SAI or DMA transfer errors are reported at most once a second. An audio
-// stream that stops advancing for kAudioStallMs while it runs latches the mute, queues an audio
-// fault entry in the diagnostic log, and starts a planned reset that brings the sound back.
-void faultAudioWatch(uint32_t nowMs, bool audioRunning);
+// Call every loop pass with what audioPoll returned. New SAI or DMA transfer errors are reported at
+// most once a second. A stream restart queues an audio entry in the diagnostic log. A fault past
+// the restart budget, a failed restart, or a stream that stops advancing for kAudioStallMs while it
+// runs mutes at once, queues an audio entry naming the cause, and starts a planned reset that
+// brings the sound back on the power-on path.
+void faultAudioWatch(uint32_t nowMs, bool audioRunning, AudioEvent event);
 
-// True once the stall watch has latched the mute.
+// True once the stall watch has muted the output for a stall.
 bool faultAudioStalled();
 
 // Bytes of the main stack no code has touched since faultInit() painted it.
