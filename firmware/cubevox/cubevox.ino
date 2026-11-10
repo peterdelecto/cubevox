@@ -218,7 +218,7 @@ void runJackSwitch(uint32_t nowMs) {
 // dissolves in from what they left once either ends. It ticks at 25 frames a second and only
 // after the panel has taken the last frame. Without a panel the pages stay dirty, so the face waits.
 void drawFace(const UiContext& ctx, uint32_t nowMs) {
-  switch (gSplash.draw(nowMs, kFirmwareVersion, gCanvas)) {
+  switch (gSplash.draw(nowMs, kFirmwareVersion, gCanvas, mutePowerOnWait())) {
     case SplashStep::Up: return;
     case SplashStep::Ended: gFace.invalidate(); break;
     case SplashStep::Off: break;

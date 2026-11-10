@@ -138,7 +138,7 @@ void Box::pickCycledCard(Card card, UiAction action, int (*slotOf)(const Layout&
 
 // The splash owns the canvas until it ends; the face then dissolves in from what it left.
 void Box::drawFace(const UiContext& ctx, uint32_t nowMs) {
-  switch (splash_.draw(nowMs, kFirmwareVersion, canvas_)) {
+  switch (splash_.draw(nowMs, kFirmwareVersion, canvas_, mute_.powerOnWait())) {
     case SplashStep::Up: return;
     case SplashStep::Ended:
       face_.invalidate();

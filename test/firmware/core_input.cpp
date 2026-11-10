@@ -528,6 +528,59 @@ void checkMutePowerOnWait() {
   check(out.xsmtHigh && out.muteNHigh, "mute: and MUTE_N follows after the XSMT lead");
 }
 
+// powerOnWait() holds from reset through the release and clears for good once Unmuted. When the
+// switch or a hold keeps the output muted, it clears at kRelayCloseAfterPowerOnMs instead.
+void checkMutePowerOnFlag() {
+  MuteSequence m;
+  m.reset(true, 0);
+  check(m.powerOnWait(), "mute wait: set from reset");
+  m.clocksRunning();
+  runMute(m, 0, kRelayCloseAfterPowerOnMs + kRelaySettleMs - 1, true);
+  check(m.powerOnWait() && m.active(), "mute wait: still set through the release");
+  m.update(kRelayCloseAfterPowerOnMs + kRelaySettleMs, true);
+  check(!m.active() && !m.powerOnWait(), "mute wait: clear once Unmuted");
+  m.update(kRelayCloseAfterPowerOnMs + kRelaySettleMs + 1, false);
+  runMute(m, kRelayCloseAfterPowerOnMs + kRelaySettleMs + 2, kRelayCloseAfterPowerOnMs + 5000, false);
+  check(m.active() && !m.powerOnWait(), "mute wait: a later mute does not set it again");
+
+  MuteSequence sw;
+  sw.reset(false, 0);
+  sw.clocksRunning();
+  runMute(sw, 0, kRelayCloseAfterPowerOnMs - 1, false);
+  check(sw.powerOnWait(), "mute wait: a muted switch keeps it set before 6.0 s");
+  sw.update(kRelayCloseAfterPowerOnMs, false);
+  check(!sw.powerOnWait() && sw.active(), "mute wait: a muted switch clears it at 6.0 s");
+  runMute(sw, kRelayCloseAfterPowerOnMs + 1, kRelayCloseAfterPowerOnMs + 3000, false);
+  sw.update(kRelayCloseAfterPowerOnMs + 3001, true);
+  check(!sw.powerOnWait(), "mute wait: it stays clear after the switch is released");
+
+  MuteSequence held;
+  held.reset(true, 0);
+  held.clocksRunning();
+  held.hold(true);
+  runMute(held, 0, kRelayCloseAfterPowerOnMs - 1, true);
+  check(held.powerOnWait(), "mute wait: a hold keeps it set before 6.0 s");
+  held.update(kRelayCloseAfterPowerOnMs, true);
+  check(!held.powerOnWait() && held.active(), "mute wait: a hold clears it at 6.0 s");
+  held.hold(false);
+  runMute(held, kRelayCloseAfterPowerOnMs + 1, kRelayCloseAfterPowerOnMs + 3000, true);
+  check(!held.powerOnWait(), "mute wait: it stays clear after the hold lifts");
+
+  MuteSequence trip;
+  trip.reset(true, 0);
+  trip.clocksRunning();
+  trip.trip(true);
+  runMute(trip, 0, kRelayCloseAfterPowerOnMs - 1, true);
+  check(trip.powerOnWait(), "mute wait: a trip keeps it set before 6.0 s");
+  trip.update(kRelayCloseAfterPowerOnMs, true);
+  check(!trip.powerOnWait() && trip.active(), "mute wait: a trip clears it at 6.0 s");
+
+  MuteSequence noClocks;
+  noClocks.reset(true, 0);
+  runMute(noClocks, 0, kRelayCloseAfterPowerOnMs, true);
+  check(!noClocks.powerOnWait(), "mute wait: clocks that never run clear it at 6.0 s");
+}
+
 void checkMuteLatchAndHold() {
   MuteSequence m;
   uint32_t t = powerOnRelease(m);
@@ -685,6 +738,7 @@ void checkInputLogic() {
   checkJackRequestWithdrawn();
   checkMuteSequence();
   checkMutePowerOnWait();
+  checkMutePowerOnFlag();
   checkMuteLatchAndHold();
   checkMuteMidRelease();
   checkMuteReset();

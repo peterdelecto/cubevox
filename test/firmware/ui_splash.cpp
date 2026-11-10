@@ -44,23 +44,49 @@ void checkTimerRule() {
 void checkSequence() {
   Splash splash;
   Canvas canvas;
-  check(splash.draw(100, kVersion, canvas) == SplashStep::Off, "splash: off until start()");
+  check(splash.draw(100, kVersion, canvas, false) == SplashStep::Off, "splash: off until start()");
 
   splash.start(1000);
-  check(splash.draw(1000, kVersion, canvas) == SplashStep::Up, "splash: up at once");
-  check(splash.draw(1000 + kSplashMs - 1, kVersion, canvas) == SplashStep::Up, "splash: up until the time is spent");
-  check(splash.draw(1000 + kSplashMs, kVersion, canvas) == SplashStep::Ended, "splash: reports Ended on the first pass after");
-  check(splash.draw(1000 + kSplashMs + 10, kVersion, canvas) == SplashStep::Off, "splash: off after Ended");
-  check(splash.draw(1000 + 10 * kSplashMs, kVersion, canvas) == SplashStep::Off, "splash: stays off");
+  check(splash.draw(1000, kVersion, canvas, false) == SplashStep::Up, "splash: up at once");
+  check(splash.draw(1000 + kSplashMs - 1, kVersion, canvas, false) == SplashStep::Up, "splash: up until the time is spent");
+  check(splash.draw(1000 + kSplashMs, kVersion, canvas, false) == SplashStep::Ended, "splash: reports Ended on the first pass after");
+  check(splash.draw(1000 + kSplashMs + 10, kVersion, canvas, false) == SplashStep::Off, "splash: off after Ended");
+  check(splash.draw(1000 + 10 * kSplashMs, kVersion, canvas, false) == SplashStep::Off, "splash: stays off");
+}
+
+// The splash stays up past kSplashMs while the power-on wait holds, and ends on the pass it drops.
+void checkHold() {
+  Splash splash;
+  Canvas canvas;
+  check(splash.draw(100, kVersion, canvas, true) == SplashStep::Off, "splash: a hold before start() shows nothing");
+
+  splash.start(1000);
+  check(splash.draw(1000, kVersion, canvas, true) == SplashStep::Up, "splash: up at once with the hold");
+  check(splash.draw(1000 + kSplashMs, kVersion, canvas, true) == SplashStep::Up, "splash: stays up past kSplashMs while held");
+  check(splash.draw(1000 + 3 * kSplashMs, kVersion, canvas, true) == SplashStep::Up, "splash: stays up while held, however long");
+  check(splash.draw(1000 + 3 * kSplashMs + 1, kVersion, canvas, false) == SplashStep::Ended,
+        "splash: reports Ended on the pass the hold drops");
+  check(splash.draw(1000 + 3 * kSplashMs + 2, kVersion, canvas, false) == SplashStep::Off, "splash: off after Ended");
+
+  Splash early;
+  early.start(0);
+  check(early.draw(0, kVersion, canvas, true) == SplashStep::Up, "splash: up with the hold");
+  check(early.draw(500, kVersion, canvas, false) == SplashStep::Up, "splash: a hold that drops early still lasts kSplashMs");
+  check(early.draw(kSplashMs, kVersion, canvas, false) == SplashStep::Ended, "splash: and ends at kSplashMs");
+
+  Splash plain;
+  plain.start(0);
+  check(plain.draw(kSplashMs - 1, kVersion, canvas, false) == SplashStep::Up, "splash: no hold, up until kSplashMs");
+  check(plain.draw(kSplashMs, kVersion, canvas, false) == SplashStep::Ended, "splash: no hold, ends at kSplashMs");
 }
 
 void checkPaintedOnce() {
   Splash splash;
   Canvas canvas;
   splash.start(0);
-  splash.draw(0, kVersion, canvas);
+  splash.draw(0, kVersion, canvas, false);
   clearAllDirty(canvas);
-  splash.draw(500, kVersion, canvas);
+  splash.draw(500, kVersion, canvas, false);
   check(canvas.dirtyPages() == 0, "splash: the frame is painted once, not on every pass");
 }
 
@@ -68,7 +94,7 @@ void checkCentred() {
   Splash splash;
   Canvas canvas;
   splash.start(0);
-  splash.draw(0, kVersion, canvas);
+  splash.draw(0, kVersion, canvas, false);
 
   const FontDesc& font = font9x12();
   const int width = Canvas::textWidth(font, kVersion);
@@ -86,7 +112,7 @@ void checkReplacesWhatWasThere() {
   Canvas canvas;
   canvas.fillRect(0, 0, kCanvasWidth, kCanvasHeight, true);
   splash.start(0);
-  splash.draw(0, kVersion, canvas);
+  splash.draw(0, kVersion, canvas, false);
   Canvas expected;
   expected.drawText((kCanvasWidth - Canvas::textWidth(font9x12(), kVersion)) / 2, (kCanvasHeight - font9x12().height) / 2,
                     font9x12(), kVersion);
@@ -99,7 +125,7 @@ void checkTooWide() {
   Canvas canvas;
   splash.start(0);
   const char* wide = "v2.00.10-bench-with-a-long-tail";
-  splash.draw(0, wide, canvas);
+  splash.draw(0, wide, canvas, false);
   Canvas expected;
   expected.drawText(0, (kCanvasHeight - font9x12().height) / 2, font9x12(), wide);
   check(sameFrame(canvas, expected), "splash: text wider than the panel starts at the left edge");
@@ -126,13 +152,13 @@ void checkInputDuringSplash() {
   bool quiet = true;
   for (uint32_t now = 1000; now < 1000 + kSplashMs; now += 50) {
     quiet = quiet && menu.update(click, now) == UiAction::None && menu.update(turn, now) == UiAction::None;
-    quiet = quiet && splash.draw(now, kVersion, live) == SplashStep::Up;
+    quiet = quiet && splash.draw(now, kVersion, live, false) == SplashStep::Up;
     clearAllDirty(live);  // the panel takes the frame
   }
   check(quiet && !menu.open(), "splash: clicks and turns while it shows open no menu and flip no setting");
 
   const uint32_t end = 1000 + kSplashMs;
-  check(splash.draw(end, kVersion, live) == SplashStep::Ended, "splash: hands over on time");
+  check(splash.draw(end, kVersion, live, false) == SplashStep::Ended, "splash: hands over on time");
   face.invalidate();
   check(face.due(end + kUiTickMs, live), "splash: the face ticks once the splash has gone");
   const ScopeRing ring;
@@ -146,7 +172,7 @@ void writeProof() {
   Splash splash;
   Canvas canvas;
   splash.start(0);
-  splash.draw(0, kFirmwareVersion, canvas);
+  splash.draw(0, kFirmwareVersion, canvas, false);
   writePgm(canvas, "oled-splash.pgm");
 }
 
@@ -155,6 +181,7 @@ void writeProof() {
 void checkSplash() {
   checkTimerRule();
   checkSequence();
+  checkHold();
   checkPaintedOnce();
   checkCentred();
   checkReplacesWhatWasThere();

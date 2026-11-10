@@ -16,8 +16,8 @@ void paint(const char* version, Canvas& canvas) {
 
 }  // namespace
 
-SplashStep Splash::draw(uint32_t nowMs, const char* version, Canvas& canvas) {
-  const bool up = splashUp(started_, startMs_, nowMs);
+SplashStep Splash::draw(uint32_t nowMs, const char* version, Canvas& canvas, bool hold) {
+  const bool up = started_ && (splashUp(started_, startMs_, nowMs) || hold);
   if (handoff_.update(up)) return SplashStep::Ended;
   if (!up) return SplashStep::Off;
   if (!painted_) {

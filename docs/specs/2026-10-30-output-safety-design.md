@@ -83,6 +83,11 @@ mute (the MUTE toggle, a jack change) keeps the same order without the 6 s wait:
 output at zero, MUTE_N high, 20 ms, fade up. The mute order stays XSMT low, 5 ms, MUTE_N low,
 so a wanted mute has no relay click. The 500 ms hold after the SAI clocks start is subsumed.
 
+The face shows the splash through the power-on wait (owner 2026-11-10). `MuteSequence::powerOnWait()`
+is true from reset until the sequence is Unmuted, or until 6.0 s have passed with something else
+(the toggle, a hold, a latch, a trip, clocks not running) keeping the output muted. The splash
+stays up while it is true, so MUTED shows only for the MUTE toggle or a fault.
+
 Host test in the mute sequence's test: the power-on release steps in this order with the
 6.0 s wait and the fade after the relay, the later releases without the wait, the mute steps
 unchanged. The emulator is unaffected.

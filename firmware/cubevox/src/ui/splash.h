@@ -1,5 +1,6 @@
-// Boot splash (spec 2026-10-24, OLED in update mode item 3): the version, centred, for kSplashMs
-// after setup() ends, so Adam can confirm an update on the box itself.
+// Boot splash (spec 2026-10-24, OLED in update mode item 3): the version, centred, for at least
+// kSplashMs after setup() ends and until the power-on wait ends, so Adam can confirm an update on
+// the box itself and never sees MUTED while the box starts.
 
 #pragma once
 
@@ -30,8 +31,9 @@ class Splash {
     painted_ = false;
   }
 
-  // Call every pass before the face draws. Paints `version` once, when the splash comes up.
-  SplashStep draw(uint32_t nowMs, const char* version, Canvas& canvas);
+  // Call every pass before the face draws. Paints `version` once, when the splash comes up. The
+  // splash stays up after kSplashMs while `hold` is true (the power-on wait).
+  SplashStep draw(uint32_t nowMs, const char* version, Canvas& canvas, bool hold);
 
  private:
   uint32_t startMs_ = 0;

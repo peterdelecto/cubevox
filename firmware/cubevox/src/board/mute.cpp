@@ -80,6 +80,8 @@ bool muteBypassOn() { return gBypassOn; }
 
 bool muteActive() { return gSequence.active(); }
 
+bool mutePowerOnWait() { return gSequence.powerOnWait(); }
+
 bool muteFullyMuted() { return gSequence.fullyMuted(); }
 
 void muteHold(bool on) { muteHoldFor(MuteReason::Panel, on); }

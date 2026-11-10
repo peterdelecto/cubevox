@@ -36,6 +36,10 @@ void muteLatch();
 // True while the output is muted or a mute / release sequence is in progress.
 bool muteActive();
 
+// True from power-on until the power-on wait stops being the reason for the mute; see
+// MuteSequence::powerOnWait. The splash stays up while it holds.
+bool mutePowerOnWait();
+
 // True once MUTE_N has gone low; see MuteSequence::fullyMuted.
 bool muteFullyMuted();
 

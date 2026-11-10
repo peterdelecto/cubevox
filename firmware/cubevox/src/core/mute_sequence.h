@@ -43,6 +43,12 @@ class MuteSequence {
   // True while muted or while a mute / release sequence is in progress.
   bool active() const { return state_ != State::Unmuted; }
 
+  // True from reset() until the power-on wait stops being the reason for the mute. It clears once
+  // the sequence is Unmuted, or once kRelayCloseAfterPowerOnMs have passed and something else (the
+  // switch, a hold, a latch, a trip, clocks not running) keeps the output muted. It stays clear
+  // until the next reset().
+  bool powerOnWait() const { return powerOnWait_; }
+
   // True once MUTE_N has gone low (XSMT went low first). K102 is still opening for kRelaySettleMs
   // after this, and XSMT keeps the output silent meanwhile.
   bool fullyMuted() const { return state_ == State::Muted; }
@@ -71,6 +77,9 @@ class MuteSequence {
   bool unmuteWanted() const { return switch_.level() && clocksRunning_ && !latched_ && !held_; }
   bool muteWanted() const { return !switch_.level() || latched_ || held_; }
   bool relayMayClose(uint32_t nowMs) const { return nowMs - resetMs_ >= kRelayCloseAfterPowerOnMs; }
+  void endPowerOnWait(uint32_t nowMs) {
+    if (state_ == State::Unmuted || (relayMayClose(nowMs) && (!unmuteWanted() || tripped_))) powerOnWait_ = false;
+  }
   MuteOutputs outputs() const;
 
   State state_ = State::Muted;
@@ -82,4 +91,5 @@ class MuteSequence {
   bool held_ = false;
   bool tripped_ = false;
   bool outputHeld_ = true;
+  bool powerOnWait_ = true;
 };

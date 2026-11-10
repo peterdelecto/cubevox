@@ -31,6 +31,7 @@ and fonts. The menu is `2026-10-24-polish-design.md` and does not change.
 7. A knob moved under the open menu updates the readout state but does not show it. Closing the menu inside the hold shows the readout again.
 8. A readout belongs to the card its knob was on. When a new layout puts another card in that slot, the readout leaves at the next tick.
 9. The menu takes no input until the face's first tick. A click or a turn during the boot splash, when nobody could see the menu, does nothing. Without a panel the face never ticks, so the menu never listens. MENU held at power-on still reaches update mode, because the bootloader reads it.
+10. The splash covers the power-on wait (owner 2026-11-10). It stays up for at least `kSplashMs` and until `mutePowerOnWait()` clears, so MUTED never shows while the box only waits to close the relay. MUTED shows only for the MUTE toggle or a fault. A box that is held, tripped or latched shows MUTED once the 6 s wait has passed.
 
 ## Readout
 1. Row one is a title bar (owner 2026-10-30, proof C2 of `tools/oled-proof/readout-title-proof.png`): the full width lit over rows 0 to 13, with the slot number, a space and the card name in capitals, Myrtle 7X12 spaced by ink with a 2 px gap, black, centred on the width, glyph top at row 1, so 1 px of bar shows above and below the letters. The bar is 12 + 2 × kScreenPad tall. The longest default title, `8 SPRING REVERB`, is 108 px wide; every card name in the registry fits with bar on both sides.

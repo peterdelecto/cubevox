@@ -7,6 +7,7 @@ void MuteSequence::reset(bool switchReleased, uint32_t nowMs) {
   latched_ = false;
   held_ = false;
   tripped_ = false;
+  powerOnWait_ = true;
   enter(State::Muted, nowMs);
 }
 
@@ -25,6 +26,7 @@ MuteOutputs MuteSequence::update(uint32_t nowMs, bool switchReleased) {
   switch_.update(switchReleased, nowMs, kSwitchDebounceMs);
   if (tripped_) {
     if (state_ != State::Muted) enter(State::Muted, nowMs);  // the pins are low already
+    endPowerOnWait(nowMs);
     return outputs();
   }
   const uint32_t elapsed = nowMs - sinceMs_;
@@ -54,5 +56,6 @@ MuteOutputs MuteSequence::update(uint32_t nowMs, bool switchReleased) {
       if (elapsed >= kXsmtLeadMs) enter(State::Muted, nowMs);
       break;
   }
+  endPowerOnWait(nowMs);
   return outputs();
 }
