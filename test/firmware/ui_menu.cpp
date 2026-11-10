@@ -18,6 +18,7 @@
 #include "core/display.h"
 #include "core/fonts.h"
 #include "core/layout.h"
+#include "core/menu_button.h"
 #include "core/panel.h"
 #include "core/record.h"
 #include "core/record_store.h"
@@ -1295,6 +1296,41 @@ void checkMenuTimeout() {
   check(!dfu.menu.open(), "menu: the DFU confirm times out without acting");
 }
 
+// Feeds the MENU button into the menu pass by pass, 1 ms apart, up to `endMs`, with the button down
+// from `downMs` until `upMs`. Returns the last action the menu gave.
+UiAction pressThrough(MenuRig& m, uint32_t downMs, uint32_t upMs, uint32_t endMs) {
+  MenuButton button;
+  button.reset(false);
+  UiAction last = UiAction::None;
+  for (uint32_t t = m.nowMs + 1; t <= endMs; ++t) {
+    const MenuButtonEvent ev = button.update(t >= downMs && t < upMs, t);
+    UiInput in;
+    in.click = ev.click;
+    in.hold = ev.hold;
+    in.press = ev.press;
+    const UiAction a = m.menu.update(in, t);
+    if (a != UiAction::None) last = a;
+  }
+  m.nowMs = endMs;
+  return last;
+}
+
+// A press that starts before the 15 s timeout keeps the list open until the button acts.
+void checkMenuPressAcrossTimeout() {
+  MenuRig click;
+  click.openListAt(kInput);
+  const uint32_t t = click.nowMs;
+  const UiAction a = pressThrough(click, t + 14700, t + 15100, t + 15200);
+  check(a == UiAction::ToggleInputJack && click.menu.open(),
+        "menu: a click pressed at 14.7 s and released at 15.1 s acts on its row");
+
+  MenuRig hold;
+  hold.openListAt(kOutput);
+  const uint32_t h = hold.nowMs;
+  pressThrough(hold, h + 14700, h + 15500, h + 15600);
+  check(!hold.menu.open(), "menu: a hold pressed at 14.7 s and held past 15 s closes the menu");
+}
+
 void checkMenuRedraw() {
   MenuRig m;
   m.step(0, true);
@@ -1469,6 +1505,7 @@ void checkMenu() {
   checkMenuExit();
   checkMenuHold();
   checkMenuTimeout();
+  checkMenuPressAcrossTimeout();
   checkMenuRedraw();
   checkMenuInvalidate();
   checkScreenshots();

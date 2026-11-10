@@ -57,5 +57,6 @@ UiInput inputPoll(uint32_t nowMs) {
   const MenuButtonEvent button = gButton.update(!gClick.level(), nowMs);
   in.click = button.click;
   in.hold = button.hold;
+  in.press = button.press;
   return in;
 }

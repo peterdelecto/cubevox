@@ -50,6 +50,7 @@ std::array<float, kPotCount> gRaw;  // last unfiltered read per mux channel
 // One pot's turn: select its mux channel, start the conversion once the mux has settled, read it.
 enum class Scan : uint8_t { Select, Convert, Read };
 Scan gScan = Scan::Select;
+bool gMuxReady = false;  // kMuxSelectHoldMs has passed since power-on
 uint8_t gScanChannel = 0;
 uint32_t gStepAtUs = 0;
 
@@ -104,7 +105,9 @@ void readConversion(uint32_t nowMs) {
 }
 
 void scanMux(uint32_t nowMs) {
-  if (nowMs < kMuxSelectHoldMs || gAdcError != nullptr) return;  // selects stay low until 3V3A is up
+  // Selects stay low until 3V3A is up. The latch keeps a millis() wrap from re-arming the wait.
+  if (!gMuxReady) gMuxReady = nowMs >= kMuxSelectHoldMs;
+  if (!gMuxReady || gAdcError != nullptr) return;
   switch (gScan) {
     case Scan::Select:
       selectChannel(gScanChannel);

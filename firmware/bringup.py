@@ -1084,11 +1084,12 @@ def drill_flipped_byte(ctx):
     ensure_drive(ctx)
     volume = ctx.volume()
     copy_error = copy_to_drive(volume, ctx.files["flipped"], COPY_NAME)
-    eject_drive(volume)  # the eject restarts the box, which finds the image invalid and offers the drive again
+    # the image check after the last block fails, so the box keeps the drive; a remount rebuilds INFO_UF2.TXT
+    remount_drive()
     seen, read_error = wait_installed(ctx, "invalid", UPDATE_WAIT_S)
     r = install(ctx, ctx.files["bench"], COPY_NAME)
     got = f"installed '{seen}'" + (f" (last read error: {read_error})" if seen != "invalid" and read_error else "")
-    detail = (f"after the flipped copy the restarted drive reports {got}; a full copy then restarted the box "
+    detail = (f"after the flipped copy the remounted drive reports {got}; a full copy then restarted the box "
               f"({r.back_s:.1f} s)")
     return (PASS if seen == "invalid" else FAIL), detail + os_note(copy_error if seen != "invalid" else None), ""
 

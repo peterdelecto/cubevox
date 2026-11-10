@@ -12,8 +12,7 @@ uint32_t cvCrc32(uint32_t crc, const uint8_t* data, uint32_t length) {
   return ~cvCrc32Update(~crc, data, length);
 }
 
-// The CRC the header must carry: the whole image with the CRC field read as zero.
-static uint32_t imageCrc(const uint8_t* image, uint32_t length) {
+uint32_t cvImageCrc(const uint8_t* image, uint32_t length) {
   static const uint8_t kZero[4] = {0u, 0u, 0u, 0u};
   const uint32_t field = CV_IMAGE_HEADER_OFFSET + CV_IMAGE_OFFSET_CRC;
   uint32_t crc = cvCrc32(0u, image, field);
@@ -35,5 +34,5 @@ void cvImageInspect(const uint8_t* image, uint32_t regionBytes, struct CvImageRe
   const bool lengthOk = header.length >= CV_IMAGE_HEADER_OFFSET + CV_IMAGE_HEADER_SIZE &&
                         header.length <= regionBytes;
   if (!cvImageHeaderVersionOk(header.headerVersion) || !lengthOk) return;
-  if (imageCrc(image, header.length) == header.crc32) report->state = CvImageGood;
+  if (cvImageCrc(image, header.length) == header.crc32) report->state = CvImageGood;
 }

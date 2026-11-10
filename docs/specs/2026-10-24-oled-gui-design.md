@@ -7,16 +7,16 @@ and fonts. The menu is `2026-10-24-polish-design.md` and does not change.
 
 ## Status
 1. Host part built and tested 2026-10-24. The readout and MUTED frames equal the proof renderer byte for byte.
-2. The owner approved proofs 3 to 10 on 2026-10-24 with one change, "we don't want re-centering". The value row now sits in a fixed field per parameter, as set out under Value field. The proof renderer and the goldens follow it.
+2. The owner approved proofs 3 to 10 on 2026-10-24.
 3. A sweep test measures every parameter of every card for sideways movement and is a hard gate, as set out under Tests and proofs.
 4. The Readout section stands. `2026-10-29-readout-card-design.md` (proof D) was set aside by the owner on 2026-10-30 before it was built; the readout keeps its three rows. The same day the owner asked for an on-screen sign when a slot's toggle is flipped, set out under Toggle.
 5. Bench part open. The list is in Bench, below.
-5. The application drives the panel through `board/sh1106.c`, the driver the bootloader compiles too, with no U8g2 or Wire. Panel, below, sets out how it starts, retries and recovers.
+6. The application drives the panel through `board/sh1106.c`, the driver the bootloader compiles too, with no U8g2 or Wire. Panel, below, sets out how it starts, retries and recovers.
 
 ## Screens
 | Screen | Shows | Rows |
 |---|---|---|
-| Voice | (superseded 2026-11-06 by `2026-11-06-scope-design.md`: the output is a scope trace, not a ribbon) the output as a ribbon scrolling right to left, each tick's amplitude over the recent peak, steady noise under a tracked floor drawn as the line, with the input level as a boxed segment meter at the left and the DEBUG load figure bottom right | ribbon columns 13 to 126, horizon at row 32, up to 22 px each side, 1 px rim; meter box columns 1 to 9, rows 8 to 56, 16 segments inside |
+| Voice | (superseded 2026-11-06 by `2026-11-06-scope-design.md`: the output is a scope trace, not a ribbon) the output as a ribbon scrolling right to left, each tick's amplitude over the recent peak, steady noise under a tracked floor drawn as the line, with the input level as a boxed segment meter at the left and the DEBUG load figure bottom right | ribbon columns 13 to 126, horizon at row 32, up to 22 px each side, 1 px rim; meter box columns 5 to 20, rows 8 to 56, 16 segments inside (owner 2026-11-01) |
 | Readout | the knob that moved last | title bar rows 0 to 13 with the slot and card name black in 7X12 centred, name 9X12 top at 16, value 16X24 top at 34 |
 | Muted | the word of the top switch, nothing else | 16X24 centred both ways, top at 20 |
 | Menu | the list, chain view or update confirm | as the menu spec, unchanged |
@@ -36,8 +36,8 @@ and fonts. The menu is `2026-10-24-polish-design.md` and does not change.
 ## Readout
 1. Row one is a title bar (owner 2026-10-30, proof C2 of `tools/oled-proof/readout-title-proof.png`): the full width lit over rows 0 to 13, with the slot number, a space and the card name in capitals, Myrtle 7X12 spaced by ink with a 2 px gap, black, centred on the width, glyph top at row 1, so 1 px of bar shows above and below the letters. The bar is 12 + 2 × kScreenPad tall. The longest default title, `8 SPRING REVERB`, is 108 px wide; every card name in the registry fits with bar on both sides.
 2. Row two is the parameter name, 9X12, centred, top at row 16.
-3. Row three is the value, a space and the unit, 16X24, with its top at row 34, in a 24 px band that spans rows 34 to 57. The unit is written as in print, `st`, `ms`, `dB`, `%` (owner 2026-10-30; the fonts carry lowercase s, t and d for it). The row is centred on what it draws, set out under Value field.
-4. A text value (the autotune key) has no unit and does not roll. It is centred on its own width (owner 2026-10-30; it was left-aligned in a field as wide as the widest name).
+3. Row three is the value, a space and the unit, 16X24, with its top at row 34, in a 24 px band that spans rows 34 to 57. The unit is written as in print, `st`, `ms`, `dB`, `%` (owner 2026-10-30; the 16X24 font carries lowercase d, m, s and t for it, Value formatting 3). The row is centred on what it draws, set out under Value field.
+4. A text value (the autotune key) has no unit and does not roll. It is centred on its own width (owner 2026-10-30).
 5. The value eases to the knob with a 20 ms time constant, which closes 86.5 % of the gap per tick.
 6. Each tick the value sits between two whole numbers. A cell that differs between them rolls up out of its place while the next glyph rolls in from below. Both are clipped to the band.
 7. The roll offset is `round(fraction * 24)` px. A cell that is equal in both numbers draws plain.
@@ -61,41 +61,31 @@ MUTED word is for the top switch.
    `tools/oled_golden.py`; the sweep gate is unchanged.
 
 ## Value field
-Owner 2026-10-30: the value row is centred on what it draws. The field holds the cells of the wider of the two numbers the roll sits between, the space and the unit, and that field is centred; when the value is settled the field is the number's own width. So nothing moves while two numbers of the same digit count roll, and the row re-centres by half a cell exactly when a digit appears or vanishes (9 to 10, 99 to 100, the sign at 0 on a signed knob), at the start of a roll that gains a digit and at the end of one that loses it. Items 1 to 4 and 7 below still hold; the fixed, widest-rendering field of 2026-10-24 (items 5, 6, 8 and the table, kept for the cell arithmetic) is superseded for the row's position.
+Owner 2026-10-30: the value row is centred on what it draws. The field holds the cells of the wider of the two numbers the roll sits between, the space and the unit, and the field is centred on the panel. A settled value is one number, so its field is that number's own width. Nothing moves while two numbers of the same digit count roll. The row shifts by half a cell exactly when a digit or the sign appears or vanishes, at the start of a roll that gains a digit and at the end of one that loses it.
 
-1. A numeric field is a sign cell, the digit cells, a space and the unit.
-2. The sign cell exists when the range reaches below zero. It holds `-`, `+` or a blank for zero, and it stays in the leftmost cell.
-3. The digit cells are as many as the digits of the widest number of the range.
-4. A cell is 18 px wide, a 16 px glyph cell and 2 px of spacing, and a glyph's ink is centred in its cell.
-5. The field is `cells * 18` px plus the width of the space and the unit. Its left edge is `(128 - width) / 2`, taken once. The space and the unit start at the left edge plus `cells * 18`.
-6. A number is right-aligned in the digit cells, and a shorter number leaves its leading cells blank. `+5 ST` is the sign cell `+`, a blank tens cell and `5` in the ones cell. `0 ST` is two blank cells and `0`.
-7. A number that gains a digit lights its leading cell and nothing else shifts. On a percent knob 99 to 100 rolls a `1` into the blank leading cell while each 9 rolls to 0 in its own cell.
-8. A name field (the key) is as wide as the widest name, which is `F# / D#M` at 116 px. A name starts at the field's left edge, and a shorter name leaves the right of the field blank.
-
-| Knob | Range | Cells | Field width | Left edge |
-|---|---|---|---|---|
-| Mix, Depth, Rate, Drive, Tone, Time on reverbs | 0..100 % | 3 | 77 px | 25 |
-| Threshold | -70..-10 dB | sign and 2 | 94 px | 17 |
-| Semitones | -12..+12 ST | sign and 2 | 95 px | 16 |
-| Echo Time, Autotune Response | 60..250 and 1..500 ms | 3 | 95 px | 16 |
-| Decay | 5..1000 ms | 4 | 113 px | 7 |
-| Key | 12 names | none | 116 px | 6 |
+1. A numeric field is the sign cell when it is drawn, the digit cells, a space and the unit.
+2. A cell is 18 px wide, a 16 px glyph cell and 2 px of spacing, and a glyph's ink is centred in its cell.
+3. The digit cells are as many as the digits of the wider of the two numbers. The digits are right-aligned, so the shorter number leaves its leading cell blank.
+4. The sign cell is drawn when either number carries a sign, `-` or `+` (Value formatting 1 and 2). It comes first, and a number without a sign leaves it blank. A settled 0 on a signed knob has no sign cell.
+5. The field's width is `cells * 18 - 2` px, plus 2 px and the width of the space and the unit when the knob has a unit. Its left edge is `(128 - width) / 2`, rounded down. The space and the unit start at the left edge plus `cells * 18`.
+6. A number that gains a cell moves its first cell 9 px left and its unit 9 px right, and one that loses a cell moves them back. On a percent knob, 99 to 100 widens the field from 2 cells to 3 at the start of the roll: the first cell moves from x 34 to x 25, the unit from x 70 to x 79, and a `1` rolls into the new leading cell while each 9 rolls to 0 in its own cell. `+5 st` settled is the sign cell and one digit cell, 68 px wide from x 30.
+7. A text value (the key) has no cells. Readout item 4 centres it on its own width.
 
 ## Value formatting
 All of it comes from the card's parameter table in `core/registry`, never from the screens.
 
 | Parameter | Rule | Example |
 |---|---|---|
-| Continuous | rounded whole number of the unit | `210 MS`, `65 %`, `-24 DB` |
-| Stepped number | the step's whole number | `+5 ST`, `0 ST`, `-12 ST` |
-| Text | the name at the step | `F / DM`, `D♭ / B♭M` |
+| Continuous | rounded whole number of the unit | `210 ms`, `65 %`, `-24 dB` |
+| Stepped number | the step's whole number | `+5 st`, `0 st`, `-12 st` |
+| Text | the name at the step | `F / Dm`, `D♭ / B♭m`, `MOB` |
 
 1. A positive number carries `+` only when the parameter's range reaches below zero.
 2. Zero carries no sign.
-3. The fonts are single case. A lowercase letter whose cell is blank draws as its capital, so the table keeps its natural case.
-4. The key names write a flat as a lowercase b (`Db / Bbm`). The 9X12 and 16X24 fonts ink a flat sign in the b cell, and a lowercase cell a font inks keeps its own glyph, so the readout shows `D♭ / B♭M`. The flat is a draft the owner refines in the font editor. The 5x7 font has none, so a b there draws as B.
+3. The units are `st`, `ms`, `dB` and `%`, as written in print. The 9X12 and 16X24 fonts ink lowercase b, d, m, s and t, and the 7X12 font b, d, k, m, s, t and z; the 5x7 font inks no lowercase. A lowercase letter a font does not ink draws as its capital. The card name in the title bar and the parameter name go to capitals before they are drawn, so on the readout only the value row shows lowercase.
+4. The key names write a flat as a lowercase b (`Db / Bbm`). The 9X12 and 16X24 fonts ink a flat sign in the b cell, and the m of a minor key draws as the font's own lowercase m, so the readout shows `D♭ / B♭m`. In the 5x7 font a b draws as B.
 5. `knobCells` gives the cells of a parameter and `formatCells` fills them.
-6. `core_registry.cpp` checks that every knob's field fits the panel in 16X24 with 1 px each side. The widest are `1000 MS` at 113 px and `F# / D#M` at 116 px. The flat is 12 px wide, 1 px narrower than the 13 px sharp, so the flat names stay inside that field (`Db / Bbm` is 114 px).
+6. `core_registry.cpp` checks that every knob's field fits the panel in 16X24 with 1 px each side. The widest numeric field is four cells and ` ms`, 109 px (Input gate DECAY, Gate DECAY and Chatter LENGTH). The widest name is `F# / D#m` at 116 px. The flat is 12 px wide, 1 px narrower than the 13 px sharp, so the flat names stay inside that width (`Db / Bbm` is 114 px).
 
 ## Voice
 1. Superseded in part 2026-11-06 and 2026-11-07 by `2026-11-06-scope-design.md`: the scope reads the chain output ahead of POLISH COMP from its ring, and no output energy is taken. The input half stands. The audio interrupt sums the squares of the input samples of every block where they enter the chain (so the bench clip moves the bar too). The main loop takes the sum with its sample count at each UI tick, in a masked take.
@@ -105,8 +95,8 @@ All of it comes from the card's parameter table in `core/registry`, never from t
 5. Superseded 2026-11-06 by `2026-11-06-scope-design.md` (a 1 px trace, no rim dither). A column is solid from `32 - h` to `32 + h`. A 1 px rim above and below it is lit where the Bayer threshold of the pixel is under 32, which is half of them.
 6. At height 0 the column is the one pixel on row 32. In silence the screen is the line, the empty meter box and nothing else.
 7. Superseded 2026-11-06 by `2026-11-06-scope-design.md`: the scope has no history and reads the ring only while the voice screen shows; no meter tracks the output under the other screens. The ribbon keeps filling while another screen shows, so the voice returns with its history.
-8. The input meter (owner 2026-10-30, "a minimal, thin input level VU meter on the left", then "a bounding box, like a thermometer without the bulb, in segments", then "5 px wider with more black around it"): a 1 px outline box with its sides at columns 1 and 9 and its top and bottom at rows 8 and 56, always drawn on the voice screen so the meter is present in silence. Inside, 16 segments across columns 2 to 8, each 2 rows tall with 1 row of gap, segment 1 at rows 54 and 55 up to segment 16 at rows 9 and 10. Lit segments = `round(level * 16)`, the level linear in dB of the input tick RMS from -50 dBFS (0) to 0 dBFS (16). The level rises at once and falls with a 120 ms time constant, counted in real time so a late tick falls further, and a level under 0.01 snaps to 0. Each segment is about 3 dB and the top one is the clip light. The box, the segments and the ribbon walk together, and the meter shows on the voice screen only.
-9. The DEBUG load figure (owner 2026-10-30, polish spec menu row 7): with DEBUG on, the voice screen draws the worst audio block of the last whole second as a percent of the block budget (640000 cycles at 480 MHz) in 5x7, last column 126 and top row 56, so `42%` keeps 1 px from the right and bottom edges. It reads 0 for the first second after boot, is held to 0..999, refreshes each UI tick, does not walk, and never appears on the readout, the toggle readout, MUTED, BYPASS or the menu.
+8. The input meter (owner 2026-10-30, "a minimal, thin input level VU meter on the left", then "a bounding box, like a thermometer without the bulb, in segments", then "5 px wider with more black around it"): a 1 px outline box with its sides at columns 5 and 20 and its top and bottom at rows 8 and 56, always drawn on the voice screen so the meter is present in silence (owner 2026-11-01, "twice as wide, 4 px from the edge"; columns 21 to 23 stay blank before the scope). Inside, 16 segments across columns 6 to 19, each 2 rows tall with 1 row of gap, segment 1 at rows 54 and 55 up to segment 16 at rows 9 and 10. Lit segments = `round(level * 16)`, the level linear in dB of the input tick RMS from -50 dBFS (0) to 0 dBFS (16). The level rises at once and falls with a 120 ms time constant, counted in real time so a late tick falls further, and a level under 0.01 snaps to 0. Each segment is about 3 dB and the top one is the clip light. The box, the segments and the scope trace walk together, and the meter shows on the voice screen only.
+9. The DEBUG load figure (owner 2026-10-30, the polish spec's DEBUG menu row): with DEBUG on, the voice screen draws the worst audio block of the last whole second as a percent of the block budget (640000 cycles at 480 MHz) in 5x7, last column 126 and top row 56, so `42%` keeps 1 px from the right and bottom edges. It reads 0 for the first second after boot, is held to 0..999, refreshes each UI tick, does not walk, and never appears on the readout, the toggle readout, MUTED, BYPASS or the menu.
 
 ## Dissolve
 1. A screen change shows two mixed frames and then the new screen. At 25 fps each frame lasts 40 ms, so the mix takes 80 ms.
@@ -187,21 +177,12 @@ Settings, mute state, Menu::open ───────────────�
 
 ## Tests and proofs
 1. `test/firmware/golden/*.bin` hold 31 frames of `oled_motion` (1024 page-layout bytes each). `tools/oled_golden.py` cuts them from a run of the proof renderer.
-2. The host tests match them byte for byte: the four settled readouts, nine rolling frames of 120 to 210 MS, eight rolling frames of 0 to -12 ST, MUTED and its two dissolve frames, one readout replaced by another, the two toggle frames and one voice frame (`voice-meter-ribbon`, scene 12; superseded 2026-11-06 by `voice-scope` and `voice-scope-loud`, see `2026-11-06-scope-design.md`).
-3. The fixed field changed 11 of the 27 frames, and the other 16 stayed byte-identical. The proof renderer's `rollValue` follows the same rule, and the goldens were re-cut from it.
-
-| Frames | Why they changed |
-|---|---|
-| `settled-65pct` | the field has 3 digit cells, so 65 has a blank leading cell and sits half a cell to the right |
-| `roll-semi-6`, `-12`, `-16`, `-20`, `-24`, `-28`, `-32` | the sign sits in its own cell and a one-digit number leaves its tens cell blank. `-32` is the frame mid-roll between -10 and -9, where the number loses a digit |
-| `switch-1`, `-2`, `-3` | the second readout is SEMITONES at 0, laid out in its field |
-
-The unchanged frames are `settled-210ms`, `settled-m12st`, `settled-m24db`, the nine `roll-time` frames, `roll-semi-40` and the three `muted` frames. Their numbers already filled the field.
-
-4. The field tests build the value rows from the wording of Value field, taking only the knob's readings from the code. They compare every number of every knob in the default layout (about 3,600) cell by cell, then check that nothing lies left of the field and the unit never moves while numbers roll. They also check 99 to 100, -9 to -10, the sign cell, and the key's left-aligned field.
+2. The host tests match them byte for byte: the four settled readouts, nine rolling frames of 120 to 210 ms, eight rolling frames of 0 to -12 st, MUTED and its two dissolve frames, one readout replaced by another, the two toggle frames and one voice frame (`voice-meter-ribbon`, scene 12; superseded 2026-11-06 by `voice-scope` and `voice-scope-loud`, see `2026-11-06-scope-design.md`).
+3. The proof renderer's `rollValue` lays out the value row by the Value field rule, and the readout goldens are cut from it. `roll-semi-32` stands at -9.9 on the roll from 0 to -12 st, where the number gains a digit.
+4. The field tests build the value rows from the wording of Value field, taking only the knob's readings from the code. They compare every number of every knob in the default layout cell by cell (the test requires more than 2,000 numbers), then check that nothing lies left of the field and the unit never moves while numbers roll. They also check 99 to 100, -9 to -10, the sign cell, and each key name centred on its own width.
 5. The lateral sweep is the hard gate for the owner's rule, "I don't want anything bouncing around laterally as values change". `checkReadoutSweep` renders the settled readout at every step of every knob of every card in the registry, Chasm Reverb included.
-6. A continuous knob runs through every whole number between the lowest and the highest its 4096 pot readings reach. A stepped knob runs through every position. Today that is 18 parameters and 3,852 steps, and the test prints both counts on every run.
-7. Each frame is measured on its pixels and takes no position from a model of the layout. The digits and the sign are found by matching each glyph's picture. The unit's first and last lit columns and a key name's first lit column are read straight off the frame. Each must equal the column the first frame that showed it gave, so a shift of one pixel fails.
+6. A continuous knob runs through every whole number between the lowest and the highest its 4096 pot readings reach. A stepped knob runs through every position. Today that is 30 parameters, 8,666 settled steps and 43,080 rolling frames, and the test prints the counts on every run.
+7. Each frame is measured on its pixels and takes no position from a model of the layout. The digits and the sign are found by matching each glyph's picture. The unit's first and last lit columns are read straight off the frame. Each must equal the column the first frame of the same digit count gave, so a shift of one pixel between numbers of the same digit count fails. Between neighbouring counts of cells the first cell must move 9 px and the unit the rest of the 18 px cell, as Value field item 6 says. A key name must be drawn on its own width with its left and right margins within 1 px.
 8. The sweep also requires that the cells and the unit account for every lit pixel of the value rows, that nothing above or below those rows changes, and that every step looks different from the one before.
 9. Superseded 2026-11-06 by `2026-11-06-scope-design.md`: the voice goldens are `voice-scope` (frame 79 of scene 12) and `voice-scope-loud` (frame 76), and the voice tests check the scope's trigger, columns and scale instead of the level map, scroll and rim. The voice golden `voice-meter-ribbon` is frame 79 of scene 12, a scripted drive the test repeats tick for tick, because the proof's scene 1 comes from Adam's recordings, which the host cannot replay. The voice tests also check the walk, the bar and three levels through the whole path (the level map, the window, the heights, the scroll and the rim are superseded).
 10. `ctest` writes `build/oled-readout-{210ms,65pct,m12st,m24db,160ms,key,key-flat}.pgm`, `oled-readout-roll-99-100.pgm`, `oled-readout-roll-m10-m9.pgm`, `oled-muted.pgm`, `oled-bypass.pgm`, `oled-voice-{quiet,mid,loud}.pgm`, `oled-face-menu.pgm` and `oled-splash.pgm` at 4x.
@@ -217,8 +198,8 @@ build/oled_motion build/oled-motion.raw && python3 -I tools/oled_golden.py build
 ## Open decisions
 Each item says what is built now. The owner approves text and screens per numbered proof.
 
-1. Level map. The brief gave -6 dBFS for full height and -50 dBFS for zero, linear in dB. Superseded twice on 2026-10-30: first by the window under the recent peak, then by the map linear in amplitude of Voice 2, which the owner chose over a 24 dB window linear in dB because a waveform overview draws that way.
-2. Height curve. The proof renderer raised the level to 0.8 again when it set the height. Dropped 2026-10-30 with the 0.6 curve of the old level map; the half-height is the level times 22.
+1. Level map. Settled by `2026-11-06-scope-design.md` section 3: the scope fits each frame's own peak, and the input meter maps -50 to 0 dBFS linearly in dB onto its 16 segments (Voice 8).
+2. Height curve. Settled by the same spec: the trace draws each sample at its height on the frame's scale, with no curve.
 3. Walk. It covers the voice screen only, as the brief says. MUTED and the readout stay put, and MUTED can sit unchanged for hours. Giving MUTED the same shift is a small change to `renderMuted`.
 4. Menu motion. Opening and closing the menu dissolves. The cursor, the values and the sub-screens do not, because the menu stays as it is. They show at the next tick, up to 40 ms after the click.
 5. Units. `HZ` is on the proof sheet and no card carries it, since Unison Rate is a percent. The knob table has no decimals field; a parameter that needs one adds it with its own width rule.
@@ -226,10 +207,10 @@ Each item says what is built now. The owner approves text and screens per number
 7. Panel reset under a still screen. A panel that loses power and comes back while nothing changes on glass, such as MUTED for minutes, powers up with its display off and still answers its address. Its later writes go through, so the driver never restarts it, and it stays dark until the box restarts. Built now: nothing catches it. Re-sending the init settings and the display-on command once a second would, for about 0.6 ms of bus time a second. Bench 8 shows first whether it happens.
 
 ## Bench
-1. UI cost as load % at 480 MHz with the default chain running, measured with the face on and off. The audio side adds one multiply-add per input sample.
+1. UI cost as load % at 480 MHz with the default chain running, measured with the face on and off. The audio side adds one multiply-add per input sample and one store per output sample into the scope ring.
 2. A knob turn raises the readout, the digits roll, it fades after 2 s, mute shows MUTED, and the dissolves read as smooth on glass.
 3. Whether a loop pass that blocks about 3 ms on a page write slows the knob scan enough to feel.
-4. The level map against the real mic and line input: where speech and singing sit between -50 and -6 dBFS.
+4. The input meter against the real mic and line input: where speech and singing sit on its -50 to 0 dBFS range.
 5. TOP SWITCH set to BYPASS with the real switch shows BYPASS.
 6. The 60 s walk, seen once on glass.
 7. The panel's connector pulled and pushed back while the voice runs. The face returns within 1 s, and the log shows one `[WARN]` line and one `[oled]` line.

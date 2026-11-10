@@ -59,9 +59,9 @@ What can go wrong:
 2. A hold on the update confirm screen does nothing: EXIT is not on that screen, a click there starts the update, and a long press must not start it. A turn cancels, as before. The starting screen takes no input, as before. The chain view, which no row opens, ignores a hold too.
 3. A hold with the menu closed opens the list, once the 600 ms is up, as a click does.
 4. Holding MENU at power-on belongs to the bootloader (`2026-10-24-field-update-design.md`) and is not this. A button still down when the firmware starts reports nothing when it is let go.
-5. A hold counts as activity for the 15 s menu timeout and for the screen dimming.
+5. The press itself, a hold and a click each count as activity for the 15 s menu timeout and for the screen dimming. So a press that starts just before the timeout keeps the list open: the click acts on its row, and a hold closes the list and does not open it again.
 
-Detection lives in `core/menu_button.h` (`MenuButton`), fed the debounced level by `board/input.cpp` and by the emulator's window; the time counts from the debounced press. `UiInput` carries `click` (a release before 600 ms) and `hold` (sent once, at 600 ms).
+Detection lives in `core/menu_button.h` (`MenuButton`), fed the debounced level by `board/input.cpp` and by the emulator's window; the time counts from the debounced press. `UiInput` carries `click` (a release before 600 ms), `hold` (sent once, at 600 ms) and `press` (the debounced down edge, sent once per press, never for a button already down at power-on).
 
 Owner 2026-11-01, "crowd and unison will be interchangeable in the menu like the two reverb modes
 are": one more row sits right after SLOT 3. Its label is the number of the slot that holds Unison
@@ -157,8 +157,10 @@ what the box plays; `--polish-comp off` and `--polish-eq off` switch them for A/
 3. `test/firmware/core_record.cpp`: v2 round trip, v1 record decodes with defaults, a bad
    settings byte is rejected.
 4. `test/firmware/core_protocol.cpp`: the three fields in and out, absent on input means unchanged.
-5. `test/firmware/ui_menu.cpp`: the seven rows in order at their 9 px y positions, the other
-   screens on the 8 px grid, each click, the saved settings, proofs `oled-menu.pgm` for the owner.
+5. `test/firmware/ui_menu.cpp`: the 14 rows in order on the 16 px pitch, the scroll window, the
+   other screens on the 8 px grid, each click, the saved settings, the 600 ms hold that closes the
+   list, the 15 s timeout, a press that starts before the timeout and ends after it (the click acts
+   on its row, the hold closes the list), proofs `oled-menu.pgm` for the owner.
 6. Bench (hardware, later): bypass crossfade audible-click free on glass, comp cost in load %,
    TOP SWITCH both ways with the real switch.
 
