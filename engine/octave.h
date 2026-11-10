@@ -63,10 +63,21 @@ class OctaveVoiceT {
       aGlide_ = smooth::coef(t.glideMs * 0.001f);
       glideDecay_ = smooth::keep(t.glideMs * 0.001f, kBlock);
     }
-    // The taps sit half a window apart, a whole number of samples, so they share one fraction.
-    windowSmp_ = 2.0f * floorf(0.5f * clampf(t.grainWindowMs, kMinWindowMs, kMaxWindowMs) * kSmpPerMs + 0.5f);
+    windowSmp_ = windowSamples(t);
     invWindow_ = 1.0f / windowSmp_;
     return p.on && s != 0;
+  }
+
+  // The grain window in samples. The taps sit half a window apart, a whole number of samples, so they share
+  // one fraction.
+  static float windowSamples(const OctaveTuning& t) {
+    return 2.0f * floorf(0.5f * clampf(t.grainWindowMs, kMinWindowMs, kMaxWindowMs) * kSmpPerMs + 0.5f);
+  }
+
+  // The farthest a tap reads behind the sample it plays, in whole samples: the far end of its sweep and the
+  // read's reach.
+  static int deepestRead(const OctaveTuning& t) {
+    return static_cast<int>(kMinDelay + windowSamples(t) + kReadReach);
   }
 
   // True from a reset or a park until the next render: the voice holds no state worth keeping.

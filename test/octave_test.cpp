@@ -268,16 +268,18 @@ bool testFormantMoves() {
                 "centroid/f0 x%.3f of input (+-10%%), f0=%.1f", rC, fC);
 }
 
-// A 0.5 DC step through the wet path at unity trim (MIX 1, so the dry path adds nothing). The voice's
-// DC blocker takes it away: from the output's peak the level falls under -60 dBFS within 200 ms and
-// stays there. The 5 Hz one-pole falls from a peak of 0.477 to -60 dBFS in 196 ms, so the limit sits
-// 2 % over the filter's own decay.
+// A 0.5 DC step through the wet path at unity trim (MIX 1, so the dry path adds nothing). The card sits on
+// in 0.1 s of silence first, so its fade is up when the step arrives. The voice's DC blocker takes the step
+// away: from the output's peak the level falls under -60 dBFS within 200 ms and stays there. The 5 Hz
+// one-pole falls from a peak of 0.477 to -60 dBFS in 196 ms, so the limit sits 2 % over the filter's own
+// decay.
 bool testDcBlocked() {
   constexpr double kLimit = 1e-3;  // -60 dBFS
   constexpr double kSettleMs = 200.0;
   cv::PitchCardParams p = octaveOnly(12);
   p.octave.tuning.trimDb = 0.0f;
-  const std::vector<float> in(static_cast<size_t>(cv::kSampleRate), 0.5f);
+  std::vector<float> in(static_cast<size_t>(cv::kSampleRate * 11 / 10), 0.5f);
+  std::fill(in.begin(), in.begin() + cv::kSampleRate / 10, 0.0f);
   gFx.reset();
   const std::vector<float> out = run(gFx, in, p);
 
@@ -327,17 +329,25 @@ bool testNoise() {
 constexpr int kStepAt = cv::kSampleRate / cv::kBlock * cv::kBlock;
 constexpr int kThroughTotal = 2 * cv::kSampleRate;
 
+// The card sits on through silence until its ring holds the taps' reach, so its voice starts with the tone.
+// The step's curvature depends on where the grain window sits against the tone, and this is the phase the
+// limits were set on. The run returns the output from the tone's start.
 std::vector<float> throughZeroRun(float mix, int gapBlocks, double hz = 220.0) {
-  const std::vector<float> in = tone(hz, kThroughTotal);
+  const int lead = cv::OctaveVoice::deepestRead(cv::OctaveTuning{});
+  const std::vector<float> tune = tone(hz, kThroughTotal);
+  std::vector<float> in(static_cast<size_t>(lead), 0.0f);
+  in.insert(in.end(), tune.begin(), tune.end());
   std::vector<float> out(in.size());
   cv::PitchCardParams p = octaveOnly(1);
   p.octave.mix = mix;
   gFx.reset();
+  gFx.process(in.data(), out.data(), lead, p);
   for (int i = 0; i < kThroughTotal; i += cv::kBlock) {
     const int block = (i - kStepAt) / cv::kBlock;
     p.octave.semitones = i < kStepAt ? 1 : (block < gapBlocks ? 0 : -1);
-    gFx.process(&in[static_cast<size_t>(i)], &out[static_cast<size_t>(i)], cv::kBlock, p);
+    gFx.process(&in[static_cast<size_t>(lead + i)], &out[static_cast<size_t>(lead + i)], cv::kBlock, p);
   }
+  out.erase(out.begin(), out.begin() + lead);
   return out;
 }
 

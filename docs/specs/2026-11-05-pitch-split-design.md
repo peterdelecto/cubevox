@@ -48,6 +48,15 @@ Status: built 2026-11-05 (v2.01.59). Ringer (`RingMod`) was removed 2026-11-05. 
    for one block of calls holds any `n`.
 5. Each engine with a ring has `rest()`, which zeroes 512 floats a block while its slot is stopped, and
    `reset()` clears the rest with `fill`.
+6. Fix pass 2026-11-10: `InputRing` counts the samples written since its last clear (`filled()`). Octave and
+   Formant stay off until their ring holds their deepest read, so a card switched on from rest passes its
+   input until then and never plays the clear's zeros. Octave waits for its taps' reach (`OctaveVoice::deepestRead`,
+   1,927 samples at the 40 ms window, 40 ms) and ends a chunk at that sample, so any call length comes on at
+   one sample. Formant waits for its lag, two periods and the chunk (about 2,040 samples at 110 Hz). The fade
+   then rises over the 20 ms one-pole. Measured through `runChain` (Autotune on, off or absent, MIX 50 and
+   100 %, both knob ends, 98 and 220 Hz): no block of exact zeros and no dip of 0.5 dB in the 40 ms after
+   the toggle, where Formant behind Autotune went silent for 17 to 24 ms and Octave at MIX 100 % dipped 12 to
+   17 dB (`checkPitchCardSwitchOnFromRest`).
 
 ### Ring lengths
 
@@ -121,7 +130,9 @@ No Autotune ahead leaves the struct empty, and Deepthroat then uses its own trac
 ### Tracker gating
 
 1. Autotune's tracker runs while Autotune is on or fading, or while a reader behind it is on: Formant or
-   Yawn directly behind, Mob, or Deepthroat.
+   Yawn directly behind, Mob, or Deepthroat. Formant counts only while it can be heard, MIX over 0 or its
+   fade up (`FormantFx::needsTracker`, fix pass 2026-11-10); at MIX 0 it passes its input and the tracker
+   idles. Yawn pins its MIX at 1, so it always counts.
 2. Autotune's slot runs its engine with its toggle off while a reader needs the tracker, as the Input gate
    keeps its detector. Settled off, its output is its input bit for bit.
 3. The fine pass runs while Autotune is on or fading, or while Formant or Yawn reuses the tracker.

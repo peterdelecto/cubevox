@@ -219,16 +219,20 @@ bool testRangeMap() {
   return ok;
 }
 
-// RANGE +12 st, the pot's top, at SENSITIVITY 50 % on a -14 dBFS note held 0.6 s: the card hands the stage
-// +12 st on the onset, the glided SHIFT opens past +10.5 st, and from 150 ms past the decay's end it rests
-// within 0.01 st of 0.
+// RANGE +12 st, the pot's top, at SENSITIVITY 50 % on a -14 dBFS note held 0.6 s after 0.1 s of silence, which
+// fills the card's ring: the card hands the stage +12 st on the onset, the glided SHIFT opens past +10.5 st,
+// and from 150 ms past the decay's end it rests within 0.01 st of 0.
 bool testUpSweep() {
   int handedTop = 0;
   float high = 0.0f;
   float low = 0.0f;
   float rest = 0.0f;
-  const int restFrom = static_cast<int>(cv::kFollowerDefaultDecayMs * cv::kSmpPerMs) + kRate * 15 / 100;
-  through(sawtooth(kRate * 6 / 10, 0.2f), boxApraxia(0.5f, 1.0f), [&](const Stage& s, int done) {
+  constexpr int kLead = kRate / 10;
+  const int restFrom = kLead + static_cast<int>(cv::kFollowerDefaultDecayMs * cv::kSmpPerMs) + kRate * 15 / 100;
+  Signal in(static_cast<size_t>(kLead), 0.0f);
+  const Signal note = sawtooth(kRate * 6 / 10, 0.2f);
+  in.insert(in.end(), note.begin(), note.end());
+  through(in, boxApraxia(0.5f, 1.0f), [&](const Stage& s, int done) {
     handedTop = std::max(handedTop, s.handed);
     high = std::max(high, s.formant.shiftSemis());
     low = std::min(low, s.formant.shiftSemis());

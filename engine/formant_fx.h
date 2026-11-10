@@ -40,8 +40,10 @@
 //
 // The toggle's fade crosses the card's input to the mixed output over the 20 ms one-pole. The mix has
 // linear gains, and a level gain that follows how far the base and the voice correlate (see levelGainAt)
-// holds the level across SHIFT. A voice resets on its enable edge only once its crossfade has settled at
-// zero, so a quick off and on keeps the running voice. Settled off, the output is the input bit for bit.
+// holds the level across SHIFT. The card comes on only once its ring holds the voice's deepest read since
+// the ring's last clear, so a card started from rest passes its input until then and never plays the
+// clear's zeros. A voice resets on its enable edge only once its crossfade has settled at zero, so a quick
+// off and on keeps the running voice. Settled off, the output is the input bit for bit.
 
 namespace cv {
 
@@ -76,7 +78,7 @@ class FormantFx {
     fadeSm_ = 0.0f;
     shiftSet_ = false;
     gains_ = Gains{};
-    was_ = false;
+    wasOn_ = false;
     rangeBad_ = false;
     lagSet_ = false;
     lag_ = 0.0f;
@@ -120,6 +122,10 @@ class FormantFx {
   float fade() const { return fade_; }
   float shiftSemis() const { return shiftSm_; }
 
+  // True while the card reads a tracker's period: the card is wanted at these params or its crossfade is up.
+  // At MIX 0 it passes its input and reads none.
+  bool needsTracker(const FormantParams& p) const { return wantedBy(p) || fade_ > 0.0f; }
+
   // The delay of the card's output behind its input in samples: the delay the voice and the base play at,
   // weighted by the toggle's fade. The input crosses to the mix as the fade rises. Cutting from Autotune's
   // ring, the card waits for Autotune's corrected voice and adds only the part of its delay that
@@ -134,11 +140,12 @@ class FormantFx {
   const PitchResult& ownPitch() const { return tracker_.result(); }
 
   // Test hooks: the card cut from Autotune's input in the last chunk, the ring, the floats the ring clears
-  // have zeroed, the lag the voice read at last, and the level gain.
+  // have zeroed, the lag the voice read at last, and how far behind the ring's head its oldest grain reads.
   bool groupedForTest() const { return grouped_; }
   const InputRing<kFormantRingLen>& ringForTest() const { return ring_; }
   uint32_t ringClearedForTest() const { return ring_.clearedForTest(); }
   float lagForTest() const { return lag_; }
+  int voiceReachForTest() const { return voice_.reachForTest(ring_.head()); }
 
  private:
   // The crossfade's fade and the mix's gains: the base's share, and the shifted voice's with its trim.
@@ -206,21 +213,22 @@ class FormantFx {
       lagSet_ = false;
     }
 
-    // A voice coming on starts clean only when its crossfade has settled at zero; while the crossfade is
-    // still up the running voice carries on.
-    if (wanted && !was_ && fade_ == 0.0f) {
-      resetVoices();
-      resetLevelGain();
-      shiftSet_ = false;
-    }
-    was_ = wanted;
-
     // A voiced frame on the edge of the tracker's range, or past it, reads the edge, not the note, so the
     // card steps aside for the dry voice until a frame inside the range returns. Unvoiced frames hold the
     // state, as they hold the period. The period stays set while the crossfade is up, so the grains never
-    // lose their pitch mid-fade.
+    // lose their pitch mid-fade. The card also waits until the ring holds what the voice reads.
     if (pr.voiced) rangeBad_ = pr.clamped || pr.outOfRange;
-    const bool on = wanted && pr.period > 0.0f && !rangeBad_;
+    const bool on = wanted && pr.period > 0.0f && !rangeBad_ && ringHolds(pr.period, group, n);
+
+    // A voice coming on starts clean only when its crossfade has settled at zero, whether the toggle, the
+    // range or the ring held it off; while the crossfade is still up the running voice carries on.
+    if (on && !wasOn_ && fade_ == 0.0f) {
+      resetVoices();
+      resetLevelGain();
+      shiftSet_ = false;
+      lagSet_ = false;
+    }
+    wasOn_ = on;
     const float mixTarget = smooth::clamp01(p.mix);
     const float fadeTarget = on ? 1.0f : 0.0f;
     if (fresh_) {
@@ -251,6 +259,17 @@ class FormantFx {
     const float level0 = levelGain_;
     levelGain_ = smooth::step(level0, levelGainAt(mix_), coef_.at(n));
     mix(in, out, n, first, zeroBefore, g0, g1, level0, group);
+  }
+
+  // True when the ring holds the deepest read of a chunk of n samples since its last clear: the voice's lag,
+  // two periods for a grain's reach either side of its mark, and the chunk. A full ring holds every read.
+  bool ringHolds(float period, const GroupChunk& group, int n) const {
+    const int filled = ring_.filled();
+    if (filled >= kFormantRingLen) return true;
+    const float p = PitchTracker::clampPeriod(period);
+    const float wanted = group.feed != nullptr ? group.feed->delay : static_cast<float>(PsolaVoice::kGrainDelay) + p;
+    const float deepest = formant_detail::clampLag<kFormantRingLen>(wanted, period) + 2.0f * p + static_cast<float>(n);
+    return static_cast<float>(filled) >= deepest;
   }
 
   // Starts the voices over: the ones that cut from Autotune's input start when the share they serve comes up.
@@ -622,7 +641,7 @@ class FormantFx {
   bool lagSet_ = false;   // baseLag_ holds a live value
   int zeroRun_ = kFormantRingLen;  // samples at the ring's newest end that are exactly 0
 
-  bool was_ = false;       // the card was wanted last chunk
+  bool wasOn_ = false;     // the card was on last chunk
   bool rangeBad_ = false;  // the last voiced frame sat on the edge of the tracker's range or past it
   bool fresh_ = true;      // the next chunk takes its targets outright
   bool rested_ = false;    // the card sat stopped since it last ran

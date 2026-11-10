@@ -12,8 +12,10 @@
 // The Octave card's engine. It keeps a ring of its own input, cuts the granular voice from it and mixes
 // the voice against the input at equal power. The voice needs no pitch, so the engine runs no tracker.
 // The toggle's fade and the MIX knob share the one crossfade, so the dry and wet stay equal-power at every
-// fade. The voice resets on its enable edge only once the crossfade has settled at zero, so a quick off
-// and on keeps the running voice. Settled off, the output is the input bit for bit.
+// fade. The card comes on only once its ring holds the taps' deepest read since the ring's last clear, so a
+// card started from rest passes its input until then. The voice resets on its enable edge only once the
+// crossfade has settled at zero, so a quick off and on keeps the running voice. Settled off, the output is
+// the input bit for bit.
 
 namespace cv {
 
@@ -47,9 +49,18 @@ class OctaveFx {
   }
 
   // Runs n samples of any call length, in chunks of at most kBlock. in and out may be the same buffer.
+  // A chunk ends where the ring comes to hold the taps' deepest read, so the card comes on at that sample
+  // whatever the call length.
   void process(const float* in, float* out, int n, const OctaveParams& p) {
     if (rested_) reset();
-    for (int c = 0; c < n; c += kBlock) chunk(in + c, out + c, n - c < kBlock ? n - c : kBlock, p);
+    const int deepest = OctaveVoice::deepestRead(p.tuning);
+    for (int c = 0; c < n;) {
+      int m = n - c < kBlock ? n - c : kBlock;
+      const int filled = ring_.filled();
+      if (filled < deepest && filled + m > deepest) m = deepest - filled;
+      chunk(in + c, out + c, m, p, deepest);
+      c += m;
+    }
   }
 
   // True when the voice carries at least half the output's power: the wet gain's sine of its share of
@@ -82,12 +93,14 @@ class OctaveFx {
     return g;
   }
 
-  void chunk(const float* in, float* out, int n, const OctaveParams& p) {
-    const int first = ring_.write(in, n);
-
+  // `deepest` is the taps' deepest read behind the sample they play.
+  void chunk(const float* in, float* out, int n, const OctaveParams& p, int deepest) {
+    // The card waits until the ring holds what the taps read: `deepest` samples ahead of the chunk's first.
     // A voice coming on starts clean only when its crossfade has settled at zero; while the crossfade is
     // still up the running voice carries on.
-    bool on = voice_.prepare(p);
+    const bool held = ring_.filled() >= deepest;
+    const int first = ring_.write(in, n);
+    bool on = voice_.prepare(p) && held;
     if (on && !was_ && fade_ == 0.0f) {
       voice_.reset();
       on = voice_.prepare(p);

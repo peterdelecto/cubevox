@@ -1236,12 +1236,19 @@ std::vector<long> pulsesOf(const Signal& x, size_t from, size_t to, long minDist
 // stretches it). The stretch, its mean and spread over the second half of the note, is logged. The grains
 // land on the input's pulses when it holds still; a grid at the wrong period walks it round the period.
 bool checkOctavePulses() {
-  const Signal in = pulseTrain(220.0, 3.0, -20.0, 0.0);
+  // The pulses wait in silence until Octave's ring holds its taps' reach, so its voice starts with them.
+  const size_t lead = static_cast<size_t>(cv::OctaveVoice::deepestRead(cv::OctaveTuning{}));
+  Signal in(lead, 0.0f);
+  const Signal train = pulseTrain(220.0, 3.0, -20.0, 0.0);
+  in.insert(in.end(), train.begin(), train.end());
   Rig rig;
   rig.stage.octave.on = true;
   rig.stage.octave.semitones = 12;
   rig.stage.octave.mix = 1.0f;
-  const Signal out = rig.run(in, growlAt(0.0f, 0.0f));
+  Signal out = rig.run(in, growlAt(0.0f, 0.0f));
+  out.erase(out.begin(), out.begin() + static_cast<long>(lead));
+  rig.heard.erase(rig.heard.begin(), rig.heard.begin() + static_cast<long>(lead));
+  in.erase(in.begin(), in.begin() + static_cast<long>(lead));
   const float lag = rig.growl->dryLagSamples();
   const size_t from = static_cast<size_t>(kRate) * 3 / 2, to = in.size() - 3000;
   const std::vector<long> src = pulsesOf(rig.heard, from - 4000, to, 70, 0.3f);

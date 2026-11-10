@@ -77,11 +77,12 @@ bool slotLive(const ChainSnapshot& snap, const SlotFades& fades, int s) {
 }
 
 // What the Autotune slot `s` owes the cards behind it. The tracker runs while a reader behind is live: the
-// Formant engine directly behind the slot (every slot between holds Empty), a Crowd card or a Growl card
-// anywhere behind. The Formant engine reads the 48 kHz fine pass and the out-of-range flag, the Crowd card
-// reads the flag, and Autotune's input goes into the Crowd card's ring while one is placed behind. A live
-// Formant engine directly behind also takes Autotune's input, which it cuts its grains from, and hands
-// Autotune its grain grid, which a corrected voice that starts takes up.
+// Formant engine directly behind the slot (every slot between holds Empty) while it can be heard, a Crowd
+// card or a Growl card anywhere behind. The Formant engine reads the 48 kHz fine pass and the out-of-range
+// flag, the Crowd card reads the flag, and Autotune's input goes into the Crowd card's ring while one is
+// placed behind. A live Formant engine directly behind takes Autotune's input at any MIX, which it cuts its
+// grains from, and hands Autotune its grain grid, which a corrected voice that starts takes up. At MIX 0 with
+// its fade down the Formant card passes its input and reads no tracker; Apraxia pins its MIX at 1.
 StageContext autotuneContext(const ChainEngines& engines, const ChainSnapshot& snap, const SlotFades& fades, int s) {
   StageContext ctx;
   bool onlyEmpty = true;
@@ -91,9 +92,10 @@ StageContext autotuneContext(const ChainEngines& engines, const ChainSnapshot& s
     if (e == kNoEngine) continue;
     const bool live = slotLive(snap, fades, t);
     if (e == Engine::Formant && onlyEmpty && live) {
-      ctx.tracker.run = true;
-      ctx.tracker.fine = true;
-      ctx.tracker.outOfRange = true;
+      const bool reads = c == Card::FormantFollower || engines.formant.needsTracker(snap.params.pitchCards.formant);
+      ctx.tracker.run = reads;
+      ctx.tracker.fine = reads;
+      ctx.tracker.outOfRange = reads;
       ctx.feedsFormant = true;
       ctx.groupGrid = engines.formant.gridMarks();
     }

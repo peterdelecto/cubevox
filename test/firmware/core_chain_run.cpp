@@ -911,7 +911,7 @@ void checkPitchCardToggles() {
   for (int b = 0; b < 60; ++b) {
     const Block in = tone(b, 0.3f);
     const Run run = runBlock(*rig, snapOctave, in, StillClock());
-    if (b >= 20) running = running && run.out != in;
+    if (b >= 40) running = running && run.out != in;  // the ring holds the taps' reach after 31 blocks
   }
   check(running, "slot flip: with Autotune off and Octave on, Octave's engine runs in its own slot");
   check(rig->fades.level(0) == 0 && rig->fades.level(1) == kSlotFadeBlocks,
@@ -953,6 +953,110 @@ void checkPitchTogglesFadeOwnSlot() {
     for (int s = 0; s < 3; ++s) own = own && rig->fades.level(s) == (s > flip ? kSlotFadeBlocks : 0);
   }
   check(own, "slot flip: each pitch card's toggle fades its own slot and leaves the other pitch slots settled");
+}
+
+// Twelve harmonics at 1/h of `hz`, peak about 0.35, continuing across blocks.
+Block harmonicTone(int block, double hz) {
+  constexpr double kPi = 3.14159265358979323846;
+  Block x{};
+  for (int i = 0; i < kN; ++i) {
+    const double t = static_cast<double>(block * kN + i) / cv::kSampleRate;
+    double s = 0.0;
+    for (int h = 1; h <= 12; ++h) s += std::sin(2.0 * kPi * hz * h * t) / h;
+    x[static_cast<size_t>(i)] = 0.2f * static_cast<float>(s);
+  }
+  return x;
+}
+
+// RMS in dB of the last `blocks` blocks of `x`, which ends at a block edge.
+double tailDb(const std::vector<float>& x, int blocks) {
+  const size_t from = x.size() - static_cast<size_t>(blocks * kN);
+  double sum = 0.0;
+  for (size_t i = from; i < x.size(); ++i) sum += static_cast<double>(x[i]) * static_cast<double>(x[i]);
+  return 10.0 * std::log10(sum / (blocks * kN) + 1e-30);
+}
+
+// A pitch card switched on from rest, behind a running Autotune, behind a settled-off one, or alone, at MIX 50
+// and 100 % and at both ends of SHIFT, SEMITONES or RANGE, on a 98 Hz and a 220 Hz tone. The level is read
+// over the 8 blocks to each block, against the input's and the same layout settled on. For 100 ms from the
+// toggle no block is exact zeros and the level never swells 6 dB over the higher of the two. For the first
+// 40 ms it never dips 2 dB under the lower (the worst reads 0.5 dB). The card's own 20 ms fade from the input
+// to its delayed output comes after that, and a tone partly cancels across it.
+void checkPitchCardSwitchOnFromRest() {
+  constexpr int kWarm = 300;
+  constexpr int kAfter = 75;      // 100 ms
+  constexpr int kFirst = 30;      // 40 ms
+  constexpr int kWindow = 8;
+  constexpr double kMaxDipDb = 2.0;
+  constexpr double kMaxSwellDb = 6.0;
+  bool noZeros = true;
+  double dip = 0.0;
+  double swell = 0.0;
+  std::string dipCase = "none";
+  for (Card card : {Card::Formant, Card::FormantFollower, Card::Octave}) {
+    for (int ahead = 0; ahead < 3; ++ahead) {  // Autotune on, Autotune off, alone
+      const Layout layout = ahead == 2 ? layoutOf({card}) : layoutOf({Card::Autotune, card});
+      const int slot = ahead == 2 ? 0 : 1;
+      for (float upper : {0.0f, 1.0f}) {
+        for (float lower : {0.5f, 1.0f}) {
+          if (card == Card::FormantFollower && lower == 0.5f) continue;  // RANGE runs 0 to 1 below
+          for (double hz : {98.0, 220.0}) {
+            Toggles off = allToggles(false);
+            if (ahead == 0) off[0] = true;
+            Toggles on = off;
+            on[static_cast<size_t>(slot)] = true;
+            // Apraxia's RANGE is the lower pot, so its two runs take RANGE at both ends.
+            const float knobLower = card == Card::FormantFollower ? upper : lower;
+            const float knobUpper = card == Card::FormantFollower ? 0.5f : upper;
+            const auto snapWith = [&](const Toggles& t) {
+              PanelReading panel;
+              panel.toggle = t;
+              for (auto& k : panel.knob) k.fill(0.5f);
+              panel.knob[static_cast<size_t>(slot)] = {knobUpper, knobLower};
+              Settings settings;
+              settings.polishComp = false;
+              settings.voxEq = VoxEq::Off;
+              return composeSnapshot(layout, panel, settings, BenchOverrides());
+            };
+            const ChainSnapshot snapOff = snapWith(off);
+            const ChainSnapshot snapOn = snapWith(on);
+            auto rig = newRig();
+            auto settled = newRig();
+            rig->fades.settle(off);
+            settled->fades.settle(on);
+            std::vector<float> in;
+            std::vector<float> out;
+            std::vector<float> ref;
+            for (int b = 0; b < kWarm + kAfter; ++b) {
+              const Block x = harmonicTone(b, hz);
+              const Run run = runBlock(*rig, b < kWarm ? snapOff : snapOn, x, StillClock());
+              const Run want = runBlock(*settled, snapOn, x, StillClock());
+              append(in, x);
+              append(out, run.out);
+              append(ref, want.out);
+              if (b < kWarm) continue;
+              noZeros = noZeros && !allZero(run.out);
+              const double inDb = tailDb(in, kWindow);
+              const double refDb = tailDb(ref, kWindow);
+              const double outDb = tailDb(out, kWindow);
+              swell = std::max(swell, outDb - std::max(inDb, refDb));
+              const double under = std::min(inDb, refDb) - outDb;
+              if (b - kWarm < kFirst && under > dip) {
+                dip = under;
+                dipCase = std::string(cardDesc(card).name) +
+                          (ahead == 0 ? " behind Autotune on" : ahead == 1 ? " behind Autotune off" : " alone") + ", " +
+                          std::to_string(static_cast<int>(hz)) + " Hz, block +" + std::to_string(b - kWarm);
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  check(noZeros, "pitch cards: switched on from rest, no block in the first 100 ms is exact zeros");
+  const std::string what = "pitch cards: switched on from rest, no dip of 2 dB in the first 40 ms (worst " + std::to_string(dip) +
+                           " dB, " + dipCase + ") and no swell of 6 dB in 100 ms (" + std::to_string(swell) + " dB)";
+  check(dip <= kMaxDipDb && swell <= kMaxSwellDb, what.c_str());
 }
 
 // 200 ms of the tone: the tracker finds its period in about 32 ms and the voices sound at least
@@ -1477,6 +1581,25 @@ void checkAutotuneTrackerForReaders() {
   const auto& ring = chain->engines.autotune.ringForTest().data();
   check(std::all_of(ring.begin(), ring.end(), [](float v) { return v == 0.0f; }),
         "autotune: with no reader on, a settled-off slot rests its engine and leaves its ring clear");
+
+  // Formant on at MIX 0 passes its input, so it reads nothing and Autotune's tracker stays idle.
+  PanelReading panel;
+  panel.toggle = togglesOn({1});
+  for (auto& k : panel.knob) k.fill(0.5f);
+  panel.knob[1][1] = 0.0f;
+  Settings settings;
+  settings.polishComp = false;
+  settings.voxEq = VoxEq::Off;
+  const ChainSnapshot mixZero = composeSnapshot(layout, panel, settings, BenchOverrides());
+  auto quiet = newRig();
+  quiet->fades.settle(mixZero.slotOn);
+  bool passes = true;
+  for (int b = 0; b < 200; ++b) {
+    const Block in = tone(b, 0.3f);
+    passes = passes && runBlock(*quiet, mixZero, in, StillClock()).out == in;
+  }
+  check(mixZero.params.pitchCards.formant.mix == 0.0f && passes && quiet->engines.autotune.pitch().period == 0.0f,
+        "autotune: with Formant on at MIX 0 behind it, the chain passes the input and Autotune's tracker stays idle");
 }
 
 // Apraxia behind a Deepthroat-first layout: Deepthroat has no Autotune ahead, so Apraxia runs its own tracker
@@ -1717,6 +1840,7 @@ void checkChainRun() {
   checkInputGateOffInPause();
   checkPitchCardToggles();
   checkPitchTogglesFadeOwnSlot();
+  checkPitchCardSwitchOnFromRest();
   checkCrowdStage();
   checkCrowdPitchStage();
   checkCrowdToggleOff();

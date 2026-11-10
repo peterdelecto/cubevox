@@ -31,6 +31,7 @@ class InputRing {
       done += run;
     }
     head_ = at;
+    filled_ = filled_ + m < Len ? filled_ + m : Len;
     return first;
   }
 
@@ -41,10 +42,14 @@ class InputRing {
   void clear() {
     clearSome(Len);
     head_ = 0;
+    filled_ = 0;
   }
 
   const Array& data() const { return ring_; }
   int head() const { return head_; }
+
+  // The samples written since the last clear(), at most Len. A read deeper than this finds the clear's zeros.
+  int filled() const { return filled_; }
 
   // The floats the clears have zeroed since construction, for the tests. It wraps.
   uint32_t clearedForTest() const { return cleared_; }
@@ -61,6 +66,7 @@ class InputRing {
 
   Array ring_{};
   int head_ = 0;
+  int filled_ = 0;
   int zero_ = Len;  // where the next clear starts; Len when the walk has covered the ring
   uint32_t cleared_ = 0;
 };

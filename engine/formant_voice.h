@@ -142,6 +142,18 @@ class FormantPsolaVoiceT {
   // The grain playback rate the last prepare() took, for the tests.
   float rate() const { return rate_; }
 
+  // How far behind ring index `head` the grain in flight that reads oldest reads next, in whole samples, for
+  // the tests.
+  int reachForTest(int head) const {
+    int far = 0;
+    for (size_t k = 0; k < count_; ++k) {
+      int d = head - (grains_[k].pos >> kFracBits);
+      if (d < 0) d += RingLen;
+      far = d > far ? d : far;
+    }
+    return far;
+  }
+
   // On, a grain keeps the gain it launched with, so a step in rate or ratio reaches only the grains
   // that launch after it. Off, every grain in flight takes the newest gain, as the Mob copies'
   // slow glides have it. The Mob card runs it off, and crowd_test's pinned hashes and the Mob

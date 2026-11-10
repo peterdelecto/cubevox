@@ -153,3 +153,28 @@ block, % at 50.4k board cycles per host us): default layout 1.378 us (10.9 %) be
 before and 0.48 us after at MIX 100 % (3.4 % and 3.8 %) and 0.62 before, 0.51 after at MIX 50 %. With Autotune
 toggled every 300 ms the card's worst 1 % of blocks add 1.9 us (15 %) before and 1.9 us after, the blocks of the
 fade and the restart. `kFormant` is 4 / 7 and `kFormantFollower` 5 / 8.
+
+## Fix pass (2026-11-10)
+
+1. Switch-on from rest. A stopped Formant slot rests and the next call clears the card's ring, while Autotune's
+   tracker stays warm. The card used to come on at once and read the cleared ring, so Formant or Apraxia behind
+   a running Autotune played 17 to 24 ms of exact zeros (MIX 100 %) or dipped 4 to 20 dB (MIX 50 %). The card now
+   stays off until its ring holds its lag, two periods and the chunk since the clear (`InputRing::filled()`),
+   passing its input meanwhile, then fades in over the 20 ms one-pole. No block of exact zeros and no dip of
+   0.5 dB in the 40 ms after the toggle (`core_chain_run` `checkPitchCardSwitchOnFromRest`).
+2. Formant at MIX 0 behind Autotune passes its input and no longer keeps Autotune's tracker and fine pass running
+   (`FormantFx::needsTracker`). Its slot still feeds the card Autotune's input, so MIX leaving 0 finds the ring
+   full. Host bench, default layout with Formant in slot 3, Autotune off, MIX 0: 4.76 us a block before,
+   4.09 after.
+3. A card that steps aside for a range flag and returns starts its voices clean when its fade leaves 0, as the
+   toggle's edge does. It used to fade back in on grains frozen before the dropout, reading up to 3,840 samples
+   back where the lag is about 1,100 (`formant_test` "range return").
+4. As built item 2's settled-off claim is pinned: `pitch_split_test` compares the grouped card behind a
+   settled-off Autotune with the card alone on Adam's three clips, SHIFT -7, 0 and +4, MIX 50 and 100 %, with `==`.
+5. The card's own fade from its input to its delayed output still dips on a steady tone where the two partly
+   cancel: up to 9.2 dB at 98 Hz, SHIFT +7, MIX 100 %, 60 to 80 ms after the toggle, with Autotune off or
+   absent (9.3 dB before the pass). Formant behind a running Autotune reads 6.9 dB there.
+6. Host cost, default layout (Adam's clips, all slots on, Apple clang -O2, minimum of 9 passes over several
+   interleaved runs, whole chain): 5.36 to 5.46 us a block before, 5.39 to 5.45 after at knobs 0.5; with
+   Formant in slot 3 at MIX 100 %, 5.70 to 5.79 before, 5.73 to 5.81 after. The gate adds no cost a host bench
+   can see.

@@ -138,6 +138,7 @@ cubevox_engine_test(pitch)
 cubevox_engine_test(pitch_onset)
 target_compile_definitions(pitch_onset_test PRIVATE CUBEVOX_SAMPLES_DIR="${CMAKE_SOURCE_DIR}/samples")
 cubevox_engine_test(pitch_split)
+target_compile_definitions(pitch_split_test PRIVATE CUBEVOX_SAMPLES_DIR="${CMAKE_SOURCE_DIR}/samples")
 cubevox_engine_test(fastmath)
 cubevox_engine_test(fastmem)
 # the board file's GCC-only pragma is unknown to the host's clang

@@ -1,5 +1,6 @@
 // The Formant engine's base and voice sitting on one lag, and its joining of Autotune's grain pass directly
-// behind the Autotune card. No window, no audio device.
+// behind the Autotune card, which behind a settled-off Autotune equals the card alone bit for bit on Adam's
+// clips. No window, no audio device.
 
 #include <algorithm>
 #include <cmath>
@@ -7,6 +8,7 @@
 #include <memory>
 #include <vector>
 
+#include "clip_util.h"
 #include "engine/autotune_fx.h"
 #include "engine/formant_fx.h"
 
@@ -177,6 +179,47 @@ bool testNoGroupWithoutEngine() {
   return ok;
 }
 
+// Behind a settled-off Autotune the grouped engine runs its ratio 1 voice alone, on Autotune's tracker, and
+// equals the engine on its own ring and its own tracker, bit for bit. The grouped run is the chain's: the
+// Autotune slot feeds the card and runs its engine for the tracker, hands on the dry input, and its slot
+// gains are 0.
+bool testSettledOffGroupEqualsAlone() {
+  bool whole = true;
+  const std::vector<Signal> takes = clips::load(CUBEVOX_SAMPLES_DIR, whole);
+  if (!whole || takes.empty()) return report("settled-off group equals the card alone: Adam's clips missing", false, 0.0);
+  bool ok = true;
+  for (size_t c = 0; c < takes.size(); ++c) {
+    for (int st : {-7, 0, 4}) {
+      for (float mix : {0.5f, 1.0f}) {
+        auto at = std::make_unique<cv::AutotuneFx>();
+        auto grouped = std::make_unique<cv::FormantFx>();
+        auto alone = std::make_unique<cv::FormantFx>();
+        cv::FormantParams fp;
+        fp.on = true;
+        fp.shiftSt = st;
+        fp.mix = mix;
+        Signal scratch(cv::kBlock);
+        Signal a(takes[c].size());
+        const Signal g = run(takes[c], [&](const float* i, float* o, int n, int pos) {
+          cv::TrackerNeeds need{true, true, true};
+          grouped->feed(i, n);
+          at->process(i, scratch.data(), n, cv::AutotuneParams{}, need, grouped->gridMarks());
+          const cv::UpstreamPitch up{&at->pitch(), 0.0f, 0.0f, at.get(), 0.0f, 0.0f};
+          grouped->process(i, o, n, fp, up);
+          alone->process(i, &a[static_cast<size_t>(pos)], n, fp);
+        });
+        size_t differ = 0;
+        for (size_t k = 0; k < g.size(); ++k) differ += g[k] != a[k] ? 1u : 0u;
+        char name[96];
+        std::snprintf(name, sizeof name, "settled-off group equals the card alone, clip %zu SHIFT %+d MIX %.0f %%", c + 1, st,
+                      100.0 * mix);
+        ok &= report(name, differ == 0 && grouped->groupedForTest(), static_cast<double>(differ));
+      }
+    }
+  }
+  return ok;
+}
+
 }  // namespace
 
 int main() {
@@ -184,5 +227,6 @@ int main() {
   ok &= testBase();
   ok &= testGroup();
   ok &= testNoGroupWithoutEngine();
+  ok &= testSettledOffGroupEqualsAlone();
   return ok ? 0 : 1;
 }
