@@ -46,14 +46,15 @@
 //    the lag is the grain delay plus a period, and with Autotune ahead it is the floor.
 //
 //    The throat moves with each syllable. The syllable sweep (`syllable_sweep.h`, Apraxia's law) reads the
-//    card's input, and throatSt is formantSt plus the sweep times throatDropTop times GROWL. At GROWL 100 %
-//    a syllable drops the throat from 5 st down to 12 st down, and it returns over DECAY while the note
-//    holds. At GROWL 0 the throat stays at formantSt. The throat reaches the voice through the 20 ms glide
-//    GROWL and DRIVE use.
+//    card's input, and throatSt is formantSt plus the sweep times throatDropTop times the engine's `growl`
+//    (the pot times kGrowlRaspTop). With the GROWL pot at 100 % a syllable drops the throat from 5 st down
+//    to 10.6 st down, and it returns over DECAY while the note holds. At GROWL 0 the throat stays at
+//    formantSt. The throat reaches the voice through the 20 ms glide GROWL and DRIVE use.
 // 2. The rasp. A raised wave at half the pitch of the card's input multiplies the dropped voice, so alternate
 //    periods of the sung note come out loud and quiet, the period doubling of a growl's false folds.
-//    Over the top half of GROWL a wave at a third of the pitch blends in. The wave is a raised sine at
-//    GROWL 0 and hardens toward a square as GROWL rises. A level gain holds the modulated voice at the
+//    Over the top half of the engine's `growl`, from 62.5 % of the GROWL pot, a wave at a third of the pitch
+//    blends in, up to a 0.30 share at the pot's top. The wave is a raised sine at GROWL 0 and hardens toward
+//    a square as GROWL rises, to 5.5 times a raised sine's slope at the pot's top. A level gain holds the modulated voice at the
 //    power of the plain one. Without a pitch (unvoiced, silence) the wave holds its last rate and its
 //    depth falls to 0 over 20 ms, so breath does not buzz.
 //
@@ -96,11 +97,11 @@ constexpr float kGrowlDefaultPot = 0.75f;
 struct GrowlTuning {
   float pitchSt = -12.0f;       // the drop; the voice's pitch ratio is 2^(pitchSt / 12)
   float formantSt = -5.0f;      // the throat at rest; the grains play at 2^(throatSt / 12)
-  float throatDropTop = -7.0f;  // the sweep's added throat shift at GROWL 100 %
+  float throatDropTop = -7.0f;  // the sweep's added throat shift at engine growl 1 (-5.6 st at the pot's top)
   float sensitivity = kSweepDefaultSensitivity;  // the syllable sweep's SENSITIVITY, 0..1
   float decayMs = kSweepDefaultDecayMs;          // a sweep falls from the drive to 0 over this
-  float hardTop = 7.0f;         // the wave's added slope at GROWL 100 %, 1 + hardTop * GROWL^2 times a raised sine's
-  float thirdTop = 0.5f;        // the third-of-pitch wave's share at GROWL 100 %
+  float hardTop = 7.0f;         // the wave's slope is 1 + hardTop * growl^2 times a raised sine's (5.5 at the pot's top)
+  float thirdTop = 0.5f;        // the third-of-pitch wave's share at engine growl 1 (0.30 at the pot's top)
   float hpHz = 100.0f;          // the wet path's 2nd-order Butterworth high-pass, after the fold and ahead of MIX
   float lowShelfHz = 200.0f;    // ahead of the knee
   float lowShelfDb = 6.0f;      // at DRIVE 100 %

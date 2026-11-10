@@ -3,7 +3,7 @@
 // the drive reads about 1 on a -21 dBFS note, 0.5 on a -27 dBFS note and 0 on a -33 dBFS note, and the
 // full point moves with the pot; the follower's attack and release measured on a step; each onset fires
 // a sweep that opens at the drive, halves at half the decay and rests at 0 while the note holds, and the
-// next note fires it again; a +12 st sweep opens to +12 st and comes back to 0; silence rests at 0; at
+// next note fires it again; a soft note that fires no onset still dips and rests at 0; a +12 st sweep opens to +12 st and comes back to 0; silence rests at 0; at
 // -12 st the grains play at half speed and at +12 st at double speed, their window sum holds unity and
 // every read stays in the ring and behind the newest sample, and the output stays finite and under 0 dBFS on a tone and on Adam's clips; the output stays finite
 // on the clips at every knob corner; and the card at its default holds the level rule on them. The card
@@ -425,6 +425,31 @@ bool testSweep(float decayMs) {
   return ok;
 }
 
+// A soft note at the default: a -25 dBFS sine held 1 s reads a drive of about 0.42, under the 0.5 onset,
+// and its rise from the drive's 0 point is under 6 dB, so no onset fires. The note's first block with a
+// drive above 0 starts the sweep, so SHIFT still dips. The sweep reads 0 from DECAY after that block, and
+// SHIFT is back within 0.01 st of 0 five glide times later.
+bool testSoftNote() {
+  const int decay = static_cast<int>(cv::kFollowerDefaultDecayMs * cv::kSmpPerMs);
+  int start = -1;
+  float drive = 0.0f;
+  float sweepHeld = 0.0f;
+  float dip = 0.0f;
+  float rest = 0.0f;
+  through(sine(kRate, -25.0), boxDefault(), [&](const Stage& s, int done) {
+    if (start < 0 && s.follower.drive() > 0.0f) start = done;
+    drive = std::max(drive, s.follower.drive());
+    dip = std::min(dip, s.formant.shiftSemis());
+    if (start < 0) return;
+    if (done > start + decay) sweepHeld = std::max(sweepHeld, s.follower.sweep());
+    if (done >= start + decay + kRate / 10) rest = std::max(rest, std::fabs(s.formant.shiftSemis()));
+  });
+  return report("sweep: a soft note under the onset dips and rests within 0.01 st of 0 while it holds",
+                drive > 0.38f && drive < 0.46f && dip < -1.0f && sweepHeld == 0.0f && rest < 0.01f,
+                "drive %.3f, SHIFT dips to %+.2f st, sweep after DECAY %.3f, rests within %.4f st", drive, dip, sweepHeld,
+                rest);
+}
+
 // One Formant voice at `rate` (0.5 at -12 st, 2 at +12 st) and ratio 1 on the engine's ring, driven as the
 // engine drives it at a steady `period`: calls of kBlock for 1 s at the lag the engine's own tracker gives
 // it, the grain delay plus a period. Its ring holds 1.0 up to `reach` samples behind the newest sample and
@@ -673,6 +698,7 @@ int main() {
   ok &= testAttackRelease();
   ok &= testSweep(250.0f);
   ok &= testSweep(cv::kFollowerDefaultDecayMs);
+  ok &= testSoftNote();
   ok &= testUpSweep();
   ok &= testHalfSpeedVoice();
   ok &= testHalfSpeedTone();

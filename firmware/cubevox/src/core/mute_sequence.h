@@ -76,9 +76,8 @@ class MuteSequence {
   }
   bool unmuteWanted() const { return switch_.level() && clocksRunning_ && !latched_ && !held_; }
   bool muteWanted() const { return !switch_.level() || latched_ || held_; }
-  bool relayMayClose(uint32_t nowMs) const { return nowMs - resetMs_ >= kRelayCloseAfterPowerOnMs; }
-  void endPowerOnWait(uint32_t nowMs) {
-    if (state_ == State::Unmuted || (relayMayClose(nowMs) && (!unmuteWanted() || tripped_))) powerOnWait_ = false;
+  void endPowerOnWait() {
+    if (state_ == State::Unmuted || (powerOnDone_ && (!unmuteWanted() || tripped_))) powerOnWait_ = false;
   }
   MuteOutputs outputs() const;
 
@@ -92,4 +91,5 @@ class MuteSequence {
   bool tripped_ = false;
   bool outputHeld_ = true;
   bool powerOnWait_ = true;
+  bool powerOnDone_ = false;  // kRelayCloseAfterPowerOnMs have passed since reset(); set once
 };

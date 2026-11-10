@@ -77,14 +77,12 @@ void AudioBlock::syncSnapshot() {
   if (first) flow_.settleSlots(held_.slotOn);
 }
 
-// At the zero point of the fade: adopts the newest snapshot, resets the engines whose slot changed
-// card and settles every slot's toggle, since the output is at zero and nothing needs a crossfade.
+// At the zero point of the fade: adopts the newest snapshot (BlockFlow::adopt).
 void AudioBlock::swapSnapshot() {
   seenSeq_ = published_.load(std::memory_order_acquire);
   const ChainSnapshot& pub = snapshots_[seenSeq_ & 1];
-  flow_.queueReset(enginesToReset(held_.layout, pub.layout));
+  flow_.adopt(held_, pub);
   held_ = pub;
-  flow_.settleSlots(held_.slotOn);
   layoutPending_ = false;
 }
 

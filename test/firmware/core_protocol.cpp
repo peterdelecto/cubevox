@@ -661,12 +661,61 @@ void checkFramerStray() {
   check(f.strayBytes() == 8, "framer: the line added no stray bytes");
 }
 
+// One loop() pass of the serial reader over `in` from `at`, as board/serial_link.cpp runs it. Counts
+// the line events and returns the bytes it read.
+size_t readerPass(protocol::Framer& f, const std::string& in, size_t at, int& events) {
+  size_t bytesRead = 0;
+  protocol::Framer::Kind kind = protocol::Framer::Kind::None;
+  while (!protocol::pollPassDone(kind, bytesRead) && at + bytesRead < in.size()) {
+    kind = f.feed(static_cast<uint8_t>(in[at + bytesRead]));
+    ++bytesRead;
+    if (kind != protocol::Framer::Kind::None) ++events;
+  }
+  return bytesRead;
+}
+
+// A host that keeps sending gets one line handled per loop() pass, so the reader always returns.
+void checkReaderBudget() {
+  std::string flood;
+  for (int i = 0; i < 200; ++i) flood += "{\"id\":1,\"cmd\":\"hello\"}\n";
+  protocol::Framer f;
+  size_t at = 0;
+  int passes = 0;
+  int lines = 0;
+  bool oneEach = true;
+  while (at < flood.size()) {
+    int events = 0;
+    at += readerPass(f, flood, at, events);
+    oneEach = oneEach && events <= 1;
+    lines += events;
+    ++passes;
+  }
+  check(oneEach && lines == 200 && passes == 200, "reader: a flood of lines is handled one line a pass");
+
+  const std::string stray(5000, 'x');
+  protocol::Framer g;
+  int events = 0;
+  check(readerPass(g, stray, 0, events) == protocol::kPollByteBudget && events == 0,
+        "reader: bytes that never make a line stop the pass at the byte budget");
+
+  std::string tooLong = "{" + std::string(protocol::kMaxLine + 10, 'a') + "\n{\"id\":2}\n";
+  protocol::Framer h;
+  events = 0;
+  const size_t first = readerPass(h, tooLong, 0, events);
+  check(first == protocol::kMaxLine + 1 && events == 1, "reader: a line too long ends the pass");
+  events = 0;
+  const size_t second = readerPass(h, tooLong, first, events);
+  check(events == 1 && first + second == tooLong.size() && std::strcmp(h.line(), "{\"id\":2}") == 0,
+        "reader: the next pass drops the rest of that line and frames the one after");
+}
+
 void checkFramer() {
   checkFramerBasics();
   checkFramerLimits();
   checkFramerReset();
   checkFramerNul();
   checkFramerStray();
+  checkReaderBudget();
 }
 
 // ---- bench ops -----------------------------------------------------------------------------

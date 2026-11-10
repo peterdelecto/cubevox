@@ -13,10 +13,10 @@
 // the full point to 1 at it.
 //
 // An onset is the drive rising through 0.5 after it sat under 0.2, or the follower rising more than 6 dB
-// in about 10 ms. Each onset starts a sweep at the drive, the drive times a ramp that falls from 1 to 0
-// over DECAY. A held note then rests at 0 until the next onset, and a new onset restarts the ramp at the
-// drive of that moment. While no sweep runs, before the first onset and once the drive has fallen to 0,
-// the sweep is the drive itself.
+// in about 10 ms. The sweep is the drive times a ramp that falls from 1 to 0 over DECAY. A sweep starts
+// on a note's first block, the first with a drive above 0, and each onset restarts the ramp at 1, so a
+// soft note that never reaches an onset still plucks. A held note rests at 0 until the next onset. Once
+// the drive falls to 0 the sweep ends and reads 0.
 //
 // The sweep steps once per call. It runs no per-sample work beyond the peak scan.
 
@@ -111,7 +111,7 @@ class SyllableSweep {
 
   // Starts a sweep on an onset and steps the running one down its ramp.
   void stepSweep(bool onset, int n, float decayMs) {
-    if (onset) {
+    if (onset || (!sweeping_ && drive_ > 0.0f)) {
       sweeping_ = true;
       ramp_ = 1.0f;
     } else if (sweeping_) {
