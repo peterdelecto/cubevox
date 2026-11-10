@@ -53,9 +53,8 @@ three settings. change it to VOX EQ and default off". Built 2026-11-05.
     `kVoxEq` passes without measuring the stage. The run puts VOX EQ at ON+CUTS with each
     layout (`set_layout` carries `settings.vox_eq` `"cuts"`) and puts the box's own setting back at the
     end (`2026-11-01-stress-bench-design.md`). The row `kVoxEq` in `core/costs.h` stays the
-    ON+CUTS cost. The subsonic high-pass adds two biquads to the front half, about 0.2 % of a block by
-    instruction count, inside the row's headroom (mean 1.7 % of 2 %, worst 2.4 % of 3 %); the next
-    stress run on the box confirms it.
+    ON+CUTS cost. The subsonic high-pass adds two biquads to the front half. The stress run of 2026-11-10
+    (v2.01.85) read VOX EQ at 2.11 to 2.17 % mean and 3.26 to 3.29 % worst, so the row is {3, 4}.
 
 ## Settings and the record
 1. `Settings::voxEq` is `VoxEq::Off`, `On` or `Cuts` (0, 1, 2), default Off. `polishEq` is gone.

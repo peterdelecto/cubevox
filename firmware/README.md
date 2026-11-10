@@ -342,7 +342,7 @@ DrumSynthV3 are references to read, and nothing in `firmware/` is copied from th
 ## Status
 
 Costs in `core/costs.h` are marked measured or estimated. The measured rows come from stress runs of the engine
-chain on the box, and the POLISH COMP, soft ceiling and BYPASS rows stay estimates until a run reads them; the
+chain on the box (the stress run of 2026-11-10, v2.01.85, read every card row), and the soft ceiling and BYPASS rows stay estimates until a run reads them; the
 method is in that file. The bring-up logs are in `hardware/bringup/`. The OLED driver starts the panel at
 boot and retries one that does not answer once a second, with a `[WARN]` in the boot report, so the box plays on
 without a panel. `board/power_sense` mutes the output when 5VA, read on VA_SENSE (PB1), falls under

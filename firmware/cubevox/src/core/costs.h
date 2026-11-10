@@ -67,9 +67,9 @@ constexpr Cost operator+(Cost a, Cost b) {
 }
 
 constexpr Cost kEmpty{0, 0, true};
-constexpr Cost kInputGate{1, 3, true};     // 5.7k to 6.0k / 15.2k to 17.8k, stress run 2026-11-05 (v2.01.40, default, lofi, chatter and chasm layouts: mean 0.9 %, worst 2.4 to 2.8 %)
-constexpr Cost kAutotune{3, 7, false};     // est. the pair's host-scaled figure less kTracker: its voice, its crossfade and the fine pass; see kTracker. The worst is set so the pair covers the Autotune slot's reading, 70.8k to 72.0k cycles, 11.1 to 11.3 % worst (stress run 2026-11-05, v2.01.54, four layouts), which was taken while the slot also ran Octave's work; the board has not read the slot since the cards split
-constexpr Cost kOctave{2, 3, false};       // est. from the host bench of 2026-11-05, the whole engine: 0.251 host us a block on g++ 15 (MIX 100 %), 12.6k board cycles at 50.4k, rounded up; see "Octave alone". The worst takes the only board reading of the engine, 14.0k cycles, 2.2 % (stress run 2026-11-02, v2.01.14, octave-alone), rounded up to 3
+constexpr Cost kInputGate{1, 4, true};     // 6.0k to 6.3k / 15.1k to 20.4k, stress run 2026-11-10 (v2.01.85, all 13 layouts: mean 0.9 to 1.0 %, worst 2.4 to 3.2 %; the throat layout read 3.19 % on both runs, which the old worst of 3 failed); the 2026-11-05 run (v2.01.40) read 5.7k to 6.0k / 15.2k to 17.8k
+constexpr Cost kAutotune{3, 7, true};      // the pair's host-scaled figure less kTracker: its voice, its crossfade and the fine pass; see kTracker. The worst is set so the pair covers the Autotune slot's reading, 70.8k to 72.0k cycles, 11.1 to 11.3 % worst (stress run 2026-11-05, v2.01.54, four layouts), which was taken while the slot also ran Octave's work; stress run 2026-11-10 (v2.01.85, 12 layouts with Autotune: mean 29.5k to 30.1k, 4.6 to 4.7 %, worst 52.9k to 54.6k, 8.3 to 8.5 %) reads the split slot under the pair's 7 / 12, so the rows hold
+constexpr Cost kOctave{2, 3, true};        // 8.6k to 8.8k / 12.9k to 15.0k, stress run 2026-11-10 (v2.01.85, default, crowd, chasm, crowd-chasm, chatter, lofi, throat and octave-alone layouts: mean 1.3 to 1.4 %, worst 2.0 to 2.3 %; octave-alone's 2.3 % is its second invocation, one run); earlier est. from the host bench of 2026-11-05, the whole engine: 0.251 host us a block on g++ 15 (MIX 100 %), 12.6k board cycles at 50.4k, rounded up; see "Octave alone". The worst takes the only board reading of the engine, 14.0k cycles, 2.2 % (stress run 2026-11-02, v2.01.14, octave-alone), rounded up to 3
 constexpr Cost kUnison{2, 3, true};        // 10.5k / 13.7k to 15.7k, stress run 2026-11-05 (v2.01.40, default, lofi, chatter and chasm layouts: mean 1.6 %, worst 2.1 to 2.5 %)
 constexpr Cost kSlapback{1, 3, true};      // 2.7k to 2.9k / 13.5k to 13.8k, stress run 2026-11-02 (v2.01.11, all seven layouts, TIME and AMOUNT swept, ten toggle flips: mean 0.4 to 0.5 %, worst 2.1 to 2.15 %, lowest run worst per layout); the host bench estimate of 6.4k to 8.3k worst missed the block after an enable
 constexpr Cost kDistortion{4, 6, true};    // 24.1k to 24.2k / 32.8k to 33.0k, stress run 2026-11-05 (v2.01.40, default, lofi, chatter and chasm layouts: mean 3.8 %, worst 5.1 to 5.2 %)
@@ -101,7 +101,10 @@ constexpr Cost kReverbChasm{5, 7, true};    // 30.3k / 38.8k, stress run 2026-11
 // rows are estimates, and a board bench of the pair after the pass is owed. At the 50.4k ratio the
 // tracker's 0.867 us would read 6.8 points mean and its 1.136 us 8.9 points worst, against the 4 and
 // 5 held here.
-constexpr Cost kTracker{4, 5, false};
+// The stress run of 2026-11-10 (v2.01.85) measured the pair as the Autotune slot, 4.6 to 4.7 % mean and 8.3 to 8.5 %
+// worst, and the tracker's own slot in the formant-alone and heaviest layouts (Formant plus tracker, 4.8 to 4.9 % mean,
+// 9.4 to 9.7 % worst). Both sit under the rows, which hold.
+constexpr Cost kTracker{4, 5, true};
 
 // The Mob card (code id crowd), eight copies. The stress run of 2026-11-02 (v2.01.11) read its slot in
 // the Mob and Mob-chasm layouts at 86.3k to 86.5k cycles mean (13.5 %), knobs at top, and 104.3k to
@@ -117,21 +120,21 @@ constexpr Cost kCrowd{14, 17, true};  // 86.3k to 86.5k / 104.3k to 106.9k, stre
 // other; settled off it runs the one voice at ratio 1, and its base is a ring read. Formant's row is an
 // estimate: the one board reading of the card, formant-alone at 29.2k to 29.4k / 52.8k to 54.3k (4.6 % /
 // 8.2 to 8.5 %, 2026-11-02, v2.01.14), includes the tracker and the engine as it was then.
-constexpr Cost kFormant{4, 7, false};  // est. from the host bench of 2026-11-05 (Adam's clips, -3 st, MIX 100 %, Autotune on, Apple clang -O2, minimum of 15 passes per block; g++ 15 has no SDK here): the card adds 0.47 host us a block over Autotune alone, 3.7 % at 50.4k, rounded up to 4; its worst 1 % of blocks add 0.74 us, 5.8 %, and a block of Autotune's crossfade runs a second voice, about 0.85 us, 6.7 %, rounded up to 7
-constexpr Cost kFormantFollower{5, 8, false};  // est.: kFormant plus the follower. Host bench 2026-11-04 (Adam's clips, SENSITIVITY 50 %, Apple clang -O2, median of 9 interleaved passes, 2 runs; g++ 15 has no SDK here): 15.8 to 15.9 ns a sample at RANGE -12 st, the worst setting, where the grains play at half speed, against Formant's 14.8 at -7 st, at most 1.1 ns more, 3.7k board cycles a block at 50.4k, 0.59 %, rounded up
+constexpr Cost kFormant{4, 7, true};   // stress run 2026-11-10 (v2.01.85, formant layout behind Autotune: 16.1k / 19.2k, mean 2.5 %, worst 3.0 %; formant-alone and heaviest, with the card's own tracker: 30.9k to 31.5k / 59.9k to 61.9k, mean 4.8 to 4.9 %, worst 9.4 to 9.7 %); the readings sit under the row and under the row plus kTracker, so it holds, and the settled crossfade voice stays the 2026-11-05 estimate: from the host bench of 2026-11-05 (Adam's clips, -3 st, MIX 100 %, Autotune on, Apple clang -O2, minimum of 15 passes per block; g++ 15 has no SDK here): the card adds 0.47 host us a block over Autotune alone, 3.7 % at 50.4k, rounded up to 4; its worst 1 % of blocks add 0.74 us, 5.8 %, and a block of Autotune's crossfade runs a second voice, about 0.85 us, 6.7 %, rounded up to 7
+constexpr Cost kFormantFollower{5, 8, true};   // 17.9k / 26.8k, stress run 2026-11-10 (v2.01.85, apraxia layout behind Autotune: mean 2.8 %, worst 4.2 %, the lowest of two runs), under the row, which holds; est. before: kFormant plus the follower. Host bench 2026-11-04 (Adam's clips, SENSITIVITY 50 %, Apple clang -O2, median of 9 interleaved passes, 2 runs; g++ 15 has no SDK here): 15.8 to 15.9 ns a sample at RANGE -12 st, the worst setting, where the grains play at half speed, against Formant's 14.8 at -7 st, at most 1.1 ns more, 3.7k board cycles a block at 50.4k, 0.59 %, rounded up
 constexpr Cost kLofi{2, 5, true};          // 11.1k / 26.6k, stress run 2026-11-05 (v2.01.40, default, lofi, chatter and chasm layouts: mean 1.7 %, worst 4.1 %)
 constexpr Cost kBloom{2, 4, true};     // 11.7k to 12.0k / 22.9k to 23.4k, stress run 2026-11-02 (v2.01.14, chatter and heaviest layouts, LENGTH and AMOUNT swept: mean 1.8 to 1.9 %, worst 3.6 to 3.7 %, lowest run worst per layout); the host bench estimate was 3 / 5
 
 // The Deepthroat card (code id growl), Distortion's alternate in slot 6, reads Autotune's tracker like Mob,
 // and pays a tracker of its own with no Autotune ahead. Its row is the card's slot measured on the box.
-constexpr Cost kGrowl{5, 7, true};  // 25.7k / 42.7k, stress run 2026-11-05 (v2.01.51-bench, throat layout: mean 4.0 %, worst 6.7 %)
+constexpr Cost kGrowl{5, 8, true};  // 24.5k / 46.4k, stress run 2026-11-10 (v2.01.85, throat layout: mean 3.8 %, worst 7.26 %, lowest of two runs, which the old worst of 7 failed); the 2026-11-05 run (v2.01.51-bench) read 25.7k / 42.7k
 
 // What every block spends whatever the layout: VOX EQ's front half ahead of the slots, and the
 // tail after them. The stress run of 2026-11-05 measured VOX EQ at ON+CUTS (both halves) and POLISH COMP, and
 // stress.py gates their buckets against kVoxEq and kPolishComp. The run read the rest of the fixed
 // path, SOFT CEILING and BYPASS mix, at about 0.9 % mean combined. Those two rows stay estimates.
 // stress.py gates the whole fixed path against kFixed, the sum of the four rows.
-constexpr Cost kVoxEq{2, 3, true};         // 10.9k / 15.0k to 15.1k, stress run 2026-11-05 (v2.01.40, default, lofi, chatter and chasm layouts: mean 1.7 %, worst 2.4 %)
+constexpr Cost kVoxEq{3, 4, true};         // 13.5k to 13.9k / 20.9k to 21.1k, stress run 2026-11-10 (v2.01.85, all 13 layouts: mean 2.11 to 2.17 %, worst 3.26 to 3.29 %; the 40 Hz subsonic high-pass of v2.01.59 added the rise from the 2026-11-05 run, v2.01.40: 10.9k / 15.0k to 15.1k)
 constexpr Cost kPolishComp{3, 4, true};    // 14.6k to 15.4k / 18.7k to 20.9k, stress run 2026-11-05 (v2.01.40, default, lofi, chatter and chasm layouts: mean 2.3 to 2.4 %, worst 2.9 to 3.3 %)
 constexpr Cost kSoftCeiling{1, 1, false};  // est.: a compare per sample; tanh only past -2 dBFS
 constexpr Cost kBypassMix{1, 1, false};    // est.: the dry copy, the input energy sum, the BYPASS fade
