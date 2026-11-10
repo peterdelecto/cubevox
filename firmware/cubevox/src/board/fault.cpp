@@ -1,5 +1,6 @@
 #include "board/fault.h"
 
+#include <stddef.h>
 #include <unistd.h>
 
 #include <array>
@@ -20,6 +21,7 @@
 #include "board/print_hex.h"
 #include "board/serial_link.h"
 #include "core/audio_stall.h"
+#include "core/record_store.h"
 #include "core/timing.h"
 
 // faultCapture's own stack, so a fault from an overflowed main stack still records. The trampolines
@@ -48,9 +50,18 @@ constexpr uint32_t kStackPaint = 0xC5A5C5A5u;
 // Left unpainted below the stack pointer, for the frames of the calls that paint.
 constexpr uintptr_t kPaintMarginBytes = 256;
 
-// Written by the fault handler, read on the next boot. .cv_noinit (firmware/cubevox.ld) sits at
-// the top of DTCM, above the boot block and .dtcm_bss, and survives a system reset.
-__attribute__((section(".cv_noinit"))) CvFaultRecord gStored;
+// .cv_noinit (firmware/cubevox.ld) sits at the top of DTCM, above the boot block and .dtcm_bss, and
+// survives a system reset. The fault handler writes the fault record, read on the next boot, at its
+// start, where the bootloader reads it too. The record store's read limits follow it.
+struct NoInit {
+  CvFaultRecord fault;
+  RecordReadLimits recordLimits;
+};
+static_assert(offsetof(NoInit, fault) == 0, "the fault record sits at CV_FAULT_RECORD_ADDR");
+static_assert(sizeof(NoInit) <= CV_FAULT_RECORD_SIZE, "the fault record and the read limits fit the slot");
+
+__attribute__((section(".cv_noinit"))) NoInit gNoInit;
+CvFaultRecord& gStored = gNoInit.fault;
 
 CvFaultRecord gLast = {};  // copy taken at boot, printed by every report this run
 uint32_t gResetFlags = 0;
@@ -270,6 +281,8 @@ void faultInit() {
 }
 
 bool faultInitDone() { return gInitDone; }
+
+RecordReadLimits& faultRecordReadLimits() { return gNoInit.recordLimits; }
 
 uint32_t faultResetFlags() { return gResetFlags; }
 

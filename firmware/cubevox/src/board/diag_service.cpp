@@ -8,6 +8,7 @@
 #include "board/boot_health.h"
 #include "board/fault.h"
 #include "board/flash_bank2.h"
+#include "board/power_sense.h"
 #include "board/record_service.h"
 #include "board/serial_link.h"
 #include "core/entry_log.h"
@@ -97,7 +98,7 @@ void diagInit() {
 }
 
 void diagPoll() {
-  gLog.poll();
+  if (!powerSenseTripped()) gLog.poll();  // a falling rail starts no flash work
   reportFailure();
 }
 

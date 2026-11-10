@@ -31,6 +31,7 @@ int main() {
   checkCanvas();
   checkPanelTest();
   checkRecords();
+  checkRecordCuts();
   checkEntryLog();
   checkCrc32();
   checkBootHealth();

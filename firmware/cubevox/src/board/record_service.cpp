@@ -5,6 +5,7 @@
 #include "board/boot_block_access.h"
 #include "board/fault.h"
 #include "board/flash_bank2.h"
+#include "board/power_sense.h"
 #include "board/serial_link.h"
 #include "core/protocol.h"
 #include "core/record_store.h"
@@ -26,34 +27,42 @@ bool gLayoutRejected = false;
 std::array<char, protocol::kErrorBytes> gRejectReason = {};
 uint32_t gBootFaultAddress = 0;  // the bootloader's last read fault, kept after recoverEcc clears it
 
-// The bank 2 address of a double ECC error. Either the last run hit it, or the bootloader hit it
-// (reading the diagnostic log for DIAG.TXT, say) and left the address in the boot block.
-bool eccFaultAddress(uint32_t& address) {
-  if (faultLastWasBank2Ecc(address)) return true;
-  if (bank2SectorOf(gBootFaultAddress) < 0) return false;
-  address = gBootFaultAddress;
-  return true;
-}
-
 // A double ECC error on a half-programmed word repeats on every read, so the faulted sector goes.
-// In a record sector the store first carries the newest readable record to the other sector. The
-// log's sector holds diagnostics alone and is simply erased; its scan at boot would otherwise fault
-// again. Once the sector the bootloader named is erased, its address is cleared so the bootloader
-// reads the log again. A sector that stays leaves the address, and the bootloader keeps skipping it.
+// The address comes from the last run's fault record, or else from the boot block, where the
+// bootloader leaves it after a fault reading the diagnostic log for DIAG.TXT.
+//
+// In a record sector the store lowers the sector's read limit, carries the newest readable record
+// to the other sector and erases. The log's sector holds diagnostics alone and is simply erased; its
+// scan at boot would otherwise fault again. Once the sector the bootloader named is erased, its
+// address is cleared so the bootloader reads the log again. A sector that stays leaves the address,
+// and the bootloader keeps skipping it.
+//
+// A recovery from the last run's own fault that learned a bad word gives that start back to the
+// bootloader's count, so a run of recoveries never ends in update mode.
 void recoverEcc() {
   gBootFaultAddress = bootBlockWritten() ? bootBlock().faultAddress : 0u;
-  if (!eccFaultAddress(gEccAddress)) return;
+  const bool ownFault = faultLastWasBank2Ecc(gEccAddress);
+  if (!ownFault) {
+    if (bank2SectorOf(gBootFaultAddress) < 0) return;
+    gEccAddress = gBootFaultAddress;
+  }
   gEccSector = bank2SectorOf(gEccAddress);
   if (gEccSector < 0) return;
   bool erased = false;
+  bool learned = false;
   if (gEccSector == kDiagLogSector) {
     gLogEraseFailed = !eraseAndWait(gFlash, gEccSector);
     erased = !gLogEraseFailed;
+    learned = erased;
   } else {
     gEccRecord = gStore.recover(gEccSector, (gEccAddress - kBank2Base) % kFlashSectorBytes);
     erased = !gEccRecord.carryFailed && !gEccRecord.eraseFailed;
+    learned = gEccRecord.learned;
   }
   if (erased && bank2SectorOf(gBootFaultAddress) == gEccSector) bootBlock().faultAddress = 0;
+  if (ownFault && bootBlockWritten()) {
+    cvBootFailsSet(&bootBlock(), failsAfterEccRecovery(cvBootFailsGet(&bootBlock()), learned));
+  }
 }
 
 // One line on what the recovery did, an [ERROR] when a sector had to stay.
@@ -114,22 +123,19 @@ void reportScan(Print& out) {
 }  // namespace
 
 static void loadRecord(Layout& layout, Settings& settings, uint32_t nowMs) {
-  // The recovery reads the fault record that faultInit() loads; before that it would see no fault.
+  // The recovery reads the fault record and the reset flags that faultInit() loads; before that it
+  // would see no fault.
   gFaultInitMissing = !faultInitDone();
+  gStore.useReadLimits(faultRecordReadLimits(), faultResetWasPowerOn());
   recoverEcc();
-  RecordData rec;
-  if (!gStore.begin(rec)) return;
+  const RecordLoad load = loadNewestRecord(gStore, layout, settings, nowMs);
+  if (!load.loaded) return;
 
-  gBootSequence = rec.sequence;
+  gBootSequence = load.sequence;
   gBootSector = gStore.status().sector;
   gLoaded = true;
-  layout = rec.layout;
-  settings = rec.settings;
-  const Recovery recovery = recoverLayout(layout);
-  gLayoutRejected = recovery.replaced;
-  if (!recovery.replaced) return;
-  layoutReason(recovery.why, gRejectReason.data(), gRejectReason.size());
-  gStore.request(layout, settings, nowMs);  // rewrite the record with the default layout
+  gLayoutRejected = load.layout.replaced;
+  if (gLayoutRejected) layoutReason(load.layout.why, gRejectReason.data(), gRejectReason.size());
 }
 
 void recordBoot(Layout& layout, Settings& settings, uint32_t nowMs) {
@@ -157,8 +163,9 @@ uint32_t recordErrors() { return gStore.status().errors; }
 uint32_t recordBootFaultAddress() { return gBootFaultAddress; }
 
 void recordPoll(uint32_t nowMs) {
-  // The bank takes one operation at a time, so a save waits while the diagnostic log erases.
-  if (gFlash.erasingSector() != kDiagLogSector) gStore.poll(nowMs);
+  // The bank takes one operation at a time, so a save waits while the diagnostic log erases. A
+  // falling rail starts no flash work, and a save mid-program stops between words.
+  if (gFlash.erasingSector() != kDiagLogSector && !powerSenseTripped()) gStore.poll(nowMs);
   if (gStore.takeSaveFailed()) serialOut().println("[ERROR] record save failed, the box keeps the previous record");
 }
 
