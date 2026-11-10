@@ -287,7 +287,7 @@ DrumSynthV3 are references to read, and nothing in `firmware/` is copied from th
   block and the worst block through the last fade-in. `python3 -I tools/protocol_check.py` (repo root `tools/`, no
   pyserial needed) runs the checks against a box and prints PASS or FAIL per check; `--no-reset` skips the reset-and-reload
   check, which uses the bench `spin` op (so a release build skips it). On a release build it also checks that bench
-  `fault`, `record_erase`, `stop_audio`, `slot_on`, `all_on`, `set_knob` and `knobs_live` are refused; on both builds it sends raw `faewdx1k` outside a line and
+  `fault`, `record_erase`, `stop_audio`, `stream_fault`, `fail_restart`, `slot_on`, `all_on`, `set_knob` and `knobs_live` are refused; on both builds it sends raw `faewdx1k` outside a line and
   checks that nothing acts and `stray_bytes` grows by 8.
 - Bench operations (spec `2026-10-12-serial-protocol-design.md`, "Bench operations"): the box takes no single-byte
   commands. A byte outside a JSON line is ignored and counted (`stray_bytes` in `status`). Every bench action is a
@@ -301,7 +301,11 @@ DrumSynthV3 are references to read, and nothing in `firmware/` is copied from th
      the release image does not contain the code): `slot_off`, `slots_on`, `slot_on`, `all_on`, `slots_live`,
      `pin_knobs`, `set_knob`, `knobs_live`, `chasm`, `clip`, `reset_peaks`, `stop_audio`, `fault`, `spin`,
      `record_save`, `record_erase`, `panel_test`, `panel_summary`, `panel_dump`, `panel_jack`, `panel_mute`,
-     `panel_oled`.
+     `panel_oled`, `bypass`, `polish_comp`, `vox_eq`, `stream_fault`, `fail_restart`. `stream_fault` stops the
+     RX stream and reports a DMA error through the HAL's error callback, the way a DMA error that stops the
+     stream arrives, so `audioPoll` restarts the stream or, past the budget, resets the box. `fail_restart`
+     flips whether the next restart is refused as a failed DMA start (`[bench] the next stream restart fails`
+     or `stream restarts run as usual`). `bringup.py --stream-faults` drills both (AU20, AU21).
   3. Panel levers (bench image only, hands-free stress runs). A slot is on when its panel toggle reads on or the
      bench forces it on, and no bench force-off holds it off. `slot_off` N and `slot_on` N each flip one bit of
      their force mask. `slots_on` clears the force-off mask. `all_on` forces all eight slots on. `slots_live`

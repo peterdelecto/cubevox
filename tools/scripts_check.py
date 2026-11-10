@@ -238,6 +238,60 @@ def diag_text_failures():
             if got != want:
                 failed.append(f"bringup.parse_refused on drivetext's {name} gives {describe(got)}, "
                               f"drivetext.c writes {describe(want)}")
+        failed += diag_entry_failures(read(os.path.join(drive, "DIAG.TXT")),
+                                      read(os.path.join(drive, "DIAG-crowded.TXT")))
+    return failed
+
+
+def diag_entry_failures(sample, crowded):
+    """bringup.parse_diag_entries on the entry lines diag.c writes for drivetext.c's samples.
+
+    DIAG.TXT lists #9 boot (reset 0x1000000, AppRequest), #8 update (up 1234 s, sai 2) and #7 boot
+    (fails 1, ovr 3, an option byte failure). DIAG-crowded.TXT starts with the widest entry, whose
+    fault text has spaces and is followed by an `ob=` field with a comma.
+    """
+    got = [(e.sequence, e.kind, e.rst, e.reason, e.fault, e.sai, e.ovr) for e in bringup.parse_diag_entries(sample)]
+    want = [(9, "boot", 0x1000000, "AppRequest", "software none", 0, 0),
+            (8, "update", 0x1000000, "none", "software none", 2, 0),
+            (7, "boot", 0x4000000, "none", "watchdog bus", 0, 3)]
+    failed = [] if got == want else [f"bringup.parse_diag_entries on DIAG.TXT gives {got}, drivetext.c writes {want}"]
+    widest = bringup.parse_diag_entries(crowded)[:1]
+    fault = "bus pc=0x08021A4C lr=0x08020F31 cfsr=0x00008200 bfar=0xDEADBEE0"
+    if not widest or widest[0].fault != fault or widest[0].sai != 123456:
+        failed.append(f"bringup.parse_diag_entries on DIAG-crowded.TXT gives {widest}, want fault '{fault}', sai 123456")
+    return failed
+
+
+def stream_judge_failures():
+    """bringup.judge_stream_reset reads the entries a reset by an audio fault leaves, newest first."""
+    entry = bringup.DiagEntry
+    restarted = bringup.CAUSE_RESTARTED
+    budget = bringup.CAUSE_OUT_OF_RESTARTS
+
+    def audio(seq, cause):
+        return entry(seq, "audio", "v2", "30s", 0, "0", "none", cause, 0, 0)
+
+    def boot(seq, rst):
+        return entry(seq, "boot", "v2", "?", rst, "0", "none", "", 0, 0)
+
+    update = entry(20, "update", "v2", "40s", 0, "0", "none", "", 0, 0)
+    good = [update, boot(19, bringup.SOFTWARE_RESET), audio(18, budget), audio(17, restarted), audio(16, restarted),
+            audio(15, restarted)]
+    cases = [
+        ("four faults", good, budget, 3, True),
+        ("power-on boot", [update, boot(19, 0x4000000), *good[2:]], budget, 3, False),
+        ("no boot entry", [update, *good[2:]], budget, 3, False),
+        ("other cause", good, bringup.CAUSE_RESTART_FAILED, 3, False),
+        ("two restarts", good[:5], budget, 3, False),
+        ("failed restart", [update, boot(19, bringup.SOFTWARE_RESET), audio(18, bringup.CAUSE_RESTART_FAILED)],
+         bringup.CAUSE_RESTART_FAILED, 0, True),
+        ("no audio entry", [update, boot(19, bringup.SOFTWARE_RESET)], budget, 3, False),
+    ]
+    failed = []
+    for what, entries, cause, restarts, want in cases:
+        ok, detail = bringup.judge_stream_reset(entries, cause, restarts)
+        if ok != want:
+            failed.append(f"bringup.judge_stream_reset {what}: {ok} ({detail}), wanted {want}")
     return failed
 
 
@@ -439,7 +493,7 @@ def stress_judge_failures(stress, rows):
 
 
 CHECKS = [bump_failures, build_query_failures, pin_failures, symbol_failures, term_failures,
-          bringup_failures, diag_text_failures, flash_failures, clangd_failures, bootloader_font_failures,
+          bringup_failures, diag_text_failures, stream_judge_failures, flash_failures, clangd_failures, bootloader_font_failures,
           workflow_failures, stress_failures, syntax_failures]
 
 

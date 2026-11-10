@@ -58,7 +58,7 @@ carries no drill it doesn't need. This realises item 5 of `2026-10-08-effect-reg
 | Class | Ops | Builds |
 |---|---|---|
 | Query | `report`, `stats`, `record_status` | all |
-| Bench | `slot_off`, `slots_on`, `pin_knobs`, `chasm`, `clip`, `reset_peaks`, `stop_audio`, `fault`, `spin`, `record_save`, `record_erase`, `panel_test`, `panel_summary`, `panel_dump`, `panel_jack`, `panel_mute`, `panel_oled`, `slot_on`, `all_on`, `slots_live`, `set_knob`, `knobs_live` | `CUBEVOX_BENCH` only |
+| Bench | `slot_off`, `slots_on`, `pin_knobs`, `chasm`, `clip`, `reset_peaks`, `stop_audio`, `fault`, `spin`, `record_save`, `record_erase`, `panel_test`, `panel_summary`, `panel_dump`, `panel_jack`, `panel_mute`, `panel_oled`, `slot_on`, `all_on`, `slots_live`, `set_knob`, `knobs_live`, `bypass`, `polish_comp`, `vox_eq`, `stream_fault`, `fail_restart` | `CUBEVOX_BENCH` only |
 
 Panel levers (owner 2026-11-01, "you can control the toggles. we need autonomous stress testing";
 `2026-11-01-stress-bench-design.md`): `slot_on` with `"slot":1..8` forces that slot's toggle on,
