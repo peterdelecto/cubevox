@@ -52,8 +52,10 @@ MUTED word is for the top switch.
 2. The toggle readout keeps the title bar, leaves row two empty, and draws ON or OFF on the value row,
    16X24, centred, top at row 34. The words are ON and OFF, never BYPASS, so the slot's state
    never reads like the top switch's BYPASS screen.
-3. A flip or a knob on the slot already shown refreshes the readout in place, without a
-   dissolve; another slot replaces it as a knob on another slot does.
+3. A slot has three readouts, one for each knob and one for its toggle. A second flip of the
+   toggle already shown, like a turn of the knob already shown, refreshes the readout in place,
+   without a dissolve. A move to another of the slot's three readouts, or to another slot,
+   dissolves (Dissolve 6; owner 2026-11-10, either way is fine, so the box stays as built).
 4. The panel hands the face one flip at a time with the slot and the new state, debounced by the
    20 ms switch debounce. The first debounced level after power-on is the baseline and raises
    nothing.
