@@ -1,5 +1,6 @@
 // The bootloader's policy as pure C: run the application or stay in update mode, what a fault
-// leaves for the next start, which UF2 blocks update mode takes, and what the panel shows. No HAL,
+// leaves for the next start, which UF2 blocks update mode takes, how update mode follows the cable,
+// the host and the transfer, and what the panel shows. No HAL,
 // no I/O. Board code reads the hardware, calls these functions and acts on the result. The host
 // tests (test/firmware/boot_decide.cpp) compile boot_decide.c unchanged.
 //
@@ -138,8 +139,9 @@ void cvBootRecordFault(struct CvBootBlock* block, const CvFaultInfo* fault);
 bool cvBootTimeoutAllowed(const struct CvBootBlock* block, CvImageStatus image, bool hostSeen,
                           bool writeBegun);
 
-// After a complete UF2 write. Zeroes the counter and clears the request, the reason, the fault
-// address, the bootloader's fault registers and the application's summary.
+// After a complete UF2 write. Zeroes the counter and clears the request, the reason, the
+// bootloader's fault registers and the application's summary. A fault address in bank 2 stays for
+// the new application, which erases that log sector and clears it; any other is cleared.
 void cvBootMarkUpdated(struct CvBootBlock* block);
 
 // ---- Option bytes -------------------------------------------------------------------------
@@ -158,8 +160,21 @@ uint32_t cvOptionsWpsn(uint32_t wpsnPrg1);
 
 // ---- Update mode --------------------------------------------------------------------------
 
-// Only this board's family, inside the application region, in whole 32-byte flash words.
-bool cvUf2BlockAccepted(uint32_t familyId, uint32_t address, uint32_t length);
+// Only this board's family, inside the application region, in whole 32-byte flash words, from a
+// file that starts at CV_APP_START and fits the region. A file's blocks are numbered in address
+// order with one payload size, so the block's number and address give the file's base, and its
+// block count gives the file's size. Every block of a file based elsewhere or too large is refused,
+// so no block of it is written.
+bool cvUf2BlockAccepted(uint32_t familyId, uint32_t address, uint32_t length, uint32_t blockNo,
+                        uint32_t numBlocks);
+
+// A copy that sends no block for this long has stopped.
+#define CV_WRITE_IDLE_MS 5000u
+
+// True when a copy has stopped short of its last block: the host session accepted blocks, the
+// last block has not arrived, and no block has been written for CV_WRITE_IDLE_MS since
+// lastBlockMs.
+bool cvUpdateStalled(bool sessionAccepted, bool updateWritten, uint32_t nowMs, uint32_t lastBlockMs);
 
 // What the board knows when an accepted block arrives.
 typedef struct {
@@ -200,6 +215,138 @@ void cvDebounceReset(CvDebounce* debounce, bool level);
 // Feeds one sample at nowMs. The level follows a sample that has held for holdMs. True when the
 // level changed.
 bool cvDebounceUpdate(CvDebounce* debounce, bool sample, uint32_t nowMs, uint32_t holdMs);
+
+// ---- Update session -----------------------------------------------------------------------
+
+// The cable's level must hold this long before update mode acts on it.
+#define CV_VBUS_DEBOUNCE_MS 50u
+// A restart on the host's eject waits this long, so the status of the eject command reaches the
+// host first.
+#define CV_EJECT_SETTLE_MS  20u
+
+// Update mode's state from its start to its restart. board_hooks.c feeds it the cable, the host,
+// the UF2 blocks and the clock, and acts on what each call returns.
+typedef struct {
+  // The decision's reason, an enum CvBootReason.
+  uint32_t reason;
+  // The cable, debounced, and whether update mode has acted on its first reading.
+  CvDebounce vbus;
+  bool cableTracked;
+  // The cable came out after a host had connected, and is still out.
+  bool cableOut;
+  // A host has enumerated since the cable went in; the timeout waits for a pull.
+  bool hostSeen;
+  bool mounted;
+  // When the timeout started counting: update mode's start, or the last pull with nothing written.
+  uint32_t timeoutFromMs;
+  // Update mode has accepted a UF2 block, so the installed image is partly overwritten.
+  bool writeBegun;
+  // The last block of an update is written, its image checked good and the boot block marked.
+  bool updateWritten;
+  // The host ejected the drive after a write began, and when. The box restarts CV_EJECT_SETTLE_MS
+  // later.
+  bool ejectPending;
+  uint32_t ejectedMs;
+  // Since the host last mounted the drive, as CvScreenInputs names them, and a copy that stopped
+  // short of its last block (cvUpdateStalled).
+  bool sessionAccepted;
+  bool sessionRefused;
+  bool sessionFailed;
+  bool sessionStalled;
+  // When the last block was written.
+  uint32_t lastBlockMs;
+  // Application sectors the transfer in progress has written, one bit each from sector 1.
+  uint32_t sessionSectors;
+  // DIAG.TXT lags what update mode knows.
+  bool diagDirty;
+} CvUpdateSession;
+
+// A UF2 block as the board's filter sees it.
+typedef struct {
+  uint32_t familyId;
+  uint32_t targetAddr;
+  uint32_t payloadSize;
+  uint32_t blockNo;
+  uint32_t numBlocks;
+  // The block count of the transfer in progress, 0 when none is.
+  uint32_t sessionBlocks;
+} CvUf2BlockInfo;
+
+typedef enum {
+  CvBlockRefused,
+  CvBlockJoined,
+  // Accepted, and the transfer starts over: the board forgets the old one's counts and erases.
+  CvBlockRestarted
+} CvBlockVerdict;
+
+typedef enum {
+  CvCableNone,
+  // The cable is in: hold the D+ pull-up.
+  CvCableConnect,
+  // The cable is out at update mode's start: drop the pull-up.
+  CvCableDisconnect,
+  // The cable came out: drop the pull-up and post the unplug event.
+  CvCableUnplugged,
+  // The cable came out after a complete write: restart into the new image.
+  CvCableRestart
+} CvCableAction;
+
+typedef enum {
+  CvTickNone,
+  // The eject has settled after a write began: restart. A marked block runs the new image, an
+  // unmarked one finds the image invalid and offers the drive again.
+  CvTickRestart,
+  // The timeout ran out: reset, and the decision runs the application.
+  CvTickTimeout
+} CvTickAction;
+
+// Update mode's start, with the cable's first raw reading.
+void cvSessionStart(CvUpdateSession* s, uint32_t reason, bool cableIn, uint32_t nowMs);
+
+// The cable's raw reading on each pass.
+CvCableAction cvSessionCable(CvUpdateSession* s, bool cableIn, uint32_t nowMs);
+
+// The host's mount state on each pass. A mount or an unmount starts a new host session. True on a
+// mount, when the board rebuilds the drive's texts.
+bool cvSessionMount(CvUpdateSession* s, bool mounted);
+
+// True when the transfer in progress has erased the sector holding `address`. Only then does the
+// board read the flash at the block's target for cvSessionBlock.
+bool cvSessionSectorErased(const CvUpdateSession* s, uint32_t address, uint32_t sessionBlocks);
+
+// A UF2 block before it is written. targetHoldsOtherData: the sector is erased by this transfer
+// and the target holds data that is neither blank nor the block's payload. A refused block is
+// never written. A second file in one host session, or the file dropped again after a failed
+// transfer, restarts the transfer (cvUf2SessionRestart).
+CvBlockVerdict cvSessionBlock(CvUpdateSession* s, const CvUf2BlockInfo* block, bool targetHoldsOtherData);
+
+// After the flash write of an accepted block. A failed one stops the update.
+void cvSessionBlockWritten(CvUpdateSession* s, bool written, uint32_t nowMs);
+
+// A root directory sector named a file that cannot be firmware; newName when it differs from the
+// last one. Shows the wrong-file screen unless blocks went in.
+void cvSessionWrongFile(CvUpdateSession* s, bool newName);
+
+// After the last block of a transfer, with the image check of the flash. True when the board marks
+// the boot block for the new image. An image that fails the check stops the update instead.
+bool cvSessionLastBlock(CvUpdateSession* s, bool imageGood);
+
+// The host ejected the drive. Once a write has begun the box restarts after CV_EJECT_SETTLE_MS;
+// before one, an eject changes nothing.
+void cvSessionEjected(CvUpdateSession* s, uint32_t nowMs);
+
+// True when the timeout may run (cvBootTimeoutAllowed).
+bool cvSessionTimeoutArmed(const CvUpdateSession* s, const struct CvBootBlock* block, CvImageStatus image);
+
+// Each pass, after the cable and the host: the eject's restart, a stalled copy, the timeout.
+CvTickAction cvSessionTick(CvUpdateSession* s, bool timeoutArmed, uint32_t nowMs);
+
+// The screen now.
+CvScreen cvSessionScreen(const CvUpdateSession* s, bool imageValid, bool timeoutArmed);
+
+// True when update mode may read every word of the application region at its start: the decision
+// allows reading, and no erase of a faulting sector failed.
+bool cvRegionReadAllowed(const CvBootDecision* decision, bool eraseFailed);
 
 #ifdef __cplusplus
 }

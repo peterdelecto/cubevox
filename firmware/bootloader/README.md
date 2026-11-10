@@ -131,10 +131,12 @@ serial the 96-bit UID as 24 uppercase hex characters, bytes in address order (th
    cut tore anywhere in the region faults now and its sector is erased at the next start, instead of
    halfway through a copy.
 2. A UF2 block is written only with this board's family, inside [0x08020000, 0x08100000), in whole
-   32-byte flash words. Anything else is refused and counted; the OLED shows the wrong-file screen and
-   DIAG.TXT the count and the last family. A wrong file never completes, so the box stays in update
-   mode. A refusal after accepted blocks in the same host session, such as a file larger than the
-   region, shows "The update stopped." instead.
+   32-byte flash words, from a file based at 0x08020000 that fits the region. A block's number and
+   address give its file's base and its block count the file's size, so every block of a file based
+   elsewhere or too large is refused and none of it is written. Anything refused is counted; the
+   OLED shows the wrong-file screen and DIAG.TXT the count and the last family. A wrong file never
+   completes, so the box stays in update mode. A refusal after accepted blocks in the same host
+   session shows "The update stopped." instead.
 3. A block the flash fails to take is not counted (patch 09), so the transfer cannot complete over
    it; the screen shows "The update stopped." and DIAG.TXT counts it with the first failing address.
 4. A second file in one host session restarts the transfer (`uf2_write_state_reset()`): a block of
@@ -145,25 +147,36 @@ serial the 96-bit UID as 24 uppercase hex characters, bytes in address order (th
 5. A root directory entry for a raw image, a hex or elf file or an archive (BIN, HEX, ELF, DFU, ZIP,
    GZ, TGZ, TAR, 7Z) shows the wrong-file screen and goes into DIAG.TXT by its 8.3 name. Finder's own
    files never carry these extensions. Such a file has no UF2 blocks, so nothing else would notice it.
-6. After the last block the screen shows DONE (`The update is done.` / `Eject the drive.`) and
-   `cvBootMarkUpdated` clears the counter and the reason. The drive stays mounted, so the host can
-   finish its own writes and the Mac shows no "disk not ejected properly" notice. The box resets
-   when the host ejects the drive, 20 ms after the eject command so its status reaches the host
-   (`CV_EJECT_SETTLE_MS`), or when the cable comes out. DONE has no timeout. An eject before the
-   last block changes nothing, and a new transfer after DONE takes the screen back to the write.
-7. The D+ pull-up follows the cable on VBUS_SENSE. A pull after a host had connected posts the unplug
+6. After the last block the written image is checked, header and CRC, as at a start. A good one
+   shows DONE (`The update is done.` / `Eject the drive.`) and `cvBootMarkUpdated` clears the
+   counter and the reason; a bank 2 fault address stays for the application. A bad one shows "The
+   update stopped." and the boot block is not marked. After DONE the drive stays mounted, so the
+   host can finish its own writes and the Mac shows no "disk not ejected properly" notice. The box
+   resets when the host ejects the drive, 20 ms after the eject command so its status reaches the
+   host (`CV_EJECT_SETTLE_MS`), or when the cable comes out. DONE has no timeout. A new transfer
+   after DONE takes the screen back to the write.
+7. A copy that stops short of its last block, a truncated file or one cancelled in Finder, shows
+   "The update stopped." once no block has arrived for 5 s (`CV_WRITE_IDLE_MS`); a block arriving
+   later takes the screen back to the write. An eject once a write has begun resets the box like an
+   eject after DONE. The boot block is unmarked, so the next start finds the image invalid and
+   offers the drive again. An eject with nothing written changes nothing.
+8. The D+ pull-up follows the cable on VBUS_SENSE. A pull after a host had connected posts the unplug
    TinyUSB's own VBUS sensing would, so the host session ends; with nothing written the 60 s timeout
    runs again from the pull. With a write begun but not complete, or no image to return to, the
    screen says the cable came out. After a complete write the pull resets the box.
-8. With reason MenuHeld, AppRequest or BootFault, a valid image, no host enumerated since the cable
+9. With reason MenuHeld, AppRequest or BootFault, a valid image, no host enumerated since the cable
    went in and no block written, update mode resets after 60 s; the request is consumed, so the
-   decision then runs the application.
-9. Screens follow the spec's table (`boards/cubevox/screens.c`), chosen by `cvUpdateScreen` in
-   `boot_decide.c`. Every line is a full sentence in the 5x7 font, a screen holds four lines of 21
-   characters on rows 0, 2, 4 and 6, and the file extension never appears. `./build.sh --proofs`
-   renders them and `./build.sh --selftest` checks the wording and the rows.
-10. Every enumeration clears the UF2 block count and the flash driver's record of erased sectors
+   decision then runs the application. While a host is connected the menu screen's last line says
+   `Unplug USB to cancel.`, because the pull starts that 60 s again.
+10. Screens follow the spec's table (`boards/cubevox/screens.c`), chosen by `cvSessionScreen` in
+    `boot_decide.c`. Every line is a full sentence in the 5x7 font, a screen holds four lines of 21
+    characters on rows 0, 2, 4 and 6, and the file extension never appears. `./build.sh --proofs`
+    renders them and `./build.sh --selftest` checks the wording and the rows.
+11. Every enumeration clears the UF2 block count and the flash driver's record of erased sectors
     (patch 08), and rebuilds both text files.
+12. The cable, the host, the blocks, the eject and the clock drive `CvUpdateSession` in
+    `boot_decide.c`, pure C that the host tests step through every case above.
+    `board_hooks.c` reads the hardware and acts on what each call returns.
 
 ## The drive
 Both files have a fixed size, space padded and ending in CR LF, so the directory never changes while
@@ -176,7 +189,7 @@ their text does.
 
 Both are rebuilt at every mount; once a write has begun the image is inspected again first, so
 `Installed` says what the flash holds. DIAG.TXT is also rebuilt, at most every 250 ms, after a
-refused block, a failed write or a wrong file. Each rewrite reads the log again, which takes a few
+refused block, a failed write, a wrong file or the last block. Each rewrite reads the log again, which takes a few
 milliseconds.
 
 ## Flash log in DIAG.TXT
@@ -221,7 +234,8 @@ slots. A slot is blank when every byte is 0xFF, valid when its magic and its tra
 1. USB enumeration as 1209:0001 and the `CUBEVOX` drive mounting on macOS.
 2. A UF2 write, the lazy sector erase, the DONE screen, and the reset into the new image on the
    host's eject (Finder's, and `diskutil eject` as flash.sh runs it) and on the cable coming out,
-   with no "disk not ejected properly" notice on the Mac.
+   with no "disk not ejected properly" notice on the Mac. The image check after the last block, and
+   the 5 s stop on a truncated copy.
 3. The read-fault path: a power cut mid-copy, the ECC fault, the sector erase, `ImageUnreadable`.
 4. The OLED driver: I2C timing at 400 kHz, the init sequence, orientation against the firmware.
 5. The MENU switch at power-on, the 60 s timeout, the LED.

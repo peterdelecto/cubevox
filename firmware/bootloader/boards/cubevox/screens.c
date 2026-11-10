@@ -18,9 +18,11 @@
 typedef struct {
   // The four lines in order, NULL for a blank one.
   const char* lines[CV_SCREEN_LINES];
-  // A waiting screen swaps its last line for "Computer connected." while a host is connected.
-  bool waiting;
+  // A waiting screen's last line while a host is connected, NULL to keep the line.
+  const char* hostLine;
 } ScreenText;
+
+static const char kConnected[] = "Computer connected.";
 
 typedef struct {
   char* text;
@@ -35,20 +37,23 @@ static const char kCancel[] = "<cancel>";
 
 // The spec's table, rows 0 / 2 / 4 / 6.
 static const ScreenText kScreens[] = {
-    [CvScreenWaitMenu] = {{"Drop the firmware on", "the CUBEVOX drive.", kInstalled, kCancel}, true},
-    [CvScreenWaitNoImage] = {{"The update stopped.", "Drop the firmware on", "the CUBEVOX drive.", NULL}, true},
-    [CvScreenWaitBootFailed] = {{"Startup failed.", "Drop the firmware on", "the CUBEVOX drive.", NULL}, true},
-    [CvScreenWriting] = {{"Writing the firmware.", "Do not unplug.", NULL, NULL}, false},
+    [CvScreenWaitMenu] = {{"Drop the firmware on", "the CUBEVOX drive.", kInstalled, kCancel},
+                          "Unplug USB to cancel."},
+    [CvScreenWaitNoImage] = {{"The update stopped.", "Drop the firmware on", "the CUBEVOX drive.", NULL},
+                             kConnected},
+    [CvScreenWaitBootFailed] = {{"Startup failed.", "Drop the firmware on", "the CUBEVOX drive.", NULL},
+                                kConnected},
+    [CvScreenWriting] = {{"Writing the firmware.", "Do not unplug.", NULL, NULL}, NULL},
     [CvScreenWrongFile] = {{"That is not a cubevox", "firmware file.", "Drop the firmware on",
                             "the CUBEVOX drive."},
-                           false},
-    [CvScreenDone] = {{"The update is done.", "Eject the drive.", NULL, NULL}, false},
+                           NULL},
+    [CvScreenDone] = {{"The update is done.", "Eject the drive.", NULL, NULL}, NULL},
     [CvScreenCableOut] = {{"The cable came out.", "Plug it back in and", "drop the firmware on",
                            "the CUBEVOX drive."},
-                          false},
+                          NULL},
     [CvScreenClockFailed] = {{"The clock failed.", "Send the DIAG.TXT", "file on the CUBEVOX",
                               "drive for a repair."},
-                             false},
+                             NULL},
 };
 
 // Appends at most `limit` characters of `text`.
@@ -90,8 +95,8 @@ void cvScreenCompose(CvScreen screen, const char* installed, bool connected, CvS
   const ScreenText* text = &kScreens[screen];
   for (uint32_t i = 0; i < CV_SCREEN_LINES; ++i) {
     Line line = {out->line[i], sizeof out->line[i], 0u};
-    const bool hostLine = text->waiting && connected && i == CV_SCREEN_LINES - 1u;
-    composeLine(&line, hostLine ? "Computer connected." : text->lines[i], installed != NULL ? installed : "");
+    const bool hostLine = text->hostLine != NULL && connected && i == CV_SCREEN_LINES - 1u;
+    composeLine(&line, hostLine ? text->hostLine : text->lines[i], installed != NULL ? installed : "");
   }
 }
 

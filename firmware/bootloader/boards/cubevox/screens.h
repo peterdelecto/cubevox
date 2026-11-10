@@ -46,9 +46,9 @@ typedef struct {
 
 // Composes the lines of `screen`. `installed` is the installed release name for the "You have"
 // line, cut so the line keeps its period inside 21 characters. `connected` puts "Computer
-// connected." on the last line of a waiting screen; on the menu screen it replaces the cancel line,
-// because a connected host stops the timeout. The fixed wording is not cut here, so a check can see
-// a line that is too long.
+// connected." on the last line of the other waiting screens. On the menu screen a connected host
+// stops the timeout, so "Unplug USB to cancel." replaces the cancel line. The fixed wording is not
+// cut here, so a check can see a line that is too long.
 void cvScreenCompose(CvScreen screen, const char* installed, bool connected, CvScreenText* out);
 
 // Clears the frame and draws `screen` as composed above, each line cut at 21 characters.

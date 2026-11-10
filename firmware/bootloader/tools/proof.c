@@ -37,13 +37,14 @@ typedef struct {
   bool connected;
 } Proof;
 
-// One proof per state of the spec's OLED table; 04 is the menu screen with a host connected.
+// One proof per state of the spec's OLED table. 04 is the menu screen with a host connected, 10
+// the stopped update with the host still connected (a copy that stopped or failed its check).
 static const Proof kProofs[] = {
     {"wait-menu", CvScreenWaitMenu, false},      {"wait-no-image", CvScreenWaitNoImage, false},
     {"wait-boot-failed", CvScreenWaitBootFailed, false}, {"host-connected", CvScreenWaitMenu, true},
     {"writing", CvScreenWriting, false},         {"wrong-file", CvScreenWrongFile, false},
     {"done", CvScreenDone, false},               {"cable-out", CvScreenCableOut, false},
-    {"clock-failed", CvScreenClockFailed, false},
+    {"clock-failed", CvScreenClockFailed, false}, {"no-image-connected", CvScreenWaitNoImage, true},
 };
 
 // The release the menu proofs show as installed.
@@ -164,7 +165,7 @@ static const Wording kWording[] = {
     {"cable-out-connected", CvScreenCableOut, true,
      {"The cable came out.", "Plug it back in and", "drop the firmware on", "the CUBEVOX drive."}},
     {"host-connected", CvScreenWaitMenu, true,
-     {"Drop the firmware on", "the CUBEVOX drive.", "You have v2.00.10.", "Computer connected."}},
+     {"Drop the firmware on", "the CUBEVOX drive.", "You have v2.00.10.", "Unplug USB to cancel."}},
     {"no-image-connected", CvScreenWaitNoImage, true,
      {"The update stopped.", "Drop the firmware on", "the CUBEVOX drive.", "Computer connected."}},
     {"boot-failed-connected", CvScreenWaitBootFailed, true,

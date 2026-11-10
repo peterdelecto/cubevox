@@ -31,6 +31,10 @@ struct CvImageReport {
 // field as zero.
 void cvImageInspect(const uint8_t* image, uint32_t regionBytes, struct CvImageReport* report);
 
+// The CRC the header must carry: the first `length` bytes with the CRC field read as zero.
+// `length` reaches at least the end of the CRC field.
+uint32_t cvImageCrc(const uint8_t* image, uint32_t length);
+
 // CRC-32 with the zlib polynomial, chained like zlib's crc32(): start with crc 0.
 uint32_t cvCrc32(uint32_t crc, const uint8_t* data, uint32_t length);
 
