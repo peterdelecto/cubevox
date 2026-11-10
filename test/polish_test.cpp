@@ -1,5 +1,5 @@
-// VOX EQ checks: both halves bit-exact when off, the front response with and without the cuts, the back response, the de-esser behind
-// the low-pass, flat, call splitting, the setting ranges, no-alloc. No window, no audio device.
+// VOX EQ checks: both halves bit-exact when off, the front response with and without the cuts, the cuts'
+// fade, the whole stage's fade on every switch, the back response, the de-esser behind the low-pass, flat, call splitting, the setting ranges, no-alloc. No window, no audio device.
 
 #include <algorithm>
 #include <cmath>
@@ -167,6 +167,72 @@ bool testCutsFade() {
   return report("cuts fade", worst <= 2.0 * natural && settled < 0.2,
                 "ON to ON+CUTS to ON on 40 Hz: largest step %.5f against the sine's %.5f, ON+CUTS level %.3f of the input (<= 2x, < 0.2)",
                 worst, natural, settled);
+}
+
+// Both halves in series on 40 Hz + 300 Hz + 6.5 kHz, stepped OFF, ON, ON+CUTS, OFF for 10 ms and back,
+// OFF, and ON+CUTS again. Every switch fades the whole stage: the output's largest second difference, the
+// change in its slope from one sample to the next, stays within 2x the input's own. The tones' own second
+// difference stays small (the 6.5 kHz tone sits 34 dB under the others), so a hard switch in either half
+// shows past the bound. The last switch-on comes after 750 ms OFF, and from it the output equals a fresh
+// stage switched on at that sample, bit for bit, so settling OFF left no filter state behind.
+std::vector<float> stageRun(cv::Polish& e, const std::vector<float>& in, int from, bool stepped) {
+  struct Step {
+    int at;
+    bool on;
+    bool cuts;
+  };
+  const Step steps[] = {{0, false, false},     {24000, true, false},  {48000, true, true},   {60000, false, true},
+                        {60480, true, true},   {84000, false, false}, {120000, true, true}};
+  const int total = static_cast<int>(in.size());
+  std::vector<float> out(static_cast<size_t>(total - from));
+  cv::PolishParams p;
+  for (int i = from; i < total; i += cv::kBlock) {
+    const int n = std::min(cv::kBlock, total - i);
+    p.on = true;
+    p.cuts = true;
+    if (stepped) {
+      for (const Step& s : steps) {
+        if (i >= s.at) {
+          p.on = s.on;
+          p.cuts = s.cuts;
+        }
+      }
+    }
+    float* o = &out[static_cast<size_t>(i - from)];
+    gInProcess = true;
+    e.processFront(&in[static_cast<size_t>(i)], o, n, p);
+    e.processBack(o, o, n, p);
+    gInProcess = false;
+  }
+  return out;
+}
+
+bool testStageFade() {
+  constexpr int kLastOn = 120000;
+  std::vector<float> in(static_cast<size_t>(3 * kSecond));
+  for (size_t i = 0; i < in.size(); ++i) {
+    const double t = static_cast<double>(i) / cv::kSampleRate;
+    in[i] = static_cast<float>(0.25 * (std::sin(2.0 * kPi * 40.0 * t) + std::sin(2.0 * kPi * 300.0 * t)) +
+                               0.005 * std::sin(2.0 * kPi * 6500.0 * t));
+  }
+  gEq.reset();
+  const std::vector<float> out = stageRun(gEq, in, 0, true);
+  const auto bend = [](const std::vector<float>& x, size_t i) {
+    return std::fabs(static_cast<double>(x[i]) - 2.0 * x[i - 1] + x[i - 2]);
+  };
+  double natural = 0.0, worst = 0.0;
+  for (size_t i = 2; i < in.size(); ++i) {
+    natural = std::max(natural, bend(in, i));
+    worst = std::max(worst, bend(out, i));
+  }
+  cv::Polish fresh;
+  const std::vector<float> clean = stageRun(fresh, in, kLastOn, false);
+  bool same = true;
+  for (size_t i = 0; i < clean.size(); ++i) same = same && out[static_cast<size_t>(kLastOn) + i] == clean[i];
+  return report("stage fade", worst <= 2.0 * natural && same,
+                "OFF/ON/ON+CUTS/OFF 10 ms/OFF/ON+CUTS: largest second difference %.5f against the input's %.5f (<= 2x); "
+                "switch-on after OFF matches a fresh stage: %.0f (1)",
+                worst, natural, same ? 1.0 : 0.0);
 }
 
 bool testFrontDeEsserQuiet() {
@@ -344,6 +410,7 @@ int main() {
   ok &= testFrontNoCuts();
   ok &= testSubsonic();
   ok &= testCutsFade();
+  ok &= testStageFade();
   ok &= testFrontDeEsserQuiet();
   ok &= testFrontEss();
   ok &= testFrontEssNoCuts();
