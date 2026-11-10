@@ -210,14 +210,12 @@ void syncSnapshot() {
   if (first) gFlow.settleSlots(gHeld.slotOn);
 }
 
-// At the zero point of the fade: adopts the newest snapshot, resets the engines whose slot changed
-// card and settles every slot's toggle, since the output is at zero and nothing needs a crossfade.
+// At the zero point of the fade: adopts the newest snapshot (BlockFlow::adopt).
 void swapSnapshot() {
   gSeenSeq = gPublished.load(std::memory_order_acquire);
   const ChainSnapshot& pub = gSnapshots[gSeenSeq & 1];
-  gFlow.queueReset(enginesToReset(gHeld.layout, pub.layout));
+  gFlow.adopt(gHeld, pub);
   gHeld = pub;
-  gFlow.settleSlots(gHeld.slotOn);
   gLayoutPending = false;
   gSwapStarted = true;
 }
@@ -664,8 +662,11 @@ AudioEvent restartAfterFault() {
   if (!restartStream()) {
     gStreamUp = false;
     gRecovery.fail();
-    latchAfterFault(gError);
-    return AudioEvent::Latched;
+    muteLatch();
+    out.print("[ERROR] audio: ");
+    out.print(gError);
+    out.println("; output muted, the stall watch resets the box");
+    return AudioEvent::RestartFailed;
   }
   muteTripClear(MuteReason::Audio);
   muteClocksRunning();  // the release runs in the usual order: XSMT, zero output, relay, fade up

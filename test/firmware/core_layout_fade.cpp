@@ -9,6 +9,7 @@
 #include <cmath>
 
 #include "core/audio_recovery.h"
+#include "core/audio_stall.h"
 #include "core/layout.h"
 #include "core/layout_fade.h"
 #include "core/mute_sequence.h"
@@ -354,10 +355,21 @@ void checkStreamRecovery() {
   for (uint32_t i = 0; i < 10; ++i) latched = latched || spaced.update(i * 25000, true, true) == Action::Latch;
   check(!latched && spaced.restarts() == 10, "recovery: faults further apart restart every time");
 
+  // A restart that failed leaves the stream down. It is not a latch, so the stall watch, fed as
+  // board/fault.cpp feeds it, sees no block for kAudioStallMs and starts the reset.
   StreamRecovery failed;
   failed.update(0, true, true);
   failed.fail();
-  check(failed.latched() && failed.update(1, true, true) == Action::None, "recovery: a failed restart latches");
+  check(!failed.latched() && !failed.holdMute() && failed.update(1, true, true) == Action::None,
+        "recovery: a failed restart restarts nothing more and is not a latch");
+  AudioStallWatch watch;
+  const uint32_t blocks = 500;
+  watch.update(0, true, 0, blocks);
+  bool stalled = false;
+  for (uint32_t t = 1; t <= 1 + kAudioStallMs; ++t) {
+    stalled = stalled || watch.update(t, !failed.latched(), failed.restarts(), blocks);
+  }
+  check(stalled, "recovery: the stall watch resets the box after a failed restart");
 }
 
 }  // namespace

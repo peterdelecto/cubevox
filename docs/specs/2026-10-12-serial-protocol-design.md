@@ -13,9 +13,14 @@ flat requests, replies built with `snprintf`, no ArduinoJson.
 3. Lines longer than 768 bytes are dropped with an error reply (`id` 0).
 4. Output never blocks `loop()`. Replies, the boot report and bench prints go through a bounded
    transmit queue drained with non-blocking writes each pass, so a host that stops reading can't
-   stall the loop into the watchdog. Overflow drops whole lines and counts them.
+   stall the loop into the watchdog. Overflow drops whole lines and counts them. The queue holds
+   16 kB. Log lines stop 6 kB short of full, so the largest reply (a bench build's `hello`, about
+   5.3 kB) always fits behind them; `core_tx_queue` measures it against the reserve.
 5. The layout `name` is 1 to 31 printable ASCII characters; anything else is rejected. Replies
    escape every string they carry.
+6. Input never holds `loop()` either. Each pass reads bytes until one line event (a line, a line
+   too long, a NUL) or 769 bytes, then drains the queue (`protocol::pollPassDone`). A host that
+   keeps sending gets one line handled per pass, and each reply drains before the next line.
 
 ## Commands
 | cmd | Request fields | Reply |

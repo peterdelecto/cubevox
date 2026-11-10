@@ -307,7 +307,7 @@ void faultWatchdogStart() {
 void faultWatchdogKick() { LL_IWDG_ReloadCounter(IWDG1); }
 
 // A stream the audio module latched has stopped on purpose and is not a stall; a restart arms the
-// watch afresh. A stall mutes at once and resets once the flash is idle, so DIAG.TXT gets the entry
+// watch afresh, and a restart that failed leaves the watch armed on a stream that is down. A stall mutes at once and resets once the flash is idle, so DIAG.TXT gets the entry
 // and the sound comes back about a second later.
 void faultAudioWatch(uint32_t nowMs, bool audioRunning) {
   if (!audioRunning) return;

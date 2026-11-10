@@ -4,9 +4,13 @@
 #include "support.h"
 
 #include <cstddef>
+#include <cstdint>
 #include <cstring>
 #include <string>
 
+#include "core/layout.h"
+#include "core/protocol.h"
+#include "core/settings.h"
 #include "core/tx_queue.h"
 
 namespace {
@@ -76,6 +80,45 @@ void checkTxReplyReserve() {
   check(q.pending() <= TxQueue::kCapacity, "tx: replies drop only when the whole queue is full");
 }
 
+// Counts the bytes of a reply.
+class CountingWriter : public protocol::Writer {
+ public:
+  void write(const char*, size_t len) override { bytes += len; }
+  size_t bytes = 0;
+};
+
+// The longest hello: a bench build, a 31-character layout name, the serial and the settings.
+size_t largestHelloBytes() {
+  CountingWriter w;
+  const Settings settings;
+  const std::string name(protocol::kNameBytes, 'n');
+  protocol::replyHello(w, UINT32_MAX, "v99.99.99", name.c_str(), defaultLayout(), true, "0123456789ABCDEF01234567",
+                       &settings);
+  return w.bytes;
+}
+
+// A hello still fits behind a log backlog at its limit, and two hello replies queued before a drain
+// both arrive.
+void checkTxHelloFits() {
+  const size_t hello = largestHelloBytes();
+  check(hello < TxQueue::kReplyReserve, "tx: the reply reserve holds the largest hello");
+  const std::string reply = std::string(hello - 1, 'h') + "\n";
+
+  TxQueue q;
+  const std::string logLine(99, 'l');
+  while (q.dropped() == 0) {
+    q.put(logLine.data(), logLine.size(), TxClass::Log);
+    q.put("\n", 1, TxClass::Log);
+  }
+  q.put(reply.data(), reply.size(), TxClass::Reply);
+  check(q.dropped() == 1, "tx: a hello fits behind a full log backlog");
+
+  drainQueue(q);
+  q.put(reply.data(), reply.size(), TxClass::Reply);
+  q.put(reply.data(), reply.size(), TxClass::Reply);
+  check(q.dropped() == 1 && drainQueue(q) == reply + reply, "tx: two hello replies queued before a drain both arrive");
+}
+
 // discard() empties the finished lines; the line being written keeps its bytes and ends whole.
 void checkTxDiscard() {
   TxQueue q;
@@ -94,5 +137,6 @@ void checkTxDiscard() {
 void checkTx() {
   checkTxQueue();
   checkTxReplyReserve();
+  checkTxHelloFits();
   checkTxDiscard();
 }

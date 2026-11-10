@@ -45,8 +45,7 @@ class BlockFlow {
   };
 
   // Starts a block: moves the layout fade, holding the output at zero while `outputHeld`, and takes the
-  // late flag. When start.fade.swap is set the caller adopts the newest snapshot (queueReset and
-  // settleSlots) before run().
+  // late flag. When start.fade.swap is set the caller adopts the newest snapshot (adopt) before run().
   Start begin(bool outputHeld, bool layoutPending) {
     fade_.hold(outputHeld);
     Start s{fade_.next(layoutPending), false};
@@ -64,6 +63,12 @@ class BlockFlow {
 
   // Puts every slot at the settled end of its toggle, with no crossfade.
   void settleSlots(const std::array<bool, kSlotCount>& on) { slots_.settle(on); }
+
+  // At the zero point of a layout fade, moves from snapshot `from` to `to`. Queues a clear for every
+  // engine whose slot changed card and for every engine whose slot sits settled off and turns on, as a
+  // plain toggle clears it at the start of its fade in. Then settles every slot, since the output is at
+  // zero and nothing needs a crossfade.
+  void adopt(const ChainSnapshot& from, const ChainSnapshot& to);
 
   // The scope's ring, which holds the chain output of the newest blocks. The main loop reads it.
   ScopeRing& scope() { return scope_; }
