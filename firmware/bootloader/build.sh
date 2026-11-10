@@ -5,7 +5,8 @@
 #   ./build.sh               # cubevox board into $OUT (default /tmp/cubevox-boot-cubevox)
 #   ./build.sh --outdir      # print the output dir and exit
 #   ./build.sh --proofs      # host build of screens.c; numbered PNGs and diag-sample.txt in build/proofs/boot/
-#   ./build.sh --selftest    # host checks: the image check against tools/stamp_image.py, the screens,
+#   ./build.sh --selftest    # host checks: the image check against tools/stamp_image.py and on cut
+#                            # copies and lying headers, the screens,
 #                            # the drive texts, flash.sh's option byte edit, and upstream's ghostfat
 #                            # selftest on the patched tree
 #   ./build.sh --help        # print this text
@@ -131,6 +132,40 @@ image_checks() {
   expect_check "$dir/unstamped.bin" "bad v2.00.10"
   expect_check "$dir/erased.bin" "none"
   echo "[selftest] PASS: image_check.c agrees with tools/stamp_image.py"
+  partial_image_checks "$dir"
+}
+
+# What flash holds after a copy that stopped, and headers whose fields lie. A copy writes sector 1
+# (the header's sector) first, so a cut leaves the new head over an erased or an older tail.
+partial_image_checks() {
+  local dir="$1" offset
+  local sector=$(($(cv_define CV_FLASH_SECTOR_SIZE)))
+  local header=$(($(cv_define CV_IMAGE_HEADER_OFFSET)))
+  local region=$(($(cv_define CV_APP_END) - $(cv_define CV_APP_START)))
+  local length=$((header + $(cv_define CV_IMAGE_OFFSET_LENGTH)))
+  local stamp=(python3 -I "$REPO/tools/stamp_image.py")
+  # an older release of the same size whose tail differs
+  "$HOST/imagecheck" flip "$dir/unstamped.bin" "$dir/old-unstamped.bin" 150000
+  run_logged "$dir/stamp-old.log" "${stamp[@]}" stamp "$dir/old-unstamped.bin" --out "$dir/old.bin"
+  "$HOST/imagecheck" splice "$dir/stamped.bin" "$dir/erased.bin" "$sector" "$dir/head-erased.bin"
+  "$HOST/imagecheck" splice "$dir/stamped.bin" "$dir/old.bin" "$sector" "$dir/head-old.bin"
+  "$HOST/imagecheck" splice "$dir/stamped.bin" "$dir/stamped.bin" "$sector" "$dir/head-same.bin"
+  "$HOST/imagecheck" word "$dir/stamped.bin" "$dir/short-unsigned.bin" "$length" $((header + 0x1F))
+  "$HOST/imagecheck" restamp "$dir/short-unsigned.bin" "$dir/short.bin"
+  "$HOST/imagecheck" word "$dir/stamped.bin" "$dir/oversize.bin" "$length" $((region + 1))
+  "$HOST/imagecheck" word "$dir/stamped.bin" "$dir/past-end.bin" "$length" 250000
+  cp "$dir/stamped.bin" "$dir/blank-fields.bin"
+  for offset in $(seq $((header + 4)) 4 $((header + 0x1C))); do
+    "$HOST/imagecheck" word "$dir/blank-fields.bin" "$dir/blank-fields.bin" "$offset" 0xFFFFFFFF
+  done
+  expect_check "$dir/head-erased.bin" "bad v2.00.10"
+  expect_check "$dir/head-old.bin" "bad v2.00.10"
+  expect_check "$dir/head-same.bin" "good v2.00.10"
+  expect_check "$dir/short.bin" "bad v2.00.10"
+  expect_check "$dir/oversize.bin" "bad v2.00.10"
+  expect_check "$dir/past-end.bin" "bad v2.00.10"
+  expect_check "$dir/blank-fields.bin" "bad ????????????????"
+  echo "[selftest] PASS: a cut copy and a lying header fail the image check"
 }
 
 # Upstream's own selftest: with every define at its default the patched ghostfat still builds the

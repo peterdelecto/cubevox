@@ -82,35 +82,11 @@ typedef struct {
   bool updateMode;
   // The decision named a sector and its erase failed, so the faulting word may remain.
   bool eraseFailed;
-  // The cable, debounced, and whether update mode has acted on its first reading.
-  CvDebounce vbus;
-  bool cableTracked;
-  // The cable came out after a host had connected, and is still out.
-  bool cableOut;
-  // A host has enumerated since the cable went in; the timeout waits for a pull.
-  bool hostSeen;
-  bool mounted;
-  // When the timeout started counting: update mode's start, or the last pull with nothing written.
-  uint32_t timeoutFromMs;
-  // Update mode has accepted a UF2 block, so the installed image is partly overwritten.
-  bool writeBegun;
-  // The last block of an update is written and the boot block marked. The drive stays mounted
-  // until the host ejects it or the cable comes out, and either restarts the box.
-  bool updateWritten;
-  // The host ejected the drive after that, and when. The restart waits CV_EJECT_SETTLE_MS so the
-  // host receives the status of its eject command first.
-  bool ejectPending;
-  uint32_t ejectedMs;
-  // Since the host last mounted the drive, as CvScreenInputs names them.
-  bool sessionAccepted;
-  bool sessionRefused;
-  bool sessionFailed;
-  // Application sectors the transfer in progress has written, one bit each from sector 1.
-  uint32_t sessionSectors;
+  // Update mode's cable, host and transfer state (boot_decide.h).
+  CvUpdateSession session;
   CvBlockCounts blocks;
   char wrongFile[13];
-  // DIAG.TXT lags the counts or the wrong file, and the time of its last rewrite.
-  bool diagDirty;
+  // The time of DIAG.TXT's last rewrite.
   uint32_t diagMs;
   // The screen and host state on the panel, -1 before the first draw.
   int16_t shown;
@@ -412,14 +388,14 @@ static CvDriveState driveState(void) {
 static void diagRefresh(void) {
   const CvDriveState state = driveState();
   cvDiagWrite(&state);
-  gState.diagDirty = false;
+  gState.session.diagDirty = false;
   gState.diagMs = elapsedMs();
 }
 
 // Each mount gets both texts afresh. Once a write has begun the image is inspected again, so
 // Installed and installed say what the flash holds now.
 static void mountRefresh(void) {
-  if (gState.writeBegun) imageRead();
+  if (gState.session.writeBegun) imageRead();
   const CvDriveState state = driveState();
   cvInfoText(&state);
   diagRefresh();
@@ -436,26 +412,18 @@ char const* board_uf2_info(uint32_t* len) {
 //--------------------------------------------------------------------+
 
 static bool timeoutArmed(void) {
-  return cvBootTimeoutAllowed(CV_BLOCK, imageStatus(), gState.hostSeen, gState.writeBegun);
-}
-
-static CvScreen screenNow(void) {
-  if (gState.updateWritten) return CvScreenDone;
-  const CvScreenInputs in = {gState.decision.reason, gState.image.state == CvImageGood, gState.writeBegun,
-                             gState.sessionAccepted, gState.sessionRefused,             gState.sessionFailed,
-                             gState.cableOut,        timeoutArmed()};
-  return cvUpdateScreen(&in);
+  return cvSessionTimeoutArmed(&gState.session, CV_BLOCK, imageStatus());
 }
 
 static void screenShow(CvScreen screen) {
   static uint8_t frame[CV_FRAME_BYTES];
-  cvScreenDraw(frame, screen, cvInstalledText(&gState.image), gState.mounted);
+  cvScreenDraw(frame, screen, cvInstalledText(&gState.image), gState.session.mounted);
   cvOledShow(frame);
 }
 
 static void screenRefresh(void) {
-  const CvScreen screen = screenNow();
-  const int16_t shown = (int16_t)((int16_t)screen * 2 + (gState.mounted ? 1 : 0));
+  const CvScreen screen = cvSessionScreen(&gState.session, gState.image.state == CvImageGood, timeoutArmed());
+  const int16_t shown = (int16_t)((int16_t)screen * 2 + (gState.session.mounted ? 1 : 0));
   if (shown == gState.shown) return;
   gState.shown = shown;
   screenShow(screen);
@@ -467,7 +435,7 @@ static void screenRefresh(void) {
 // decision says the image must not be read, or the erase of the faulting sector just failed, the
 // read is skipped, or the same word would fault at every start.
 static void regionRead(void) {
-  if (gState.eraseFailed || !gState.decision.imageReadable) return;
+  if (!cvRegionReadAllowed(&gState.decision, gState.eraseFailed)) return;
   gState.imageReading = true;
   uint32_t sink = 0u;
   for (uint32_t at = CV_APP_START; at < CV_APP_END; at += CV_FLASH_WORD_BYTES) {
@@ -487,84 +455,53 @@ static void vbusStart(void) {
   pin.Mode = GPIO_MODE_INPUT;
   pin.Pull = GPIO_NOPULL;  // a pull would skew the R6/R7 divider
   HAL_GPIO_Init(CV_VBUS_PORT, &pin);
-  cvDebounceReset(&gState.vbus, vbusPresent());
 }
 
 static void updateModeStart(void) {
   gState.updateMode = true;
   regionRead();
   vbusStart();
+  cvSessionStart(&gState.session, gState.decision.reason, vbusPresent(), elapsedMs());
   diagRefresh();
   cvOledStart();
   screenRefresh();
 }
 
-// A self-powered device holds its D+ pull-up only while the cable carries VBUS. A pull leaves
-// TinyUSB mounted, because the core's own VBUS sensing is off, so the board posts the unplug event
-// that sensing would. Without a write the box may return to the application again, 60 s from the
-// pull. After a complete write the pull restarts the box into the new image.
+// The USB core's own VBUS sensing is off, so the board drives the D+ pull-up and posts the unplug
+// event that sensing would (cvSessionCable).
 static void cableTrack(uint32_t nowMs) {
-  const bool first = !gState.cableTracked;
-  const bool changed = cvDebounceUpdate(&gState.vbus, vbusPresent(), nowMs, CV_VBUS_DEBOUNCE_MS);
-  gState.cableTracked = true;
-  if (!first && !changed) return;
-  if (gState.vbus.level) {
-    gState.cableOut = false;
+  const CvCableAction action = cvSessionCable(&gState.session, vbusPresent(), nowMs);
+  if (action == CvCableNone) return;
+  if (action == CvCableConnect) {
     tud_connect();
     return;
   }
   tud_disconnect();
-  if (first) return;
-  if (gState.updateWritten) board_dfu_complete();
-  dcd_event_bus_signal(BOARD_TUD_RHPORT, DCD_EVENT_UNPLUGGED, false);
-  gState.cableOut = gState.hostSeen;
-  if (!gState.writeBegun) {
-    gState.hostSeen = false;
-    gState.timeoutFromMs = nowMs;
-  }
+  if (action == CvCableRestart) board_dfu_complete();
+  if (action == CvCableUnplugged) dcd_event_bus_signal(BOARD_TUD_RHPORT, DCD_EVENT_UNPLUGGED, false);
 }
 
-// tud_mounted() is the state the port's tud_mount_cb reports. A mount or an unmount starts a new
-// host session.
+// tud_mounted() is the state the port's tud_mount_cb reports.
 static void hostTrack(void) {
-  const bool mounted = tud_mounted();
-  if (mounted == gState.mounted) return;
-  gState.mounted = mounted;
-  gState.sessionAccepted = false;
-  gState.sessionRefused = false;
-  gState.sessionFailed = false;
-  if (mounted) {
-    gState.hostSeen = true;
-    mountRefresh();
-  }
+  if (cvSessionMount(&gState.session, tud_mounted())) mountRefresh();
 }
 
 // Each pass of the DFU loop. The timeout resets rather than jumps: the request is consumed, so the
 // decision runs the application from a clean reset with USB and I2C untouched.
 void board_dfu_task(void) {
   const uint32_t nowMs = elapsedMs();
-  if (gState.ejectPending && nowMs - gState.ejectedMs >= CV_EJECT_SETTLE_MS) board_dfu_complete();
   cableTrack(nowMs);
   hostTrack();
-  if (timeoutArmed() && nowMs - gState.timeoutFromMs >= CV_UPDATE_TIMEOUT_MS) NVIC_SystemReset();
-  if (gState.diagDirty && nowMs - gState.diagMs >= CV_DIAG_REFRESH_MS) diagRefresh();
+  const CvTickAction action = cvSessionTick(&gState.session, timeoutArmed(), nowMs);
+  if (action == CvTickRestart) board_dfu_complete();
+  if (action == CvTickTimeout) NVIC_SystemReset();
+  if (gState.session.diagDirty && nowMs - gState.diagMs >= CV_DIAG_REFRESH_MS) diagRefresh();
   screenRefresh();
 }
 
 //--------------------------------------------------------------------+
 // Update mode: UF2 blocks and the root directory
 //--------------------------------------------------------------------+
-
-static void blockRefused(uint32_t familyId) {
-  gState.blocks.refused += 1u;
-  gState.blocks.lastRefusedFamily = familyId;
-  if (gState.sessionAccepted) {
-    gState.sessionFailed = true;
-  } else {
-    gState.sessionRefused = true;
-  }
-  gState.diagDirty = true;
-}
 
 // Flash this transfer erased that is neither blank nor the block's own payload.
 static bool targetHoldsOtherData(UF2_Block const* block) {
@@ -574,45 +511,36 @@ static bool targetHoldsOtherData(UF2_Block const* block) {
   return !blank && memcmp(target, block->data, block->payloadSize) != 0;
 }
 
-// Before ghostfat writes or counts a block. A refused block is counted for DIAG.TXT and the screens
-// and never written. A second file in one host session, or the file dropped again after a failed
-// transfer, restarts the transfer, so it is erased and counted afresh instead of meeting the words
-// already written.
+// Before ghostfat writes or counts a block. A refused block is counted for DIAG.TXT and never
+// written. A restarted transfer is erased and counted afresh instead of meeting the words already
+// written. The target is read only for a block the filter takes, in a sector this transfer erased.
 bool board_uf2_block_accept(UF2_Block const* block, WriteState const* state) {
-  if (!cvUf2BlockAccepted(block->familyID, block->targetAddr, block->payloadSize)) {
-    blockRefused(block->familyID);
+  CvUpdateSession* session = &gState.session;
+  const CvUf2BlockInfo info = {block->familyID, block->targetAddr, block->payloadSize,
+                               block->blockNo,  block->numBlocks,  state->numBlocks};
+  const bool readTarget = cvUf2BlockAccepted(info.familyId, info.targetAddr, info.payloadSize, info.blockNo,
+                                             info.numBlocks) &&
+                          cvSessionSectorErased(session, info.targetAddr, info.sessionBlocks);
+  const CvBlockVerdict verdict = cvSessionBlock(session, &info, readTarget && targetHoldsOtherData(block));
+  if (verdict == CvBlockRefused) {
+    gState.blocks.refused += 1u;
+    gState.blocks.lastRefusedFamily = block->familyID;
     return false;
   }
-  if (state->numBlocks == 0u) gState.sessionSectors = 0u;
-  const uint32_t sector = 1u << ((block->targetAddr - CV_APP_START) / CV_FLASH_SECTOR_SIZE);
-  const bool erased = (gState.sessionSectors & sector) != 0u;
-  const CvUf2SessionInputs session = {state->numBlocks, block->numBlocks, block->blockNo, erased,
-                                      erased && targetHoldsOtherData(block), gState.sessionFailed};
-  if (cvUf2SessionRestart(&session)) {
-    uf2_write_state_reset();
-    gState.updateWritten = false;
-    gState.ejectPending = false;
-    gState.sessionSectors = 0u;
-    gState.sessionRefused = false;
-    gState.sessionFailed = false;
-  }
-  gState.sessionSectors |= sector;
-  gState.writeBegun = true;
-  gState.sessionAccepted = true;
+  if (verdict == CvBlockRestarted) uf2_write_state_reset();
   return true;
 }
 
 // After the flash write of an accepted block. A failed one does not count toward the end of the
 // transfer, so the update cannot complete over it.
 void board_uf2_block_written(UF2_Block const* block, bool written) {
+  cvSessionBlockWritten(&gState.session, written, elapsedMs());
   if (written) {
     gState.blocks.written += 1u;
     return;
   }
   if (gState.blocks.failed == 0u) gState.blocks.firstFailedAddress = block->targetAddr;
   gState.blocks.failed += 1u;
-  gState.sessionFailed = true;
-  gState.diagDirty = true;
 }
 
 // A root directory sector from the host. A file that cannot be firmware shows the wrong-file screen,
@@ -620,31 +548,28 @@ void board_uf2_block_written(UF2_Block const* block, bool written) {
 void board_uf2_dir_written(uint8_t const* sector) {
   char name[sizeof gState.wrongFile];
   if (!cvDirNamesWrongFile(sector, name)) return;
-  if (strcmp(name, gState.wrongFile) != 0) {
-    memcpy(gState.wrongFile, name, sizeof name);
-    gState.diagDirty = true;
-  }
-  if (!gState.sessionAccepted) gState.sessionRefused = true;
+  const bool newName = strcmp(name, gState.wrongFile) != 0;
+  if (newName) memcpy(gState.wrongFile, name, sizeof name);
+  cvSessionWrongFile(&gState.session, newName);
 }
 
-// After the last block: a fresh start count for the new image and the Done screen. The drive stays
-// mounted so the host can finish its own writes. msc.c calls this once per transfer.
+// After the last block, msc.c calls this once per transfer. The written image is checked first: a
+// good one gets a fresh start count and the Done screen, and the drive stays mounted so the host
+// can finish its own writes. A bad one shows that the update stopped.
 void board_dfu_written(void) {
-  cvBootMarkUpdated(CV_BLOCK);
-  gState.updateWritten = true;
+  imageRead();
+  if (cvSessionLastBlock(&gState.session, gState.image.state == CvImageGood)) cvBootMarkUpdated(CV_BLOCK);
   screenRefresh();
 }
 
-// The host unloaded the drive. After a complete write that ends the session, so the box restarts
-// once the status of the eject command has gone out; before one it changes nothing.
+// The host unloaded the drive (cvSessionEjected).
 void board_msc_ejected(void) {
-  if (!gState.updateWritten || gState.ejectPending) return;
-  gState.ejectPending = true;
-  gState.ejectedMs = elapsedMs();
+  cvSessionEjected(&gState.session, elapsedMs());
 }
 
-// The restart after a complete write, on eject or on the cable coming out. The boot block is
-// marked, so the decision runs the new image.
+// The restart after a write began, on eject, or after a complete write on the cable coming out. A
+// marked boot block runs the new image; an unmarked one finds the image invalid and offers the
+// drive again.
 void board_dfu_complete(void) {
   SCB_CleanDCache();
   NVIC_SystemReset();

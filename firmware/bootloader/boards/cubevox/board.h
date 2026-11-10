@@ -13,7 +13,7 @@ extern "C" {
 
 // Shown in INFO_UF2.TXT and DIAG.TXT. Bumped with every bootloader change; independent of
 // VERSION.txt because the two programs ship on different paths.
-#define CV_BOOT_VERSION "0.06"
+#define CV_BOOT_VERSION "0.07"
 
 //--------------------------------------------------------------------+
 // Board identity
@@ -58,16 +58,12 @@ extern "C" {
 
 // OTG_FS on PA11/PA12. The box is self-powered and PA9 is not OTG VBUS, so the port's B-session
 // override keeps the core attached and board_hooks.c senses the cable on VBUS_SENSE (pins.h
-// kVbusSense, the R6/R7 divider) as a plain input, as the application's usb_link.cpp does.
+// kVbusSense, the R6/R7 divider) as a plain input, as the application's usb_link.cpp does. Its
+// debounce and the restart's wait after an eject are policy, in boot_decide.h.
 #define USB_NO_VBUS_PIN      1
 #define BOARD_TUD_RHPORT     0
 #define CV_VBUS_PORT         GPIOA
 #define CV_VBUS_PIN          GPIO_PIN_9
-#define CV_VBUS_DEBOUNCE_MS  50u
-
-// After a complete write the box restarts this long after the host's eject command, so the status
-// of that command reaches the host first.
-#define CV_EJECT_SETTLE_MS   20u
 
 // The drive serves INFO_UF2.TXT and DIAG.TXT only (diag.c). Every UF2 block passes
 // board_uf2_block_accept() and reports its write to board_uf2_block_written(), and every root
