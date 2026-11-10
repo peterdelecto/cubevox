@@ -341,8 +341,9 @@ lines of 21 characters; the extension `uf2` never appears on screen because the 
    and the stopped screen with a computer connected (proof 10) await approval.
 2. The application's confirm screen is `Update the firmware?` / `You have vX.YY.ZZ.` /
    `Click to start.` / `Turn to cancel.` on rows 0, 2, 4, 6. Same proof rule.
-3. The application's boot splash shows the version for 2 s so Adam can confirm an update without a
-   computer.
+3. The application's boot splash shows the version for at least 2 s, and through the 6 s power-on
+   wait, so Adam can confirm an update without a computer. After an audio fault restarts the box it
+   also names the error by its code (OLED GUI spec, Priority 11).
 
 ## Failure handling
 | Event | Box | Adam sees | `DIAG.TXT` records |
@@ -435,7 +436,7 @@ lines of 21 characters; the extension `uf2` never appears on screen because the 
 | `board/fault.cpp` | Boot report lines `[boot] image v2.00.10 crc ok, boot fails 0, last update reason none` and `[boot] watchdog 2 s` (the period read back over the bootloader's 16 s). `faultResetFlags`, `faultResetWasPowerOn`, `faultRecordPresent` and `faultSummaryText` feed the diagnostic log. |
 | `board/boot_report.cpp` | `[boot] option bytes: <result>, BOR level <n>, sector 0 protected` or `writable`, from the boot block, `OPTSR_CUR` and `WPSN_CUR1`, in `DIAG.TXT`'s words; `[WARN]` when the step failed or a value is not the one it sets. A bootloader fault prints `boot fault: pc cfsr hfsr bfar`. |
 | `ui/menu.cpp` | Confirm screen per section OLED. |
-| `ui/splash.{h,cpp}` | Boot splash with version, 2 s. |
+| `ui/splash.{h,cpp}` | Boot splash with the version, at least 2 s and through the power-on wait, and the error text and code (A1 to A3) after an audio fault restart. |
 | `core/protocol.cpp` | `enter_dfu` unchanged in name and reply. `status` gains `boot_fails` and `update_reason`. `hello` gains `serial`. |
 | `platform_shim.cpp`, `platform.h`, `firmware/platform/` | Deleted. |
 

@@ -136,9 +136,10 @@ void Box::pickCycledCard(Card card, UiAction action, int (*slotOf)(const Layout&
   publish_.markStale();
 }
 
-// The splash owns the canvas until it ends; the face then dissolves in from what it left.
+// The splash owns the canvas until it ends; the face then dissolves in from what it left. The Mac
+// has no audio fault reset, so the splash names no error.
 void Box::drawFace(const UiContext& ctx, uint32_t nowMs) {
-  switch (splash_.draw(nowMs, kFirmwareVersion, canvas_, mute_.powerOnWait())) {
+  switch (splash_.draw(nowMs, kFirmwareVersion, canvas_, mute_.powerOnWait(), AudioFaultCause::None)) {
     case SplashStep::Up: return;
     case SplashStep::Ended:
       face_.invalidate();

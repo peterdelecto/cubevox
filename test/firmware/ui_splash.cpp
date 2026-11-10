@@ -1,11 +1,17 @@
 // Checks the boot splash on the host: the timer rule, the hand-over to the face, the input dropped
-// while it shows, and the centred version text. Its proof goes to build/oled-splash.pgm.
+// while it shows, the centred version text and the error text after an audio fault reset. Its
+// proofs go to build/oled-splash.pgm and build/oled-splash-a1.pgm to -a3.pgm.
 
 #include "support.h"
 
+#include <algorithm>
 #include <cstdint>
+#include <cstdlib>
+#include <string>
 
+#include "core/audio_fault_cause.h"
 #include "core/canvas.h"
+#include "core/display.h"
 #include "core/fonts.h"
 #include "core/layout.h"
 #include "core/level.h"
@@ -14,6 +20,7 @@
 #include "core/version.h"
 #include "ui/face.h"
 #include "ui/menu.h"
+#include "ui/screens.h"
 #include "ui/splash.h"
 
 namespace {
@@ -131,6 +138,109 @@ void checkTooWide() {
   check(sameFrame(canvas, expected), "splash: text wider than the panel starts at the left edge");
 }
 
+bool lit(const Canvas& canvas, int x, int y) { return ((canvas.page(y / 8)[x] >> (y % 8)) & 1u) != 0; }
+
+// The lit pixels' bounds over rows [top, bottom). An empty band has right < left.
+struct Ink {
+  int left = kCanvasWidth;
+  int right = -1;
+  int top = kCanvasHeight;
+  int bottom = -1;
+};
+
+Ink inkIn(const Canvas& canvas, int top, int bottom) {
+  Ink ink;
+  for (int y = top; y < bottom; ++y) {
+    for (int x = 0; x < kCanvasWidth; ++x) {
+      if (!lit(canvas, x, y)) continue;
+      ink.left = std::min(ink.left, x);
+      ink.right = std::max(ink.right, x);
+      ink.top = std::min(ink.top, y);
+      ink.bottom = std::max(ink.bottom, y);
+    }
+  }
+  return ink;
+}
+
+bool centredInk(const Ink& ink) {
+  const int leftMargin = ink.left;
+  const int rightMargin = kCanvasWidth - 1 - ink.right;
+  return ink.right >= ink.left && std::abs(leftMargin - rightMargin) <= 1;
+}
+
+Canvas splashFrame(AudioFaultCause cause, const char* version = kVersion) {
+  Splash splash;
+  Canvas canvas;
+  splash.start(0);
+  splash.draw(0, version, canvas, false, cause);
+  return canvas;
+}
+
+// Without a cause the splash is the version alone, as it was before the error text existed.
+void checkPlainUnchanged() {
+  Splash splash;
+  Canvas byDefault;
+  splash.start(0);
+  splash.draw(0, kVersion, byDefault, false);
+  Canvas expected;
+  expected.drawText((kCanvasWidth - Canvas::textWidth(font9x12(), kVersion)) / 2, (kCanvasHeight - font9x12().height) / 2,
+                    font9x12(), kVersion);
+  check(sameFrame(splashFrame(AudioFaultCause::None), expected) && sameFrame(byDefault, expected),
+        "splash: with no cause it shows the version alone, pixel for pixel");
+}
+
+void check(bool ok, const std::string& what) { ::check(ok, what.c_str()); }
+
+// The 5x7 ink on text row `row`.
+Ink rowInk(const Canvas& canvas, int row) { return inkIn(canvas, row * kDisplayRowPx, (row + 1) * kDisplayRowPx); }
+
+bool keepsPad(const Ink& ink) {
+  return ink.top >= kScreenPad && ink.left >= kScreenPad && ink.right <= kCanvasWidth - 1 - kScreenPad &&
+         ink.bottom <= kCanvasHeight - 1 - kScreenPad;
+}
+
+// One cause's splash: the wording, the code that DIAG.TXT also names, and each line on its row,
+// centred, clear of the edge, of the version and of each other, with the version where it was.
+void checkFaultText(AudioFaultCause cause, const char* line0, const char* line1, const char* code) {
+  const std::string name = std::string("splash ") + audioFaultCode(cause) + ": ";
+  const SplashFaultText* text = splashFaultText(cause);
+  check(text != nullptr && std::string(text->explanation[0]) == line0 && std::string(text->explanation[1]) == line1 &&
+            std::string(text->code) == code,
+        name + "the wording");
+  check(std::string(code) == std::string("ERROR ") + audioFaultCode(cause) &&
+            std::string(audioFaultDiagText(cause)).rfind(std::string(audioFaultCode(cause)) + " ", 0) == 0,
+        name + "the screen and DIAG.TXT name the same code");
+
+  const Canvas frame = splashFrame(cause);
+  const Canvas plain = splashFrame(AudioFaultCause::None);
+  const Ink version = inkIn(plain, 0, kCanvasHeight);
+  const Ink first = rowInk(frame, 0);
+  const Ink second = rowInk(frame, 2);
+  const Ink codeInk = rowInk(frame, 6);
+
+  // Each line starts where its first glyph's ink lands.
+  const FontDesc& font = font5x7();
+  const auto lineX = [&](const Ink& ink, const char* s) { return ink.left - font.inkLeft[glyphIndex(font, s[0])]; };
+  Canvas expected;
+  expected.copyFrom(plain);
+  expected.drawText(lineX(first, line0), kScreenPad, font, line0);
+  expected.drawText(lineX(second, line1), 2 * kDisplayRowPx + kScreenPad, font, line1);
+  expected.drawText(lineX(codeInk, code), 6 * kDisplayRowPx + kScreenPad, font, code);
+  check(sameFrame(frame, expected), name + "the lines in 5x7 on rows 0, 2 and 6 around the version, nothing else");
+
+  check(keepsPad(first) && keepsPad(second) && keepsPad(codeInk), name + "every line keeps 1 px from the panel edge");
+  check(centredInk(first) && centredInk(second) && centredInk(codeInk), name + "each line is centred, give or take a pixel");
+  check(second.top - first.bottom - 1 >= 2, name + "the two explanation lines stand clear of each other");
+  check(version.top - second.bottom - 1 >= 2 && codeInk.top - version.bottom - 1 >= 2,
+        name + "at least 2 px clear above and below the version");
+}
+
+void checkFaultTexts() {
+  checkFaultText(AudioFaultCause::RepeatedFaults, "THE AUDIO LINK FAILED", "4 TIMES IN A MINUTE.", "ERROR A1");
+  checkFaultText(AudioFaultCause::RestartFailed, "THE AUDIO LINK DID", "NOT START AGAIN.", "ERROR A2");
+  checkFaultText(AudioFaultCause::Stalled, "THE AUDIO STREAM", "STOPPED MOVING.", "ERROR A3");
+}
+
 // The sketch's order each pass: the menu takes the encoder's input, then the splash draws, and the
 // face ticks once the splash has gone and the panel has taken its frame. A click or a turn while the
 // splash shows opens nothing; the first click once the face shows opens the menu.
@@ -174,6 +284,10 @@ void writeProof() {
   splash.start(0);
   splash.draw(0, kFirmwareVersion, canvas, false);
   writePgm(canvas, "oled-splash.pgm");
+
+  writePgm(splashFrame(AudioFaultCause::RepeatedFaults, kFirmwareVersion), "oled-splash-a1.pgm");
+  writePgm(splashFrame(AudioFaultCause::RestartFailed, kFirmwareVersion), "oled-splash-a2.pgm");
+  writePgm(splashFrame(AudioFaultCause::Stalled, kFirmwareVersion), "oled-splash-a3.pgm");
 }
 
 }  // namespace
@@ -186,6 +300,8 @@ void checkSplash() {
   checkCentred();
   checkReplacesWhatWasThere();
   checkTooWide();
+  checkPlainUnchanged();
+  checkFaultTexts();
   checkInputDuringSplash();
   writeProof();
 }

@@ -4,6 +4,7 @@
 
 #include "board/boot_block_access.h"
 #include "board/diag_service.h"
+#include "board/fault.h"
 #include "board/flash_bank2.h"
 #include "board/mute.h"
 #include "board/record_service.h"
@@ -25,6 +26,7 @@ void reportUnfinished() {
   if (!serialFlush(kFlushBeforeResetMs)) serialOut().println("[WARN] serial output not flushed at reset");
   muteForReset();
   if (gWhy == PlannedReset::Update) {
+    faultForgetAudioCause();  // an update that replaced an audio reset ends on the update's own screens
     bootBlock().request = CV_REQUEST_UPDATE;
     __DSB();  // the request must reach DTCM before the reset
   }

@@ -4,8 +4,8 @@
 firmware/bench_ops.py against the op table in core/bench_ops.cpp, and firmware/bringup.py's
 panel thresholds, block rate and SAI kernel clock against core/panel_test.h, engine/common.h
 and board/audio.cpp. The stream fault drills' restart budget, relay wait, software reset flag and
-audio entry causes against core/audio_recovery.h, core/timing.h, the bootloader's boot_decide.h
-and board/fault.cpp. build.sh runs this, so a drift fails the build.
+audio entry causes against core/audio_recovery.h, core/timing.h, the bootloader's boot_decide.h,
+board/fault.cpp and core/audio_fault_cause.h. build.sh runs this, so a drift fails the build.
 
   python3 -I tools/bench_ops_check.py
 """
@@ -25,6 +25,7 @@ TABLE = os.path.join(SRC, "core", "bench_ops.cpp")
 PANEL_TEST_H = os.path.join(SRC, "core", "panel_test.h")
 AUDIO_CPP = os.path.join(SRC, "board", "audio.cpp")
 FAULT_CPP = os.path.join(SRC, "board", "fault.cpp")
+AUDIO_FAULT_CAUSE_H = os.path.join(SRC, "core", "audio_fault_cause.h")
 AUDIO_RECOVERY_H = os.path.join(SRC, "core", "audio_recovery.h")
 TIMING_H = os.path.join(SRC, "core", "timing.h")
 BOOT_DECIDE_H = os.path.join(ROOT, "firmware", "bootloader", "boards", "cubevox", "boot_decide.h")
@@ -84,11 +85,17 @@ def software_reset_flag():
 
 
 def cause_failures():
-    """The audio entry causes bringup.py looks for, each a string literal in board/fault.cpp."""
-    with open(FAULT_CPP) as f:
-        text = f.read()
-    causes = (bringup.CAUSE_RESTARTED, bringup.CAUSE_OUT_OF_RESTARTS, bringup.CAUSE_RESTART_FAILED)
-    return [f"bringup.py audio cause '{c}' is not a string in board/fault.cpp" for c in causes if f'"{c}"' not in text]
+    """The audio entry causes bringup.py looks for: a restart's in board/fault.cpp, and the causes that
+    reset the box, with their codes, in core/audio_fault_cause.h."""
+    wanted = ((FAULT_CPP, (bringup.CAUSE_RESTARTED,)),
+              (AUDIO_FAULT_CAUSE_H, (bringup.CAUSE_OUT_OF_RESTARTS, bringup.CAUSE_RESTART_FAILED)))
+    failed = []
+    for path, causes in wanted:
+        with open(path) as f:
+            text = f.read()
+        failed += [f"bringup.py audio cause '{c}' is not a string in {os.path.relpath(path, SRC)}"
+                   for c in causes if f'"{c}"' not in text]
+    return failed
 
 
 def main():

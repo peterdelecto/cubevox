@@ -40,8 +40,8 @@ flips each back before it ends.
 
 Both go as JSON, with no letter. `firmware/bringup.py --stream-faults` drives them with nothing by
 hand, each drill from a fresh start past the 5 s healthy window. Four faults inside 20 s give three
-restarts and then the reset with `repeated stream faults` in DIAG.TXT. A fourth fault after the
-minute restarts plainly. A failed restart resets with `stream restart failed`. The verdict comes
+restarts and then the reset with `A1 repeated stream faults` in DIAG.TXT. A fourth fault after the
+minute restarts plainly. A failed restart resets with `A2 stream restart failed`. The verdict comes
 from the port and from DIAG.TXT on the update drive (checklist AU20, AU21).
 
 ## The run: `firmware/stress.py`

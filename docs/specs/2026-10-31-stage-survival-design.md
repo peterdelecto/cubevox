@@ -55,11 +55,14 @@ How. A stuck DMA stream, a SAI error the stream did not ride through, a lock in 
 interrupt.
 Today. Eight overruns in a row drop the mute relay; the stream restarts, the mute holds, then opens.
 At most three restarts fit in any minute. Three cases reset the box, all by one path
-(`faultAudioWatch`): a fourth fault inside a minute of three restarts (owner 2026-11-10), a
-restart that fails, and a stall, where no block finishes for 100 ms. The box mutes at once, writes
-one `audio` entry whose fault text names the cause (`repeated stream faults`, `stream restart
-failed`, `audio stalled`), waits for the flash to be idle with no cap, and resets. Every reset then
-takes the power-on path, so the relay closes 6 s after the app starts. A start that does not run
+(`faultAudioWatch`), each with an error code (owner 2026-11-10): A1, a fourth fault inside a
+minute of three restarts (owner 2026-11-10); A2, a restart that fails; A3, a stall, where no block
+finishes for 100 ms. The box mutes at once, writes one `audio` entry whose fault text names the
+code and the cause (`A1 repeated stream faults`, `A2 stream restart failed`, `A3 audio stalled`),
+waits for the flash to be idle with no cap, and resets. Every reset then takes the power-on path,
+so the relay closes 6 s after the app starts. Through that wait the splash explains the error and
+shows its code (`ERROR A1` to `ERROR A3`), so Adam sees why the sound went (OLED GUI spec,
+Priority 11). A start that does not run
 audio for 5 s counts as a failed start, so a stream that faults past the budget inside 5 s of every
 start ends on the third start in "Startup failed." (update mode, until the power is cycled). A stream
 that runs longer than 5 s before it faults resets the box again and again, with the 6 s gap each

@@ -9,6 +9,7 @@
 #include "board/audio.h"
 #include "board/boot_block.h"
 #include "board/build_kind.h"
+#include "core/audio_fault_cause.h"
 
 // Takes the reset cause from the boot block and loads any fault record left by the previous run,
 // enables the MemManage, BusFault and UsageFault exceptions, and paints the unused main stack. Call
@@ -36,6 +37,14 @@ bool faultResetWasPowerOn();
 // True when the previous run left a fault record. Valid after faultInit().
 bool faultRecordPresent();
 
+// The audio fault that reset the box at the end of the previous run, so the splash names it, or
+// None. faultInit() takes the sealed cause from .cv_noinit and clears it, so one fault gives one
+// boot with the error; a power-on or any other reset reads None. Valid after faultInit().
+AudioFaultCause faultLastAudioCause();
+
+// Clears the sealed cause, for a planned reset that ends in update mode instead.
+void faultForgetAudioCause();
+
 // True when the previous run died on a double ECC error in flash bank 2 (FLASH->SR2 DBECCERR);
 // `address` is the failing flash word. Valid after faultInit().
 bool faultLastWasBank2Ecc(uint32_t& address);
@@ -48,8 +57,8 @@ void faultWatchdogKick();
 // Call every loop pass with what audioPoll returned. New SAI or DMA transfer errors are reported at
 // most once a second. A stream restart queues an audio entry in the diagnostic log. A fault past
 // the restart budget, a failed restart, or a stream that stops advancing for kAudioStallMs while it
-// runs mutes at once, queues an audio entry naming the cause, and starts a planned reset that
-// brings the sound back on the power-on path.
+// runs mutes at once, queues an audio entry naming the cause by its code (A1 to A3), seals the cause
+// for the next splash, and starts a planned reset that brings the sound back on the power-on path.
 void faultAudioWatch(uint32_t nowMs, bool audioRunning, AudioEvent event);
 
 // True once the stall watch has muted the output for a stall.

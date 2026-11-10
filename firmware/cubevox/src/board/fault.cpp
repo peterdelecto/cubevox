@@ -20,6 +20,7 @@
 #include "board/planned_reset.h"
 #include "board/print_hex.h"
 #include "board/serial_link.h"
+#include "core/audio_fault_cause.h"
 #include "core/audio_stall.h"
 #include "core/record_store.h"
 #include "core/timing.h"
@@ -52,19 +53,22 @@ constexpr uintptr_t kPaintMarginBytes = 256;
 
 // .cv_noinit (firmware/cubevox.ld) sits at the top of DTCM, above the boot block and .dtcm_bss, and
 // survives a system reset. The fault handler writes the fault record, read on the next boot, at its
-// start, where the bootloader reads it too. The record store's read limits follow it.
+// start, where the bootloader reads it too. The record store's read limits follow it, then the sealed
+// cause of an audio fault for the next boot's splash.
 struct NoInit {
   CvFaultRecord fault;
   RecordReadLimits recordLimits;
+  uint32_t audioCause;
 };
 static_assert(offsetof(NoInit, fault) == 0, "the fault record sits at CV_FAULT_RECORD_ADDR");
-static_assert(sizeof(NoInit) <= CV_FAULT_RECORD_SIZE, "the fault record and the read limits fit the slot");
+static_assert(sizeof(NoInit) <= CV_FAULT_RECORD_SIZE, "the fault record, the read limits and the cause fit the slot");
 
 __attribute__((section(".cv_noinit"))) NoInit gNoInit;
 CvFaultRecord& gStored = gNoInit.fault;
 
 CvFaultRecord gLast = {};  // copy taken at boot, printed by every report this run
 uint32_t gResetFlags = 0;
+AudioFaultCause gLastAudioCause = AudioFaultCause::None;
 bool gInitDone = false;
 bool gWatchdogPeriodSet = false;  // the 2 s period read back as written
 uintptr_t gPaintTop = 0;          // one past the highest painted word
@@ -273,6 +277,7 @@ void faultInit() {
     gLast = gStored;
     gStored.magic = 0;
   }
+  gLastAudioCause = takeAudioFaultSeal(gNoInit.audioCause);
 
   // Without these the three lesser faults escalate to HardFault and lose their kind.
   SCB->SHCSR |= SCB_SHCSR_MEMFAULTENA_Msk | SCB_SHCSR_BUSFAULTENA_Msk | SCB_SHCSR_USGFAULTENA_Msk;
@@ -292,6 +297,10 @@ bool faultResetWasPowerOn() {
 }
 
 bool faultRecordPresent() { return gLast.magic == CV_FAULT_MAGIC; }
+
+AudioFaultCause faultLastAudioCause() { return gLastAudioCause; }
+
+void faultForgetAudioCause() { gNoInit.audioCause = 0; }
 
 bool faultLastWasBank2Ecc(uint32_t& address) {
   if (gLast.magic != CV_FAULT_MAGIC || !bank2EccSet(gLast)) return false;
@@ -321,11 +330,13 @@ void faultWatchdogKick() { LL_IWDG_ReloadCounter(IWDG1); }
 
 namespace {
 
-// The one way an audio fault ends the run: mute at once, an audio entry naming the cause, and a
-// planned reset once the flash is idle. The box comes back on the power-on path.
-void resetForAudio(uint32_t nowMs, const char* cause) {
+// The one way an audio fault ends the run: mute at once, an audio entry naming the cause by its code,
+// and a planned reset once the flash is idle. The box comes back on the power-on path, and the sealed
+// cause tells its splash which error stopped the sound.
+void resetForAudio(uint32_t nowMs, AudioFaultCause cause) {
   muteLatch();
-  diagNoteAudioFault(cause);
+  gNoInit.audioCause = sealAudioFault(cause);
+  diagNoteAudioFault(audioFaultDiagText(cause));
   plannedResetStart(PlannedReset::AudioStall, nowMs);
 }
 
@@ -337,8 +348,8 @@ void faultAudioWatch(uint32_t nowMs, bool audioRunning, AudioEvent event) {
   switch (event) {
     case AudioEvent::None: break;
     case AudioEvent::Restarted: diagNoteAudioFault("stream restarted"); break;
-    case AudioEvent::OutOfRestarts: resetForAudio(nowMs, "repeated stream faults"); break;
-    case AudioEvent::RestartFailed: resetForAudio(nowMs, "stream restart failed"); break;
+    case AudioEvent::OutOfRestarts: resetForAudio(nowMs, AudioFaultCause::RepeatedFaults); break;
+    case AudioEvent::RestartFailed: resetForAudio(nowMs, AudioFaultCause::RestartFailed); break;
   }
   if (!audioRunning) return;
   reportTransferErrors(nowMs);
@@ -347,7 +358,7 @@ void faultAudioWatch(uint32_t nowMs, bool audioRunning, AudioEvent event) {
   serialOut().print("[ERROR] audio stalled after ");
   serialOut().print(gStallWatch.blocks());
   serialOut().println(" blocks, output muted; resetting");
-  resetForAudio(nowMs, "audio stalled");
+  resetForAudio(nowMs, AudioFaultCause::Stalled);
 }
 
 bool faultAudioStalled() { return gStallWatch.stalled(); }
