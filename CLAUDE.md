@@ -17,7 +17,8 @@ at a time in a Mac emulator that plays a loaded loop through the effect while th
   one grain cut taken from Autotune's input, and its output is what the two cards in slot order
   would give, cut once instead of twice (owner 2026-11-05, `docs/specs/2026-11-05-grain-group-design.md`).
   Formant's dry share is Autotune's output, never the raw input, and a card between them ends the
-  sharing.
+  sharing. `pitch_split_test` ("pair matches the cards apart") and `checkGrainPairRule` in
+  `core_chain_run` hold the pair to this.
 - Level rule (owner 2026-10-01): every stage engaged at its default setting outputs
   near unity, 0 to +0.5 dB RMS over its input on program material. The trim that
   gets a stage there lives in its tuning (wetDb / trimDb); the panel knobs never
