@@ -6,7 +6,7 @@ MUTE/BYPASS assignment. The menu stays minimal: one row per item, no sub-pages.
 
 ## Signal path tail
 ```
-slot 1 … slot 8 → POLISH COMP → POLISH EQ → output trim (OUTPUT PAD) → soft ceiling → DAC
+slot 1 … slot 8 → POLISH COMP → POLISH EQ → soft ceiling → output trim (OUTPUT PAD) → DAC
 ```
 1. Both stages run always; OFF is a settled bit-exact passthrough reached through the shared
    20 ms one-pole crossfade (`smooth::kSmoothCoef`), so a click on the menu never clicks in the audio.
@@ -104,16 +104,15 @@ Feed-forward, mono, no lookahead, log-domain gain computer, in `engine/polish_co
 | Release | program-independent | steady on held notes, no breathing |
 | Makeup | `trimDb` per tuning, set by `level_test` on the program scaled to -23 dBFS RMS | unity at the level the voice actually has; the other stages are linear and keep the test's -18 dBFS program |
 
-Three named tunings live in the engine; FIRM is the default (owner 2026-10-24, by ear on the loops).
-Adam's loops sit near -23 dBFS RMS, which is why the thresholds sit where they do.
+The engine holds one tuning, FIRM (owner 2026-10-24, by ear on the loops against GENTLE and MEDIUM,
+which are no longer in the code). Adam's loops sit near -23 dBFS RMS, which is why the threshold sits
+where it does.
 
 | Tuning | Threshold | Ratio | Knee | Attack | Release | Max GR | Makeup | On the loops |
 |---|---|---|---|---|---|---|---|---|
-| GENTLE | -24 dBFS | 2.2 : 1 | 6 dB | 10 ms | 150 ms | 12 dB | +1.5 dB | about 1 dB average, 3 to 5 dB peaks |
-| MEDIUM | -28 dBFS | 3 : 1 | 6 dB | 5 ms | 120 ms | 15 dB | +4.1 dB | about 2.5 dB average, 7 to 9 dB peaks |
-| FIRM (default) | -30 dBFS | 4 : 1 | 4 dB | 3 ms | 100 ms | 18 dB | +5.9 dB | about 3.5 dB average, 9 to 12 dB peaks |
+| FIRM | -30 dBFS | 4 : 1 | 4 dB | 3 ms | 100 ms | 18 dB | +5.85 dB | about 3.5 dB average, 9 to 12 dB peaks |
 
-`cubevox-render --polish-comp gentle|medium|firm|off` renders any of them for listening.
+`cubevox-render --polish-comp firm|off` renders it on and off for listening.
 
 Gain per sample from the envelope through the engine's fast log2/exp2. OFF settles to a
 bit-exact copy. CPU cost is measured on the bench and added to the chain table; the budget rule
@@ -121,7 +120,7 @@ bit-exact copy. CPU cost is measured on the bench and added to the chain table; 
 
 ## Soft ceiling
 Makeup plus a transient that passes the 3 ms attack can exceed full scale, so `engine/soft_ceiling.h`
-closes the tail after the output trim: bit-exact below -2 dBFS, a tanh shoulder above it with
+closes the tail ahead of the output trim (`2026-10-30-output-safety-design.md`, section 3): bit-exact below -2 dBFS, a tanh shoulder above it with
 matched value, slope and curvature, never past 1.0, NaN mapped to 0. A +6 dBFS peak leaves at
 0.9999965. None of the nine listening renders touches it. Estimated cost about 0.05 % of the
 480 MHz budget below the knee and 0.6 % while a sample is in the shoulder; measured on the bench.
@@ -151,7 +150,7 @@ what the box plays; `--polish-comp off` and `--polish-eq off` switch them for A/
    threshold within 0.3 dB of the knee formula), attack and release times within 20 %, sidechain high-pass
    (a 50 Hz tone at -6 dBFS causes under 0.5 dB of reduction), OFF is bit-exact after the
    crossfade, no NaN or denormal on silence.
-2. `level_test` rows: `polish COMP defaults` (FIRM) plus one row per other tuning, `polish EQ
+2. `level_test` rows: `polish COMP defaults` (FIRM), `polish EQ
    defaults` (exists). `test/soft_ceiling_test.cpp`: a +6 dB transient stays under full scale,
    a -3 dBFS sine is bit-exact, no NaN out for any input.
 3. `test/firmware/core_record.cpp`: v2 round trip, v1 record decodes with defaults, a bad

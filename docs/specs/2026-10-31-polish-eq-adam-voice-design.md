@@ -29,7 +29,7 @@ voiced, ess and silent; pitch by YIN checked against the harmonic peaks.
 ```
 ADC → input tap → POLISH EQ front (HPF 70 Hz → LPF 6 kHz → de-esser) → slot 1 Input gate
 (detector on the front half's output) → slots 2 to 8 → NaN guard → POLISH COMP →
-POLISH EQ back (300 Hz dip → 3.5 kHz presence → trim) → output trim → soft ceiling → output tap → DAC
+POLISH EQ back (300 Hz dip → 3.5 kHz presence → trim) → soft ceiling → output trim → output tap → DAC
 ```
 Both halves follow the one `PolishParams::on` through the usual 20 ms active smoother with snap, so
 one click fades both together and settled off is a bit-exact copy in both places. The BYPASS dry

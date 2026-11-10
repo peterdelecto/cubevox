@@ -26,7 +26,9 @@ three settings. change it to VOX EQ and default off". Built 2026-11-05.
    level, because the 6 kHz low-pass no longer sits ahead of it, so it cuts about 5.0 dB on the test
    voice where ON+CUTS cuts about 4.5 dB.
 6. Hears at ON+CUTS. Everything in ON, plus the 70 Hz high-pass and the 6 kHz low-pass (4th-order
-   Butterworth each) ahead of slot 1. This is what the earlier POLISH EQ ON did.
+   Butterworth each) ahead of slot 1. This is what the earlier POLISH EQ ON did. The low-pass is a
+   filter for the microphone, not for the effects (owner 2026-11-10): what the cards make above 6 kHz
+   passes uncut.
 7. Goes wrong, an old record. A record saved by an earlier build holds POLISH EQ in settings byte 3,
    usually ON. That byte is retired and ignored, so the box starts at OFF and Adam's saved choice for
    POLISH COMP, the switch and the rest is kept. He sets VOX EQ once and it saves.
