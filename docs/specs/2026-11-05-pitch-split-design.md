@@ -46,17 +46,43 @@ Status: built 2026-11-05 (v2.01.59). Ringer (`RingMod`) was removed 2026-11-05. 
    `FormantPsolaVoiceT` already does. `FormantFx` uses Growl's `FormantPsolaVoiceT<3852>`.
 4. Each engine runs a call in `kBlock` chunks (write the chunk, push the tracker, render), so a ring sized
    for one block of calls holds any `n`.
-5. Each engine with a ring has `rest()`, which zeroes 512 floats a block while its slot is stopped, and
-   `reset()` clears the rest with `fill`.
-6. Fix pass 2026-11-10: `InputRing` counts the samples written since its last clear (`filled()`). Octave and
-   Formant stay off until their ring holds their deepest read, so a card switched on from rest passes its
-   input until then and never plays the clear's zeros. Octave waits for its taps' reach (`OctaveVoice::deepestRead`,
-   1,927 samples at the 40 ms window, 40 ms) and ends a chunk at that sample, so any call length comes on at
-   one sample. Formant waits for its lag, two periods and the chunk (about 2,040 samples at 110 Hz). The fade
-   then rises over the 20 ms one-pole. Measured through `runChain` (Autotune on, off or absent, MIX 50 and
-   100 %, both knob ends, 98 and 220 Hz): no block of exact zeros and no dip of 0.5 dB in the 40 ms after
-   the toggle, where Formant behind Autotune went silent for 17 to 24 ms and Octave at MIX 100 % dipped 12 to
-   17 dB (`checkPitchCardSwitchOnFromRest`).
+5. A pitch card in the layout with its slot stopped calls `idle()` each block: it writes the slot's input into
+   its ring (a 64-sample copy), idles its tracker, and the first such call settles its crossfade and voices at
+   off. The Formant engine directly behind Autotune (only Empty slots between) takes Autotune's input instead,
+   fed by the Autotune slot on every block that slot runs. A switch-on finds the history in the ring, and the
+   tracker replays it (`pitch.h`) instead of starting cold. The rings clear only at power-on and when a layout
+   swap places the card or clears its engine (`BlockFlow::adopt`); a plain toggle keeps them. Mob and
+   Deepthroat still `rest()`, which zeroes 512 floats a block.
+6. `InputRing` counts the samples written since its last clear (`filled()`). After a clear, Octave and Formant
+   stay off until their ring holds their deepest read and pass their input until then: Octave its taps' reach
+   (`OctaveVoice::deepestRead`, 1,927 samples at the 40 ms window), ending a chunk at that sample so any call
+   length comes on at one sample; Formant its lag, two periods and the chunk.
+7. Switch-on, toggle to the wet within 1 dB of settled (the card's crossfade times the slot fade's engine gain),
+   147 Hz tone, the card off 400 ms before:
+
+   | Card and place | First wet | Full |
+   |---|---|---|
+   | Formant or Apraxia behind Autotune on | 1.3 ms | 6.7 ms (the slot fade) |
+   | Formant or Apraxia behind Autotune off, or alone | 10.7 ms | 20.0 ms |
+   | Octave, anywhere | 1.3 ms | 6.7 ms |
+
+   Behind a running Autotune the tracker is warm, so the card snaps on under the 8 ms slot fade. Otherwise the
+   tracker replays its ring over 8 blocks, which keeps the replay's blocks under a voiced hop's cost, and has
+   its period 10.7 ms in; the card then rises over a 14.7 ms S curve (`kFormantRiseSamples`).
+8. A switch-on's crossfade runs between the card's input and its voice a grain delay later, and on a steady
+   note the two partly cancel (9.3 dB at 98 Hz, SHIFT +7, MIX 100 %). While it moves, `CrossfadeHold`
+   (`engine/crossfade_hold.h`) holds the sum at the power the fade intends, and at a switch-on the Formant
+   level gain starts from the first chunk's powers. `checkPitchCardSwitchOnFromRest` holds Formant, Apraxia
+   and Octave behind Autotune on, off and alone, MIX 50 and 100 %, both knob ends, at 98, 147, 196 and 294 Hz:
+   no block of exact zeros, the wet full inside 30 ms, no dip of 3 dB from 0 to 150 ms under the input, the
+   settled card or the settled card's own lowest level, and no swell of 6 dB.
+9. Octave's equal-power crossfade assumes its voice and its input are unrelated. Within a semitone of unison
+   (SEMITONES stepping through 0) the voice is nearly a delayed copy, so a moving crossfade there is held the
+   same way, weighted from fully at unison to not at all a semitone out; away from unison and settled, the
+   card runs as before. `octave_test` "through 0" starts the voice at 32 points of its sawtooth: at MIX 100 %
+   the worst start reads x1.12 of steady-state curvature and 2.7 dB of dip (x1.21 and 4.9 dB without the
+   hold); at MIX 10 % x1.010 and 0.98 dB. The limits of x1.0 and 2 dB held only at the one start the test used
+   before.
 
 ### Ring lengths
 
@@ -131,8 +157,8 @@ No Autotune ahead leaves the struct empty, and Deepthroat then uses its own trac
 
 1. Autotune's tracker runs while Autotune is on or fading, or while a reader behind it is on: Formant or
    Yawn directly behind, Mob, or Deepthroat. Formant counts only while it can be heard, MIX over 0 or its
-   fade up (`FormantFx::needsTracker`, fix pass 2026-11-10); at MIX 0 it passes its input and the tracker
-   idles. Yawn pins its MIX at 1, so it always counts.
+   fade up (`FormantFx::needsTracker`); at MIX 0 it passes its input and the tracker idles. Yawn pins its MIX
+   at 1, so it always counts.
 2. Autotune's slot runs its engine with its toggle off while a reader needs the tracker, as the Input gate
    keeps its detector. Settled off, its output is its input bit for bit.
 3. The fine pass runs while Autotune is on or fading, or while Formant or Yawn reuses the tracker.

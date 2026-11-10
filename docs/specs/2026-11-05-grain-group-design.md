@@ -154,27 +154,31 @@ before and 0.48 us after at MIX 100 % (3.4 % and 3.8 %) and 0.62 before, 0.51 af
 toggled every 300 ms the card's worst 1 % of blocks add 1.9 us (15 %) before and 1.9 us after, the blocks of the
 fade and the restart. `kFormant` is 4 / 7 and `kFormantFollower` 5 / 8.
 
-## Fix pass (2026-11-10)
+## Switch-on, MIX 0, range return and the rule (fix pass 2026-11-10)
 
-1. Switch-on from rest. A stopped Formant slot rests and the next call clears the card's ring, while Autotune's
-   tracker stays warm. The card used to come on at once and read the cleared ring, so Formant or Apraxia behind
-   a running Autotune played 17 to 24 ms of exact zeros (MIX 100 %) or dipped 4 to 20 dB (MIX 50 %). The card now
-   stays off until its ring holds its lag, two periods and the chunk since the clear (`InputRing::filled()`),
-   passing its input meanwhile, then fades in over the 20 ms one-pole. No block of exact zeros and no dip of
-   0.5 dB in the 40 ms after the toggle (`core_chain_run` `checkPitchCardSwitchOnFromRest`).
-2. Formant at MIX 0 behind Autotune passes its input and no longer keeps Autotune's tracker and fine pass running
-   (`FormantFx::needsTracker`). Its slot still feeds the card Autotune's input, so MIX leaving 0 finds the ring
-   full. Host bench, default layout with Formant in slot 3, Autotune off, MIX 0: 4.76 us a block before,
-   4.09 after.
-3. A card that steps aside for a range flag and returns starts its voices clean when its fade leaves 0, as the
-   toggle's edge does. It used to fade back in on grains frozen before the dropout, reading up to 3,840 samples
-   back where the lag is about 1,100 (`formant_test` "range return").
-4. As built item 2's settled-off claim is pinned: `pitch_split_test` compares the grouped card behind a
-   settled-off Autotune with the card alone on Adam's three clips, SHIFT -7, 0 and +4, MIX 50 and 100 %, with `==`.
-5. The card's own fade from its input to its delayed output still dips on a steady tone where the two partly
-   cancel: up to 9.2 dB at 98 Hz, SHIFT +7, MIX 100 %, 60 to 80 ms after the toggle, with Autotune off or
-   absent (9.3 dB before the pass). Formant behind a running Autotune reads 6.9 dB there.
-6. Host cost, default layout (Adam's clips, all slots on, Apple clang -O2, minimum of 9 passes over several
-   interleaved runs, whole chain): 5.36 to 5.46 us a block before, 5.39 to 5.45 after at knobs 0.5; with
-   Formant in slot 3 at MIX 100 %, 5.70 to 5.79 before, 5.73 to 5.81 after. The gate adds no cost a host bench
-   can see.
+1. The Autotune slot feeds the Formant engine directly behind it Autotune's input on every block the slot
+   runs, whether the card is on or off; a stopped card with no feed writes its own slot input, which is then
+   Autotune's input too, since a settled-off Autotune passes it. A switch-on finds the ring full. Behind a
+   running Autotune the card snaps on under the 8 ms slot fade; behind a settled-off Autotune or alone it waits
+   for the tracker's replay (10.7 ms) and rises over 14.7 ms (pitch split spec, section 1, items 5 to 8). After
+   a clear (power-on, a layout swap) the card stays off until its ring holds its lag, two periods and the chunk.
+2. Formant at MIX 0 behind Autotune passes its input and reads no tracker (`FormantFx::needsTracker`); its ring
+   still takes Autotune's input. Host bench, default layout with Formant in slot 3, Autotune off, MIX 0: 4.76 us
+   a block with the tracker running for it, 4.09 without.
+3. A card that steps aside for a range flag and returns starts its voices clean when its fade leaves 0
+   (`formant_test` "range return").
+4. Tests that pin the rule (root `CLAUDE.md`, chain order):
+   1. `pitch_split_test` "pair matches the cards apart": the pair against Autotune then the card on Autotune's
+      output with its own ring and tracker, on Adam's three clips and a voice 37 cents sharp of D3, SHIFT
+      (Apraxia: RANGE) -7, 0 and +4, MIX 100 %: tracked pitch within 7 cents median, 35 cents at the 90th
+      percentile (the tracker alone reads the cards apart up to 20 / 40 cents off Autotune's output once the
+      formants move), third-octave envelope (200 Hz to 5 kHz, mean removed) within 1 dB on the clips, where a
+      SHIFT of -7 or +4 moves it 2.5 to 4.7 dB.
+   2. `core_chain_run` `checkGrainPairRule`: at MIX 0 the pair's output is Autotune's output bit for bit; at
+      MIX 50 %, SHIFT 0 and -7, on the sharp voice, the raw input's partials sit 34 to 39 dB under the
+      corrected ones; with Distortion between, Formant and Apraxia cut from their own slot input with their own
+      tracker, and with an Empty slot between they share.
+   3. `pitch_split_test` "settled-off group equals the card alone": bit for bit on Adam's clips.
+5. Host cost, default layout (Adam's clips, Apple clang -O2, minimum of 15 passes, three interleaved runs, whole
+   chain): all slots on 5.32 to 5.36 us a block before the kept rings, 5.32 to 5.47 after; Autotune and Octave
+   off 3.98 to 4.00 before, 3.99 to 4.06 after. A stopped pitch card costs a 64-sample copy.

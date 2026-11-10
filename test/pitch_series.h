@@ -6,7 +6,7 @@
 // audio that enters Autotune and hands it Autotune's tracker and engine, and it gathers the shift and the
 // delay the cards put on the pitch for the Growl card.
 // `autotunePlaced` false models a layout with no Autotune card: the Formant engine runs its own tracker and
-// the Growl and Crowd cards run theirs. While the Formant card is off with its fade down it rests and passes
+// the Growl and Crowd cards run theirs. While the Formant card is off with its fade down it idles and passes
 // its input, as a stopped slot does, and Autotune's tracker runs for it only while it can be heard.
 
 #include <algorithm>
@@ -67,7 +67,7 @@ class PitchSeries {
       need.run = readers || formantReads;
       need.fine = formantReads;
       need.outOfRange = readers || formantReads;
-      if (formantLive) formant.feed(src, n);
+      formant.feed(src, n);
       autotune.process(src, a_.data(), n, p.autotune, need, formantLive ? formant.gridMarks() : cv::GridMarks{});
       up = {&autotune.pitch(), autotune.correctionSemis(), autotune.outputLatency()};
       up.group = &autotune;
@@ -76,7 +76,7 @@ class PitchSeries {
     if (formantLive) {
       formant.process(src, b_.data(), n, p.formant, up);
     } else {
-      formant.rest();
+      formant.idle(src, n);
       std::copy(src, src + n, b_.begin());
     }
     if (up.result != nullptr) up.latency += formant.outputLatency();

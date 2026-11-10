@@ -80,9 +80,10 @@ bool slotLive(const ChainSnapshot& snap, const SlotFades& fades, int s) {
 // Formant engine directly behind the slot (every slot between holds Empty) while it can be heard, a Crowd
 // card or a Growl card anywhere behind. The Formant engine reads the 48 kHz fine pass and the out-of-range
 // flag, the Crowd card reads the flag, and Autotune's input goes into the Crowd card's ring while one is
-// placed behind. A live Formant engine directly behind takes Autotune's input at any MIX, which it cuts its
-// grains from, and hands Autotune its grain grid, which a corrected voice that starts takes up. At MIX 0 with
-// its fade down the Formant card passes its input and reads no tracker; Apraxia pins its MIX at 1.
+// placed behind. The Formant engine directly behind takes Autotune's input every block the slot runs, on or
+// off, which it cuts its grains from, and a live one hands Autotune its grain grid, which a corrected voice
+// that starts takes up. At MIX 0 with its fade down the Formant card passes its input and reads no tracker;
+// Apraxia pins its MIX at 1.
 StageContext autotuneContext(const ChainEngines& engines, const ChainSnapshot& snap, const SlotFades& fades, int s) {
   StageContext ctx;
   bool onlyEmpty = true;
@@ -91,13 +92,15 @@ StageContext autotuneContext(const ChainEngines& engines, const ChainSnapshot& s
     const Engine e = engineOf(c);
     if (e == kNoEngine) continue;
     const bool live = slotLive(snap, fades, t);
-    if (e == Engine::Formant && onlyEmpty && live) {
-      const bool reads = c == Card::FormantFollower || engines.formant.needsTracker(snap.params.pitchCards.formant);
-      ctx.tracker.run = reads;
-      ctx.tracker.fine = reads;
-      ctx.tracker.outOfRange = reads;
+    if (e == Engine::Formant && onlyEmpty) {
       ctx.feedsFormant = true;
-      ctx.groupGrid = engines.formant.gridMarks();
+      if (live) {
+        const bool reads = c == Card::FormantFollower || engines.formant.needsTracker(snap.params.pitchCards.formant);
+        ctx.tracker.run = reads;
+        ctx.tracker.fine = reads;
+        ctx.tracker.outOfRange = reads;
+        ctx.groupGrid = engines.formant.gridMarks();
+      }
     }
     if (e == Engine::Crowd) {
       ctx.feedsCrowd = true;
@@ -235,18 +238,19 @@ void mixSlotFade(float* wet, const float* dry, int n, int from, int to) {
 
 namespace {
 
-// A slot settled off with nothing live behind it. The engines that keep a ring of their input clear it a
-// slice a block, and the walk hands no pitch on, except that a settled Autotune still stands in the path.
-void restSlot(ChainEngines& engines, Engine e, PitchPath& path) {
+// A slot settled off with nothing live behind it. The pitch cards keep writing the slot's input into their
+// ring, so a switch-on finds the history; Mob and Deepthroat clear theirs a slice a block. The walk hands no
+// pitch on, except that a settled Autotune still stands in the path.
+void restSlot(ChainEngines& engines, Engine e, const float* in, int n, PitchPath& path) {
   switch (e) {
     case Engine::Autotune:
-      engines.autotune.rest();
+      engines.autotune.idle(in, n);
       path.autotuneAhead = true;
       path.adjacent = true;
       path.upstream = {&engines.autotune.pitch(), 0.0f, 0.0f, nullptr, 0.0f, 0.0f};
       return;
-    case Engine::Octave: engines.octave.rest(); break;
-    case Engine::Formant: engines.formant.rest(); break;
+    case Engine::Octave: engines.octave.idle(in, n); break;
+    case Engine::Formant: engines.formant.idle(in, n); break;
     case Engine::Crowd: engines.crowd.rest(); break;
     case Engine::Growl: engines.growl.rest(); break;  // the card keeps a ring of its own input
     default: break;
@@ -254,8 +258,8 @@ void restSlot(ChainEngines& engines, Engine e, PitchPath& path) {
   path.adjacent = false;
 }
 
-// The first block of a slot that sat settled off. Autotune, Octave and the Formant engine clear
-// themselves on their first call after a rest.
+// The first block of a slot that sat settled off. Autotune, Octave and the Formant engine keep the ring
+// they wrote while off and settled their crossfade when they stopped.
 void startSlot(ChainEngines& engines, Engine e) {
   switch (e) {
     case Engine::Autotune:
@@ -282,7 +286,7 @@ bool runSlot(ChainEngines& engines, SlotFades& fades, int s, const ChainSnapshot
   const bool trackerLive = ctx.tracker.run;
   const SlotFades::Step step = fades.step(s, stageToggleOn(snap, e));
   if (step.from == 0 && step.to == 0 && !detectorLive && !trackerLive) {
-    restSlot(engines, e, path);
+    restSlot(engines, e, in, n, path);
     return false;
   }
   if (step.from == 0 && step.to > 0 && !detectorLive && !trackerLive) startSlot(engines, e);

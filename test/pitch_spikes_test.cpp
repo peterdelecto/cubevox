@@ -8,9 +8,10 @@
 // 2. A card with a ring of its own input switched on (chain_run.cpp). A reset that clears the whole ring in one
 //    block reads high: the board's memset stored a byte at a time, about 250k cycles for a 51 kB ring, so the
 //    one block read 47 % of the budget against a settled worst of 7 %. Its word-wise memset (board/fastmem.cpp)
-//    cuts that to about 4 %, and a stopped card still clears the ring a slice a block, and the switch-on finds
-//    it clear. The host's memset is fast, so the ring work is counted as well as timed. Autotune, Octave,
-//    Formant and Mob each keep a ring and rest the same way, so the check runs on each.
+//    cuts that to about 4 %, and a stopped Mob card still clears its ring a slice a block, and the switch-on
+//    finds it clear. Autotune, Octave and Formant keep writing their ring while stopped, so they clear
+//    nothing and their switch-on finds the history; the check counts that. The host's memset is fast, so the
+//    ring work is counted as well as timed. The switch-on block's time is checked on all four.
 //
 // Block times are the minimum over several passes of one deterministic run, in host nanoseconds. No window,
 // no audio device.
@@ -283,6 +284,15 @@ bool testSwitchOn(const std::vector<Signal>& clips, Card subject, const char* la
                firstOn, static_cast<double>(kSettleBlocks), after, settled);
 
   const SwitchRun& r = runs[0];
+  if (subject != Card::Crowd) {
+    // Autotune, Octave and Formant keep writing their ring while stopped, so a switch-on finds the history
+    // and nothing is ever cleared.
+    std::snprintf(name, sizeof name, "%s: a stopped card keeps its ring and clears none of it", label);
+    ok &= report(name, r.maxClearedInBlock == 0 && r.ringNotClear > 0,
+                 "most floats cleared in one block %.0f (0), switch-ons that found the history in the ring %.0f (> 0)",
+                 static_cast<double>(r.maxClearedInBlock), static_cast<double>(r.ringNotClear));
+    return ok;
+  }
   std::snprintf(name, sizeof name, "%s: switch-on after a rest: the ring is already clear", label);
   ok &= report(name, r.clearedAtSwitchOn == 0 && r.ringNotClear == 0,
                "floats the switch-on blocks cleared %.0f (0), switch-ons that left old samples in the ring %.0f (0)",

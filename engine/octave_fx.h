@@ -4,6 +4,7 @@
 #include <cstring>
 
 #include "engine/common.h"
+#include "engine/crossfade_hold.h"
 #include "engine/fastmath.h"
 #include "engine/input_ring.h"
 #include "engine/octave.h"
@@ -12,8 +13,9 @@
 // The Octave card's engine. It keeps a ring of its own input, cuts the granular voice from it and mixes
 // the voice against the input at equal power. The voice needs no pitch, so the engine runs no tracker.
 // The toggle's fade and the MIX knob share the one crossfade, so the dry and wet stay equal-power at every
-// fade. The card comes on only once its ring holds the taps' deepest read since the ring's last clear, so a
-// card started from rest passes its input until then. The voice resets on its enable edge only once the
+// fade. A stopped card in the layout keeps writing its ring (idle), so a switch-on finds the taps' history
+// and the voice sounds from the first block. After a clear (power-on, a layout swap) the card comes on only
+// once its ring holds the taps' deepest read, and passes its input until then. The voice resets on its enable edge only once the
 // crossfade has settled at zero, so a quick off and on keeps the running voice. Settled off, the output is
 // the input bit for bit.
 
@@ -29,30 +31,26 @@ class OctaveFx {
  public:
   OctaveFx() { reset(); }
 
-  // Leaves the ring zero. A card that rested since it last ran (see rest) has cleared most of the ring
-  // already, and this clears what is left.
+  // Leaves the ring zero, as at power-on and when a layout swap places the card.
   void reset() {
     ring_.clear();
-    voice_.reset();
-    mix_ = 0.0f;
-    fade_ = 0.0f;
-    gains_ = Gains{};
-    was_ = false;
-    fresh_ = true;
-    rested_ = false;
+    settle();
+    idle_ = false;
   }
 
-  // A call for each block the card sits stopped (the chain does not run it); see AutotuneFx::rest.
-  void rest() {
-    ring_.rest();
-    rested_ = true;
+  // A call for each block the card sits stopped in the layout. It writes the block into the ring, so a
+  // switch-on finds the taps' history and the voice sounds at once. The first call after the engine ran
+  // settles the crossfade and the voice at off.
+  void idle(const float* in, int n) {
+    if (!idle_) settle();
+    for (int c = 0; c < n; c += kBlock) ring_.write(in + c, n - c < kBlock ? n - c : kBlock);
   }
 
   // Runs n samples of any call length, in chunks of at most kBlock. in and out may be the same buffer.
   // A chunk ends where the ring comes to hold the taps' deepest read, so the card comes on at that sample
   // whatever the call length.
   void process(const float* in, float* out, int n, const OctaveParams& p) {
-    if (rested_) reset();
+    idle_ = false;
     const int deepest = OctaveVoice::deepestRead(p.tuning);
     for (int c = 0; c < n;) {
       int m = n - c < kBlock ? n - c : kBlock;
@@ -86,6 +84,18 @@ class OctaveFx {
     float wet = 0.0f;
     float dry = 1.0f;
   };
+
+  // The crossfade and the voice at off, the next chunk taking its targets outright. The ring stays.
+  void settle() {
+    voice_.reset();
+    mix_ = 0.0f;
+    fade_ = 0.0f;
+    gains_ = Gains{};
+    was_ = false;
+    fresh_ = true;
+    idle_ = true;
+    cross_.reset();
+  }
 
   Gains gainsNow() const {
     Gains g;
@@ -121,6 +131,8 @@ class OctaveFx {
       if (!voice_.idle()) voice_.reset();
       gains_ = Gains{};
       if (out != in) std::memmove(out, in, sizeof(float) * static_cast<size_t>(n));
+      cross_.reset();
+      cross_.pass(n);
       return;
     }
     const Gains g0 = gains_;
@@ -137,13 +149,23 @@ class OctaveFx {
     if (heard) voice_.render(ring_.data(), first, n, buf_.data());
     else if (!voice_.idle()) voice_.park();
     const bool settled = g0.dry == g1.dry && g0.wet == g1.wet;
-    if (heard) {
-      if (settled) mixLoop<true, true>(in, out, n, g0, g1);
-      else mixLoop<true, false>(in, out, n, g0, g1);
-    } else {
-      if (settled) mixLoop<false, true>(in, out, n, g0, g1);
-      else mixLoop<false, false>(in, out, n, g0, g1);
+    if (heard && !settled) {
+      crossLoop(in, out, n, g0, g1);
+      return;
     }
+    if (heard) mixLoop<true, true>(in, out, n, g0, g1);
+    else if (settled) mixLoop<false, true>(in, out, n, g0, g1);
+    else mixLoop<false, false>(in, out, n, g0, g1);
+    releaseHold(out, n);
+  }
+
+  // A settled chunk: the held gain glides back to 1, then the hold only keeps count.
+  void releaseHold(float* out, int n) {
+    if (cross_.idle()) {
+      cross_.pass(n);
+      return;
+    }
+    for (int j = 0; j < n; ++j) out[j] = cross_.release(out[j]);
   }
 
   // The gains ramp by increments; a settled gain holds one value, so it takes no step.
@@ -166,16 +188,38 @@ class OctaveFx {
     }
   }
 
+  // A moving crossfade of a heard voice. The equal-power pair holds the level only while the voice and the
+  // input are unrelated. Within a semitone of unison the voice is nearly a delayed copy of the input, and the
+  // two swell or cancel by where the grain window sits, so there the sum is held at the unrelated pair's
+  // power, fully at unison and not at all from a semitone out.
+  void crossLoop(const float* in, float* out, int n, const Gains& g0, const Gains& g1) {
+    const float inv = 1.0f / static_cast<float>(n);
+    const float dDry = (g1.dry - g0.dry) * inv;
+    const float dWet = (g1.wet - g0.wet) * inv;
+    const float off = fabsf(voice_.intervalSemis());
+    const float weight = off < 1.0f ? 1.0f - off : 0.0f;
+    float dry = g0.dry;
+    float wet = g0.wet;
+    for (int j = 0; j < n; ++j) {
+      dry += dDry;
+      wet += dWet;
+      const float x = in[j] * dry;
+      const float v = wet * buf_[static_cast<size_t>(j)];
+      out[j] = cross_.hold(x * x + v * v, x + v, weight);
+    }
+  }
+
   InputRing<kOctaveRingLen> ring_;
   OctaveVoiceT<kOctaveRingLen> voice_;
   std::array<float, kBlock> buf_{};  // the voice's chunk
+  CrossfadeHold cross_;              // holds a moving crossfade at the unrelated pair's power
   float mix_ = 0.0f;                 // MIX after its smoothing
   float fade_ = 0.0f;                // the toggle's fade, 0 off .. 1 on
   Gains gains_;                      // the gains at the end of the last chunk
   smooth::BlockCoef coef_;           // the 20 ms one-pole's step over the last chunk length
   bool was_ = false;     // the voice was on last chunk
   bool fresh_ = true;    // the next chunk takes its targets outright
-  bool rested_ = false;  // the card sat stopped since it last ran
+  bool idle_ = false;    // the card sat stopped since it last ran, its crossfade settled at off
 };
 
 }  // namespace cv

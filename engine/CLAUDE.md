@@ -33,15 +33,19 @@
   6. `engine/reverb_parts.h`, for the two reverbs: `softClip`, `softClipHeadroom`, `kReverbClipHeadroom`, the
      allpass step, `Allpass`, `Delay`, `KnobCurve`, `kFeedbackMax`, `kMaxWobbleHz`, the wobble LFO (`lfo`, on `sinTurns`), its phase step and
      error bound.
+  7. `engine/crossfade_hold.h`, for the pitch cards: `CrossfadeHold`, which holds a moving crossfade between a
+     card's input and its delayed voice at the power its law intends, sample by sample.
 - The board links its own memset, memcpy and memmove (`firmware/cubevox/src/board/fastmem.cpp`, checked on the
   host by `fastmem_test`), which move 16 bytes a pass, about 0.3 to 0.5 cycles a byte by instruction count.
   newlib-nano's versions are byte loops at about 5 cycles a byte, so a `fill(0.0f)`, `std::copy` or struct
   copy that GCC turns into a call is fast. Keep the board's fastmem.cpp compiled with
   `no-tree-loop-distribute-patterns`, or its loops become calls to themselves. A clear the size of the pitch
   ring (51 kB, about 10k to 26k cycles, 2 to 4 % of a 640k-cycle block) is still spread: `InputRing::rest()`
-  clears 512 floats a block while a card's slot is stopped (`AutotuneFx`, `OctaveFx`, `FormantFx`, `Crowd`,
-  `Growl`), so the `reset()` at the switch-on finds the ring clear. The spread clears and the tracker's
-  resets all use `std::fill_n` or `.fill(0.0f)`. `pitch_spikes_test` holds the spread.
+  clears 512 floats a block while a Mob or Deepthroat slot is stopped (`Crowd`, `Growl`), so the `reset()` at
+  the switch-on finds the ring clear. The pitch cards (`AutotuneFx`, `OctaveFx`, `FormantFx`) instead keep
+  writing their slot's input into their ring while stopped (`idle()`), a 64-sample copy a block, so a switch-on
+  finds the history; they clear only at power-on and at a layout swap. The spread clears and the tracker's
+  resets all use `std::fill_n` or `.fill(0.0f)`. `pitch_spikes_test` holds the spread and the kept rings.
 - The onset estimate's 48 kHz refinement walks downhill from the coarse period and sums at most
   `kOnsetMaxLags` lags; summing all 13 put the estimate's block above a voiced hop's. The estimate skips the
   block that closes a hop, which runs the analysis; run there it put a block 0.4 us over a voiced hop's on clip 3.
