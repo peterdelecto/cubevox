@@ -51,7 +51,7 @@ SECTIONS
   /* CV_FAULT_RECORD_ADDR */
   ASSERT(__cv_boot_block_end <= 0x2001FFC0, "cubevox.ld: .cv_boot_block runs into the fault record")
 
-  /* The fault record. It survives a system reset. */
+  /* The fault record, then the record sectors' read limits. Both survive a system reset. */
   /* CV_FAULT_RECORD_ADDR */
   .cv_noinit 0x2001FFC0 (NOLOAD) :
   {

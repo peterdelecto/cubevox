@@ -28,8 +28,8 @@
 // ---- DTCM ----------------------------------------------------------------------------------
 
 // The top 256 bytes of DTCM are shared by both programs. struct CvBootBlock takes the first 192
-// and the fault record (.cv_noinit) the last 64. A system reset keeps them and power-on leaves
-// them random.
+// and .cv_noinit the last 64: the fault record, then the record sectors' read limits. A system
+// reset keeps them and power-on leaves them random.
 #define CV_DTCM_END           0x20020000u
 #define CV_BOOT_BLOCK_ADDR    0x2001FF00u
 #define CV_BOOT_BLOCK_SIZE    256u
