@@ -46,7 +46,7 @@ Use these words or a plain description. Never a coined label (owner 2026-10-24).
 - Enclosure: the box, lid, floor, front wall, rear wall (the back wall), beads, the TPU boot, coupon, solder jig.
 - Panel: slot, pot, bypass toggle, MUTE toggle, MENU (the one encoder), mux, K102 (mute relay), K103 (pad relay).
 - Effects: effect card (a library card), chain, layout, stage, engine, POLISH COMP, VOX EQ, output trim, soft ceiling.
-- Screens: splash, face, the scope (the voice screen's trace), readout and its fixed field, MUTED and BYPASS screens, menu, the update screens.
+- Screens: splash, face, the scope (the voice screen's trace), readout and its value field, MUTED and BYPASS screens, menu, the update screens.
 - Update path: bootloader, update mode, the CUBEVOX drive, DIAG.TXT, boot block, boot report, image header, diag log, stall watch, boot-fail counter.
 - People: the owner, Adam (the singer).
 - Agents: "the agent working the <area> files", or its name. A group of files is "its files", not a named unit.
