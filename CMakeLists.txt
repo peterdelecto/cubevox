@@ -193,6 +193,7 @@ add_executable(firmware_test
                test/firmware/core_protocol.cpp
                test/firmware/core_protocol_fuzz.cpp
                test/firmware/core_record.cpp
+               test/firmware/core_record_cut.cpp
                test/firmware/core_registry.cpp
                test/firmware/core_scope.cpp
                test/firmware/core_tx_queue.cpp

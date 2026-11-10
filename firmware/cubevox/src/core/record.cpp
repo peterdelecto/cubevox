@@ -97,6 +97,13 @@ bool sameRecordContent(const uint8_t* a, const uint8_t* b) {
   return memcmp(a, b, kOffSequence) == 0 && memcmp(a + kAfterSequence, b + kAfterSequence, kOffCrc - kAfterSequence) == 0;
 }
 
+bool recordSealed(const uint8_t* b, uint32_t& sequence) {
+  if (memcmp(b + kOffMagic, kMagic.data(), kMagic.size()) != 0) return false;
+  if (get32(b + kOffCrc) != crc32(b, kOffCrc)) return false;
+  sequence = get32(b + kOffSequence);
+  return true;
+}
+
 EntryState classifyRecordEntry(const uint8_t* bytes) {
   RecordData scratch;
   if (decodeRecord(bytes, scratch)) return EntryState::Valid;

@@ -18,6 +18,12 @@ void faultInit();
 // True once faultInit() has run. The ECC recovery reads the fault record faultInit() loads.
 bool faultInitDone();
 
+struct RecordReadLimits;
+
+// The record store's read limits, kept in .cv_noinit beside the fault record so they outlive a
+// reset. A power-on leaves them random; RecordStore::useReadLimits() checks their seal.
+RecordReadLimits& faultRecordReadLimits();
+
 // The reset flags (RCC->RSR bits) of this boot, as the bootloader stored them in the boot block
 // (CvBootBlock::resetFlags, block version 2 and up). The bootloader reads and clears the register
 // and owns it, so the application never touches it. Valid after faultInit().

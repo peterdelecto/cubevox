@@ -77,6 +77,11 @@ bool decodeRecord(const uint8_t* bytes, RecordData& out);
 // writing the second would store nothing new.
 bool sameRecordContent(const uint8_t* a, const uint8_t* b);
 
+// True when the magic and the CRC are good, whatever the schema and the settings hold, and sets
+// `sequence`. Every schema keeps the magic, the sequence at byte 8 and the CRC over bytes 0 to 251,
+// so this also reads a record a later build wrote.
+bool recordSealed(const uint8_t* bytes, uint32_t& sequence);
+
 // One record-sized entry of a sector's append log.
 enum class EntryState : uint8_t { Blank, Valid, Torn };
 
