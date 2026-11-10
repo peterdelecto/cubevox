@@ -72,6 +72,16 @@ class Framer {
   uint32_t stray_ = 0;
 };
 
+// Bytes the serial reader takes in one loop() pass when no line event comes first.
+constexpr size_t kPollByteBudget = kMaxLine + 1;
+
+// True when the serial reader ends its loop() pass: after one line event (a line, a line too long or
+// a NUL) or after kPollByteBudget bytes. A host that keeps sending then cannot hold loop() in the
+// reader, and each reply drains before the next line is handled.
+constexpr bool pollPassDone(Framer::Kind kind, size_t bytesRead) {
+  return kind != Framer::Kind::None || bytesRead >= kPollByteBudget;
+}
+
 enum class Command : uint8_t { Hello, GetLayout, SetLayout, Status, EnterDfu, Bench };
 
 struct Request {

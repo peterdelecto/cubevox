@@ -22,7 +22,8 @@ StreamRecovery::Action StreamRecovery::update(uint32_t nowMs, bool fault, bool f
       ++restarts_;
       state_ = State::Running;
       return Action::Restart;
-    case State::Latched: break;
+    case State::Latched:
+    case State::Failed: break;
   }
   return Action::None;
 }

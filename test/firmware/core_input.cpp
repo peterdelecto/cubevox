@@ -528,6 +528,21 @@ void checkMutePowerOnWait() {
   check(out.xsmtHigh && out.muteNHigh, "mute: and MUTE_N follows after the XSMT lead");
 }
 
+// The power-on wait runs once. A release just after the millisecond counter wraps, 49.7 days on,
+// waits only the XSMT lead.
+void checkMuteClockWrap() {
+  MuteSequence m;
+  powerOnRelease(m);
+  const uint32_t mutedAt = 0xFFFF0000u;
+  runMute(m, mutedAt, mutedAt + kSwitchDebounceMs + kXsmtLeadMs, false);
+  check(m.fullyMuted(), "mute wrap: muted before the counter wraps");
+  const uint32_t releasedAt = 100;
+  MuteOutputs out = runMute(m, releasedAt, releasedAt + kSwitchDebounceMs, true);
+  check(out.xsmtHigh && !out.muteNHigh, "mute wrap: a release after the wrap raises XSMT");
+  out = m.update(releasedAt + kSwitchDebounceMs + kXsmtLeadMs, true);
+  check(out.muteNHigh, "mute wrap: MUTE_N follows after the XSMT lead, not the power-on wait");
+}
+
 // powerOnWait() holds from reset through the release and clears for good once Unmuted. When the
 // switch or a hold keeps the output muted, it clears at kRelayCloseAfterPowerOnMs instead.
 void checkMutePowerOnFlag() {
@@ -738,6 +753,7 @@ void checkInputLogic() {
   checkJackRequestWithdrawn();
   checkMuteSequence();
   checkMutePowerOnWait();
+  checkMuteClockWrap();
   checkMutePowerOnFlag();
   checkMuteLatchAndHold();
   checkMuteMidRelease();

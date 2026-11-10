@@ -55,8 +55,11 @@ How. A stuck DMA stream, a SAI error the stream did not ride through, a lock in 
 interrupt.
 Today. Eight overruns in a row drop the mute relay; the stream restarts, the mute holds, then opens.
 If no block finishes for 100 ms the stall watch mutes, writes DIAG.TXT, waits for the flash to be
-idle with no cap, and resets. Every reset then takes the power-on path, so the relay closes 6 s
-after the app starts.
+idle with no cap, and resets. A restart that fails leaves the stream down and the stall watch
+resets the box the same way. Every reset then takes the power-on path, so the relay closes 6 s
+after the app starts. A fourth fault inside a minute of three restarts latches the mute
+(owner 2026-10-24): the box stays silent, with the LED dark, until it is switched off and on.
+That latch has no bound.
 After. Warm restart. The reset cause in the boot block (`resetFlags`) with 5VA good decides the
 path. SFTRSTF, IWDG1RSTF or WWDG1RSTF is warm; PORRSTF, BORRSTF or PINRSTF is cold and keeps
 today's 6 s. On a warm restart `setup()` runs audio first (clocks, the record read, the engines,
@@ -118,7 +121,9 @@ Drill. 20 menu saves during `burn 300000`; `crash` during a save.
 
 ### F10. USB plugged or unplugged mid-song
 How. A host attaches or drops.
-Today. Handled in loop() below the audio interrupts.
+Today. Handled in loop(). The USB interrupt sits at level 1, above the block interrupt at 15,
+so USB traffic counts toward block time. The serial reader handles one line per loop() pass, so a host that
+keeps sending cannot hold loop() into the watchdog.
 After. Unchanged, drilled.
 Bound. No late block.
 Drill. Plug and unplug the host under load.
