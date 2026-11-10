@@ -54,12 +54,16 @@ Drill. `nan <slot>`.
 How. A stuck DMA stream, a SAI error the stream did not ride through, a lock in the block
 interrupt.
 Today. Eight overruns in a row drop the mute relay; the stream restarts, the mute holds, then opens.
-If no block finishes for 100 ms the stall watch mutes, writes DIAG.TXT, waits for the flash to be
-idle with no cap, and resets. A restart that fails leaves the stream down and the stall watch
-resets the box the same way. Every reset then takes the power-on path, so the relay closes 6 s
-after the app starts. A fourth fault inside a minute of three restarts latches the mute
-(owner 2026-10-24): the box stays silent, with the LED dark, until it is switched off and on.
-That latch has no bound.
+At most three restarts fit in any minute. Three cases reset the box, all by one path
+(`faultAudioWatch`): a fourth fault inside a minute of three restarts (owner 2026-11-10), a
+restart that fails, and a stall, where no block finishes for 100 ms. The box mutes at once, writes
+one `audio` entry whose fault text names the cause (`repeated stream faults`, `stream restart
+failed`, `audio stalled`), waits for the flash to be idle with no cap, and resets. Every reset then
+takes the power-on path, so the relay closes 6 s after the app starts. A start that does not run
+audio for 5 s counts as a failed start, so a stream that faults past the budget inside 5 s of every
+start ends on the third start in "Startup failed." (update mode, until the power is cycled). A stream
+that runs longer than 5 s before it faults resets the box again and again, with the 6 s gap each
+time.
 After. Warm restart. The reset cause in the boot block (`resetFlags`) with 5VA good decides the
 path. SFTRSTF, IWDG1RSTF or WWDG1RSTF is warm; PORRSTF, BORRSTF or PINRSTF is cold and keeps
 today's 6 s. On a warm restart `setup()` runs audio first (clocks, the record read, the engines,

@@ -1,7 +1,7 @@
 // When the audio stream restarts after a fault, pure. A fault holds the mute, the stream restarts
 // once the output is fully muted, and the mute releases after the usual settle. At most
-// kRestartsPerWindow restarts fit in any kRestartWindowMs; a fault past that latches the mute until
-// reset. A restart that fails leaves the stream down, and the stall watch resets the box.
+// kRestartsPerWindow restarts fit in any kRestartWindowMs. A fault past that, or a restart that
+// fails, resets the box onto the power-on path (owner 2026-11-10).
 
 #pragma once
 
@@ -17,28 +17,27 @@ class StreamRecovery {
   enum class Action : uint8_t {
     None,
     Restart,  // restart the stream now, then clear the fault
-    Latch,    // latch the mute and report; nothing restarts after this
+    Reset,    // reset the box; nothing restarts after this
   };
 
   // Call every loop pass. `fault` is true while a fault waits for its restart; `fullyMuted` is
   // whether the output is muted.
   Action update(uint32_t nowMs, bool fault, bool fullyMuted);
 
-  // The restart did not bring the stream back. Nothing restarts after this, and the stream is not
-  // latched, so the stall watch stays armed and resets the box.
-  void fail() { state_ = State::Failed; }
+  // The restart did not bring the stream back. Returns Reset; nothing restarts after this.
+  Action fail() {
+    state_ = State::Resetting;
+    return Action::Reset;
+  }
 
   // True from a fault until its restart, so the caller holds the mute.
   bool holdMute() const { return state_ == State::Waiting; }
-
-  // A fault past the restart budget latched the mute. The stall watch stands down.
-  bool latched() const { return state_ == State::Latched; }
 
   // Restarts since boot.
   uint32_t restarts() const { return restarts_; }
 
  private:
-  enum class State : uint8_t { Running, Waiting, Latched, Failed };
+  enum class State : uint8_t { Running, Waiting, Resetting };
 
   bool budgetLeft(uint32_t nowMs) const;
 

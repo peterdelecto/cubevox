@@ -119,7 +119,7 @@ void checkLedCurve() {
   check(near(loadLedLevel(0, 0, true, kLoadLedNoTrouble), 1.0f), "led: a zero limit reads full, not a divide by zero");
 }
 
-// Audio stopped, stalled or latched keeps the LED dark whatever the load or a recent late block.
+// Audio stopped or stalled keeps the LED dark whatever the load or a recent late block.
 void checkLedDark() {
   check(near(calm(0, false), 0.0f) && near(calm(50, false), 0.0f) && near(calm(999, false), 0.0f),
         "led: audio not live is dark at any load");

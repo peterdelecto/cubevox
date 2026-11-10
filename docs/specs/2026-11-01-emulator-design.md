@@ -107,8 +107,8 @@ Bottom band: the source switch at the left and the version under it.
    duty is linear in light and the eye reads light on roughly a square-root scale, so a duty
    that goes with the square of the load looks like an even climb.
 4. A late, dry or overrun block holds the LED full for 100 ms, so a box in trouble shows it at
-   low load too. The LED is dark while audio is not running, has stalled, or is latched after a
-   fault, and the flash does not light it then.
+   low load too. The LED is dark while audio is not running or has stalled, and the flash does
+   not light it then.
 5. The rule is `loadLedLevel(meanPercent, limitPercent, audioLive, msSinceTrouble)` in
    `core/load_led.h`, which returns the level 0..1 and is shared by the box and the emulator.
    `BlockTroubleClock` turns the running count of late, dry and overrun blocks

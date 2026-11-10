@@ -20,8 +20,9 @@ void diagPoll();
 // Queues the entry for a request to enter update mode, with the live uptime and counters.
 void diagNoteUpdateRequest();
 
-// Queues the entry for an audio fault: a stream restart, a latched mute or a stall.
-void diagNoteAudioFault();
+// Queues the entry for an audio fault: a stream restart, a fault past the restart budget, a failed
+// restart or a stall. The entry's fault text is `cause`, which DIAG.TXT prints in that field.
+void diagNoteAudioFault(const char* cause);
 
 // True while an entry is queued or being written.
 bool diagBusy();

@@ -378,8 +378,8 @@ lines of 21 characters; the extension `uf2` never appears on screen because the 
    across erases. The two share one flash controller, so each waits while the other erases.
    1. The application queues one entry at boot whenever the reset cause is not power-on alone, a
       fault record is present, or the option byte step failed. It queues one entry (`update`) when
-      it requests update mode, and one (`audio`) for every audio fault: a stream restart, a mute
-      the audio module latched, or a stall.
+      it requests update mode, and one (`audio`) for every audio fault: a stream restart, a fault
+      past the restart budget, a failed restart, or a stall. Its fault text names which.
    2. An entry carries the firmware version, the uptime (unknown at boot), the reset flags, the
       fault record as kind, pc, lr, cfsr and bfar (or the clock step that failed), the boot-fail
       count, the bootloader's last reason and fault address, the option byte step's result, and
