@@ -114,4 +114,4 @@ stays on the box for good; lip on three walls, rear skirt short; 68D TPU, not PE
 
 ## Status
 
-Spec written 2026-11-05 from the owner's answers and the Fusion model. Not built.
+Spec written 2026-11-05 from the owner's answers and the Fusion model. Not built. Superseded whole by `2026-11-07-protector-design.md` (owner 2026-11-07).
