@@ -1,5 +1,5 @@
 // Growl card checks: off is a bit-exact copy, the voice drops an octave, the wave's depth falls without
-// a pitch, the throat follows each syllable and rests in silence, MIX 100 % is the plain card and MIX 0 is
+// a pitch, the throat follows each syllable, plucks on a soft note and rests in silence, MIX 100 % is the plain card and MIX 0 is
 // the input at the voice's lag, the output stays finite at every knob corner, the level at the default
 // (GROWL 75 %, MIX 100 %) on Adam's clips, and the fold's alias level at DRIVE 100 % on a sung note. GROWL 0
 // is pinned by hash, the peak reads +10 dB at 2.5 kHz at GROWL 100 %, the lopsided clip lifts the fold's 2nd
@@ -279,23 +279,34 @@ ThroatTrace traceThroat(const Signal& in, const cv::GrowlParams& g) {
 constexpr double kNoteSec = 1.5;
 constexpr double kRestSec = 1.2;
 
-Signal noteThenSilence() {
+// A soft note's RMS: its peaks sit about 5 dB over it, inside the drive's window and under its 0.5 onset at
+// the default SENSITIVITY (the window runs -30 to -18 dBFS).
+constexpr double kSoftNoteDbfs = -32.0;
+
+Signal noteThenSilence(double dbfs = -14.0) {
   Signal in(static_cast<size_t>(0.3 * kRate), 0.0f);
-  const Signal note = sungNote(220.0, kNoteSec, -14.0);
+  const Signal note = sungNote(220.0, kNoteSec, dbfs);
   in.insert(in.end(), note.begin(), note.end());
   in.insert(in.end(), static_cast<size_t>(kRestSec * kRate), 0.0f);
   return in;
 }
 
-// GROWL 0: the throat stays at -5 st through a note. GROWL 100 %: an onset drops the throat to within
-// 0.05 st of -12 st, and it is back at -5 st within DECAY while the note holds. Both are the throat the
-// sweep asks for. The voice plays it through the 20 ms glide, which comes within 0.05 st of -5 st again
+// The deepest throat the GROWL pot reaches: the engine's rasp tops at kGrowlRaspTop, so -5 - 7 x 0.8 st.
+float throatAtPotTop() {
+  const cv::GrowlTuning t;
+  return t.formantSt + t.throatDropTop * cv::kGrowlRaspTop;
+}
+
+// GROWL 0: the throat stays at -5 st through a note. The GROWL pot at 100 %: an onset drops the throat to
+// within 0.05 st of -10.6 st, and it is back at -5 st within DECAY while the note holds. Both are the throat
+// the sweep asks for. The voice plays it through the 20 ms glide, which comes within 0.05 st of -5 st again
 // 100 ms after the return.
 bool checkThroat() {
   const Signal in = noteThenSilence();
   const size_t noteEnd = static_cast<size_t>((0.3 + kNoteSec) * kRate) / cv::kBlock;
   const float rest = cv::GrowlTuning{}.formantSt;
   const float decayBlocks = cv::GrowlTuning{}.decayMs * cv::kSmpPerMs / cv::kBlock;
+  const float deepest = throatAtPotTop();
 
   const ThroatTrace flat = traceThroat(in, growlAt(0.0f, 0.5f));
   float flatWorst = 0.0f;
@@ -304,7 +315,7 @@ bool checkThroat() {
   }
   const bool flatOk = flatWorst < 1e-4f;
 
-  const ThroatTrace deep = traceThroat(in, growlAt(1.0f, 0.5f));
+  const ThroatTrace deep = traceThroat(in, potAt(1.0f, 1.0f));
   float low = 0.0f, lowGlided = 0.0f;
   size_t lowAt = 0;
   for (size_t b = 0; b < noteEnd; ++b) {
@@ -327,35 +338,64 @@ bool checkThroat() {
   for (size_t b = holdFrom; b < noteEnd; ++b) heldWorst = std::fmax(heldWorst, std::fabs(deep.glided[b] - rest));
   char detail[200];
   std::snprintf(detail, sizeof detail,
-                "GROWL 0 holds %.4f st off -5; GROWL 100 %% drops to %.3f st (glided %.2f), back at -5 after %.0f ms (<= %.0f), "
-                "then %.3f st off -5",
-                static_cast<double>(flatWorst), static_cast<double>(low), static_cast<double>(lowGlided),
-                static_cast<double>(returnBlocks * cv::kBlock / cv::kSmpPerMs),
+                "GROWL 0 holds %.4f st off -5; the pot at 100 %% drops to %.3f st (%.2f, glided %.2f), back at -5 after %.0f ms "
+                "(<= %.0f), then %.3f st off -5",
+                static_cast<double>(flatWorst), static_cast<double>(low), static_cast<double>(deepest),
+                static_cast<double>(lowGlided), static_cast<double>(returnBlocks * cv::kBlock / cv::kSmpPerMs),
                 static_cast<double>((decayBlocks + 1.0f + 15.0f * cv::kSmpPerMs / cv::kBlock) * cv::kBlock / cv::kSmpPerMs),
                 static_cast<double>(heldWorst));
-  const bool deepOk = low < -12.0f + 0.05f && lowGlided > -12.05f && backAt > lowAt &&
+  const bool deepOk = low < deepest + 0.05f && lowGlided > deepest - 0.05f && backAt > lowAt &&
                       returnBlocks <= decayBlocks + 1.0f + 15.0f * cv::kSmpPerMs / cv::kBlock && heldWorst < 0.05f;
   return report("throat follows syllable", flatOk && deepOk, detail);
 }
 
-// The depth at a knob setting: the deepest throat the sweep asks for on the note, measured for the report.
+// The depth at a GROWL pot position: the deepest throat the sweep asks for on the note, -5 - 7 x 0.8 x pot st.
 bool checkThroatDepth() {
   const Signal in = noteThenSilence();
   const size_t noteEnd = static_cast<size_t>((0.3 + kNoteSec) * kRate) / cv::kBlock;
   char detail[200] = "";
   bool ok = true;
   size_t used = 0;
-  for (const float growl : {0.25f, 0.5f, 1.0f}) {
-    const ThroatTrace t = traceThroat(in, growlAt(growl, 0.5f));
+  for (const float pot : {0.25f, 0.5f, 1.0f}) {
+    const ThroatTrace t = traceThroat(in, potAt(pot, 1.0f));
     float low = 0.0f;
     for (size_t b = 0; b < noteEnd; ++b) low = std::fmin(low, t.target[b]);
-    const float want = -5.0f - 7.0f * growl;
+    const float want = -5.0f - 7.0f * cv::kGrowlRaspTop * pot;
     ok = ok && std::fabs(low - want) < 0.05f;
     used += static_cast<size_t>(std::snprintf(detail + used, sizeof detail - used, "GROWL %.0f %%: %.2f st (%.2f); ",
-                                              static_cast<double>(growl * 100.0f), static_cast<double>(low),
+                                              static_cast<double>(pot * 100.0f), static_cast<double>(low),
                                               static_cast<double>(want)));
   }
   return report("throat depth per GROWL", ok, detail);
+}
+
+// A soft note whose drive stays under the 0.5 onset at the default SENSITIVITY: the note's first block with
+// a drive above 0 starts the sweep, so the throat dips and is back within 0.05 st of -5 st from DECAY after
+// that block while the note holds, the voice within 0.05 st five glide times later.
+bool checkThroatSoftNote() {
+  const Signal in = noteThenSilence(kSoftNoteDbfs);
+  const size_t noteEnd = static_cast<size_t>((0.3 + kNoteSec) * kRate) / cv::kBlock;
+  const size_t decayBlocks = static_cast<size_t>(cv::GrowlTuning{}.decayMs * cv::kSmpPerMs / cv::kBlock) + 1;
+  const size_t glideBlocks = static_cast<size_t>(100 * cv::kSmpPerMs / cv::kBlock);
+  const float rest = cv::GrowlTuning{}.formantSt;
+  const ThroatTrace t = traceThroat(in, potAt(1.0f, 1.0f));
+  size_t start = 0;
+  while (start < noteEnd && !(t.sweep[start] > 0.0f)) ++start;
+  float sweepPeak = 0.0f, dip = rest, held = 0.0f, heldGlided = 0.0f;
+  for (size_t b = start; b < noteEnd; ++b) {
+    sweepPeak = std::fmax(sweepPeak, t.sweep[b]);
+    dip = std::fmin(dip, t.target[b]);
+    if (b >= start + decayBlocks) held = std::fmax(held, std::fabs(t.target[b] - rest));
+    if (b >= start + decayBlocks + glideBlocks) heldGlided = std::fmax(heldGlided, std::fabs(t.glided[b] - rest));
+  }
+  char detail[200];
+  std::snprintf(detail, sizeof detail,
+                "sweep peak %.3f (< 0.5), dips to %.2f st, after DECAY %.4f st off -5, the voice %.4f st (<= 0.05)",
+                static_cast<double>(sweepPeak), static_cast<double>(dip), static_cast<double>(held),
+                static_cast<double>(heldGlided));
+  return report("throat plucks on a soft note", sweepPeak > 0.0f && sweepPeak < 0.5f && dip < rest - 0.5f &&
+                                                    held < 0.05f && heldGlided < 0.05f,
+                detail);
 }
 
 // After the note the throat rests at -5 st and the sweep reads 0. Room noise 50 dB under full scale
@@ -1286,6 +1326,7 @@ int main() {
   ok &= checkDepthFade();
   ok &= checkThroat();
   ok &= checkThroatDepth();
+  ok &= checkThroatSoftNote();
   ok &= checkThroatSilence();
   ok &= checkThroatTuning();
   ok &= checkCorners(voices);

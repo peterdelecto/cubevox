@@ -476,6 +476,88 @@ void checkScopeAheadOfPolish() {
   check(same && outputsDiffer, "scope ring: a POLISH COMP setting that changes the output leaves the ring the same");
 }
 
+// The default layout with every knob at 0.5 and the toggles as given, polish stages off.
+ChainSnapshot defaultWith(const Layout& layout, const std::array<bool, kSlotCount>& on) {
+  PanelReading panel;
+  panel.toggle = on;
+  for (auto& slot : panel.knob) slot.fill(0.5f);
+  return composeSnapshot(layout, panel, Settings(), BenchOverrides());
+}
+
+int slotOf(const Layout& layout, Card c) {
+  for (int s = 0; s < kSlotCount; ++s) {
+    if (layout.card[static_cast<size_t>(s)] == c) return s;
+  }
+  return -1;
+}
+
+// Fills the Reverb with a tone, switches it off and lets every other tail die on silence.
+void fillThenStopReverb(BlockFlow& flow, Rig& rig, const ChainSnapshot& on, const ChainSnapshot& off) {
+  const Block silence{};
+  for (int b = 0; b < 400; ++b) play(flow, rig, on, tone(b, 0.5f));
+  for (int b = 0; b < 10; ++b) play(flow, rig, off, tone(b, 0.5f));
+  for (int b = 0; b < 3000; ++b) play(flow, rig, off, silence);
+}
+
+double energy(const Block& x) {
+  double e = 0.0;
+  for (float v : x) e += static_cast<double>(v) * static_cast<double>(v);
+  return e;
+}
+
+// A Reverb switched off keeps its tail frozen. Switched on again it starts from silence, by a plain
+// toggle and by a toggle that goes on while a layout change in another slot fades out.
+void checkSwapClearsReengaged() {
+  const Layout base = defaultLayout();
+  const int reverb = slotOf(base, Card::ReverbSpring);
+  const int distortion = slotOf(base, Card::Distortion);
+  check(reverb >= 0 && distortion >= 0, "swap: the default layout holds Spring Reverb and Distortion");
+  if (reverb < 0 || distortion < 0) return;
+  std::array<bool, kSlotCount> allOn{};
+  allOn.fill(true);
+  std::array<bool, kSlotCount> reverbOff = allOn;
+  reverbOff[static_cast<size_t>(reverb)] = false;
+  Layout next = base;
+  next.card[static_cast<size_t>(distortion)] = Card::Lofi;
+  const ChainSnapshot on = defaultWith(base, allOn);
+  const ChainSnapshot off = defaultWith(base, reverbOff);
+  const ChainSnapshot swapped = defaultWith(next, allOn);
+  const Block silence{};
+
+  Rig plainRig;
+  BlockFlow plainFlow;
+  fillThenStopReverb(plainFlow, plainRig, on, off);
+  double plain = 0.0;
+  for (int b = 0; b < 100; ++b) plain += energy(play(plainFlow, plainRig, on, silence).out);
+
+  Rig swapRig;
+  BlockFlow swapFlow;
+  fillThenStopReverb(swapFlow, swapRig, on, off);
+  ChainSnapshot held = off;
+  bool pending = true;
+  int afterSwap = 0;
+  double across = 0.0;
+  for (int b = 0; b < 200 && afterSwap < 100; ++b) {
+    const BlockFlow::Start start = swapFlow.begin(false, pending);
+    if (start.fade.swap) {
+      swapFlow.adopt(held, swapped);
+      held = swapped;
+      pending = false;
+    }
+    Block a = silence;
+    Block scratch{};
+    Block out{};
+    swapFlow.run(swapRig.engines, held, start, a.data(), scratch.data(), false, StillClock(),
+                 [&out](int i, float v) { out[static_cast<size_t>(i)] = v; });
+    if (!pending) {
+      across += energy(out);
+      ++afterSwap;
+    }
+  }
+  check(afterSwap == 100 && plain < 1e-9 && across < 1e-9,
+        "swap: a Reverb toggled on across a layout swap starts from silence, as a plain toggle does");
+}
+
 }  // namespace
 
 void checkBlockTail() {
@@ -491,4 +573,5 @@ void checkBlockTail() {
   checkDiscardCuts();
   checkScopeRingAdvances();
   checkScopeAheadOfPolish();
+  checkSwapClearsReengaged();
 }
