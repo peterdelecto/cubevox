@@ -268,7 +268,7 @@ void Menu::onTurn(int32_t detents) {
 
 UiAction Menu::update(const UiInput& in, uint32_t nowMs) {
   if (!listening_) return UiAction::None;
-  if (in.detents != 0 || in.click || in.hold) lastActivityMs_ = nowMs;
+  if (in.detents != 0 || in.click || in.hold || in.press) lastActivityMs_ = nowMs;
   if (in.detents != 0) onTurn(in.detents);
   const UiAction action = in.click ? onClick() : UiAction::None;
   if (in.hold) onHold();

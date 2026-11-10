@@ -42,9 +42,12 @@ void checkMenuButton() {
   MenuButton b;
   b.reset(false);
   uint32_t t = 1000;
-  check(!b.update(true, t).click && !b.update(true, t + 5).hold, "menu button: the press itself is not a click");
-  MenuButtonEvent ev = b.update(false, t + 100);
-  check(ev.click && !ev.hold, "menu button: a short press is a click on the release");
+  MenuButtonEvent ev = b.update(true, t);
+  check(ev.press && !ev.click, "menu button: the down edge is a press, not a click");
+  ev = b.update(true, t + 5);
+  check(!ev.press && !ev.hold, "menu button: the press comes once while the button stays down");
+  ev = b.update(false, t + 100);
+  check(ev.click && !ev.hold && !ev.press, "menu button: a short press is a click on the release");
   ev = b.update(false, t + 200);
   check(!ev.click && !ev.hold, "menu button: and the click comes once");
 
@@ -81,10 +84,11 @@ void checkMenuButton() {
   MenuButton down;
   down.reset(true);
   ev = down.update(true, 100000);
-  check(!ev.hold && !ev.click, "menu button: a button already down at start reports no hold");
+  check(!ev.hold && !ev.click && !ev.press, "menu button: a button already down at start reports no hold and no press");
   ev = down.update(false, 100010);
-  check(!ev.click, "menu button: and no click when it is released");
-  down.update(true, 100100);
+  check(!ev.click && !ev.press, "menu button: and no click when it is released");
+  ev = down.update(true, 100100);
+  check(ev.press, "menu button: the next press reports its down edge");
   ev = down.update(false, 100150);
   check(ev.click, "menu button: and the next press is a click");
 }
@@ -528,6 +532,21 @@ void checkMutePowerOnWait() {
   check(out.xsmtHigh && out.muteNHigh, "mute: and MUTE_N follows after the XSMT lead");
 }
 
+// The power-on wait runs once. A release just after the millisecond counter wraps, 49.7 days on,
+// waits only the XSMT lead.
+void checkMuteClockWrap() {
+  MuteSequence m;
+  powerOnRelease(m);
+  const uint32_t mutedAt = 0xFFFF0000u;
+  runMute(m, mutedAt, mutedAt + kSwitchDebounceMs + kXsmtLeadMs, false);
+  check(m.fullyMuted(), "mute wrap: muted before the counter wraps");
+  const uint32_t releasedAt = 100;
+  MuteOutputs out = runMute(m, releasedAt, releasedAt + kSwitchDebounceMs, true);
+  check(out.xsmtHigh && !out.muteNHigh, "mute wrap: a release after the wrap raises XSMT");
+  out = m.update(releasedAt + kSwitchDebounceMs + kXsmtLeadMs, true);
+  check(out.muteNHigh, "mute wrap: MUTE_N follows after the XSMT lead, not the power-on wait");
+}
+
 // powerOnWait() holds from reset through the release and clears for good once Unmuted. When the
 // switch or a hold keeps the output muted, it clears at kRelayCloseAfterPowerOnMs instead.
 void checkMutePowerOnFlag() {
@@ -738,6 +757,7 @@ void checkInputLogic() {
   checkJackRequestWithdrawn();
   checkMuteSequence();
   checkMutePowerOnWait();
+  checkMuteClockWrap();
   checkMutePowerOnFlag();
   checkMuteLatchAndHold();
   checkMuteMidRelease();

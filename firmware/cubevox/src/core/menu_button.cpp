@@ -5,6 +5,7 @@ MenuButtonEvent MenuButton::update(bool down, uint32_t nowMs) {
   if (down && !down_) {
     pressedAtMs_ = nowMs;
     spent_ = false;
+    ev.press = true;
   } else if (down && !spent_ && nowMs - pressedAtMs_ >= kMenuHoldMs) {
     ev.hold = true;
     spent_ = true;

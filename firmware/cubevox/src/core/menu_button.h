@@ -1,6 +1,6 @@
 // Tells a click from a hold on the MENU button. A press that ends before kMenuHoldMs is a click,
 // reported on the release. A press that reaches kMenuHoldMs is a hold, reported once at that moment,
-// and its release reports nothing.
+// and its release reports nothing. Every press reports its down edge as `press`.
 
 #pragma once
 
@@ -11,6 +11,7 @@
 struct MenuButtonEvent {
   bool click = false;
   bool hold = false;
+  bool press = false;  // the button went down this pass
 };
 
 class MenuButton {

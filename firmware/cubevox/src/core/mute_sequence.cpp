@@ -8,6 +8,7 @@ void MuteSequence::reset(bool switchReleased, uint32_t nowMs) {
   held_ = false;
   tripped_ = false;
   powerOnWait_ = true;
+  powerOnDone_ = false;
   enter(State::Muted, nowMs);
 }
 
@@ -24,9 +25,11 @@ MuteOutputs MuteSequence::outputs() const {
 
 MuteOutputs MuteSequence::update(uint32_t nowMs, bool switchReleased) {
   switch_.update(switchReleased, nowMs, kSwitchDebounceMs);
+  // The power-on wait ends once, so a millisecond counter that wraps never starts it again.
+  if (nowMs - resetMs_ >= kRelayCloseAfterPowerOnMs) powerOnDone_ = true;
   if (tripped_) {
     if (state_ != State::Muted) enter(State::Muted, nowMs);  // the pins are low already
-    endPowerOnWait(nowMs);
+    endPowerOnWait();
     return outputs();
   }
   const uint32_t elapsed = nowMs - sinceMs_;
@@ -38,7 +41,7 @@ MuteOutputs MuteSequence::update(uint32_t nowMs, bool switchReleased) {
     case State::Unmuting:
       if (muteWanted()) {
         enter(State::Muted, nowMs);  // MUTE_N is still low, so dropping XSMT again is silent
-      } else if (elapsed >= kXsmtLeadMs && relayMayClose(nowMs)) {
+      } else if (elapsed >= kXsmtLeadMs && powerOnDone_) {
         enter(State::Releasing, nowMs);
       }
       break;
@@ -56,6 +59,6 @@ MuteOutputs MuteSequence::update(uint32_t nowMs, bool switchReleased) {
       if (elapsed >= kXsmtLeadMs) enter(State::Muted, nowMs);
       break;
   }
-  endPowerOnWait(nowMs);
+  endPowerOnWait();
   return outputs();
 }

@@ -145,8 +145,11 @@ void checkTroubleClock() {
   check(c.sinceMs(1050) == kLoadLedNoTrouble, "trouble: an unchanged count is none");
   c.note(8, 1100);
   check(c.sinceMs(1100) == 0 && c.sinceMs(1150) == 50, "trouble: a count that rose is timed from the pass that saw it");
-  c.note(8, 1200);
-  check(c.sinceMs(1200) == 100, "trouble: it keeps counting while the count holds");
+  c.note(8, 1199);
+  check(c.sinceMs(1199) == 99, "trouble: it keeps counting while the count holds");
+  c.note(8, 1100 + kLoadLedFlashMs);
+  check(c.sinceMs(1100 + kLoadLedFlashMs) == kLoadLedNoTrouble, "trouble: it reads none once the flash has run");
+  check(c.sinceMs(1100) == kLoadLedNoTrouble, "trouble: the flash does not come back when the counter wraps");
   c.note(5, 1300);
   check(c.sinceMs(1300) == 0, "trouble: a count that fell, as a peaks reset does, also restarts it");
   BlockTroubleClock w;

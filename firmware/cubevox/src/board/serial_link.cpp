@@ -9,7 +9,8 @@ namespace {
 
 // The core's CDC receive queue must hold every byte that arrives during one loop() pass. When it
 // fills, the core arms a zero-length receive and the next packet wraps the queue, which drops or
-// replays up to a queue's worth of bytes. Two full requests fit; build.sh sets the packet count.
+// replays up to a queue's worth of bytes. A pass reads at most one request (protocol::pollPassDone),
+// so the queue holds the one waiting and the one arriving; build.sh sets the packet count.
 static_assert(CDC_RECEIVE_QUEUE_BUFFER_SIZE >= 2 * protocol::kMaxLine,
               "raise CDC_RECEIVE_QUEUE_BUFFER_PACKET_NUMBER in build.sh to hold two maximum-length requests");
 
@@ -85,8 +86,12 @@ bool serialFlush(uint32_t timeoutMs) {
 void serialLinkSessionStart() { gFramer.reset(); }
 
 void serialLinkPoll(uint32_t nowMs, LineHandler onLine) {
-  while (Serial.available() > 0) {
-    switch (gFramer.feed(static_cast<uint8_t>(Serial.read()))) {
+  size_t bytesRead = 0;
+  protocol::Framer::Kind kind = protocol::Framer::Kind::None;
+  while (!protocol::pollPassDone(kind, bytesRead) && Serial.available() > 0) {
+    kind = gFramer.feed(static_cast<uint8_t>(Serial.read()));
+    ++bytesRead;
+    switch (kind) {
       case protocol::Framer::Kind::Line: onLine(gFramer.line(), nowMs); break;
       case protocol::Framer::Kind::TooLong: replyTooLong(); break;
       case protocol::Framer::Kind::BadByte: protocol::replyError(gWriter, 0, "line contains a NUL byte"); break;

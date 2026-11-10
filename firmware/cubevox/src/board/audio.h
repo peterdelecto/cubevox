@@ -39,12 +39,14 @@ bool audioInit();
 enum class AudioEvent : uint8_t {
   None,
   Restarted,  // a fault stopped the stream and it runs again; the mute releases after the settle
-  Latched,    // a fault past the restart budget, or a restart that failed: muted until reset
+  Latched,        // a fault past the restart budget: muted until reset
+  RestartFailed,  // the restart did not bring the stream back: muted, and the stall watch resets the box
 };
 
 // Call every loop pass. A fault that stopped the stream (a DMA error, a SAI frame-sync or clock
 // error) or kept the block interrupt a ring behind holds the mute; once the output is fully muted
-// the stream restarts, at most three times in any minute. Prints one line per restart or latch.
+// the stream restarts, at most three times in any minute. Prints one line per restart, latch or
+// failed restart.
 AudioEvent audioPoll(uint32_t nowMs);
 
 // The "[boot] audio ..." line, or the "[ERROR] audio: ..." line when audioInit failed. Also reports
@@ -64,7 +66,7 @@ struct AudioHealth {
   uint32_t overruns = 0;   // blocks never started before their half came round again
   uint32_t restarts = 0;   // stream restarts after a fault
   uint32_t nanBlocks = 0;  // blocks discarded before the polish stages for a NaN or an infinity
-  bool latched = false;    // a fault past the restart budget, or a failed restart, latched the mute
+  bool latched = false;    // a fault past the restart budget latched the mute
 };
 AudioHealth audioHealth();
 
