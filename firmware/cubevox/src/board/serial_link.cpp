@@ -7,10 +7,9 @@
 
 namespace {
 
-// The core's CDC receive queue must hold every byte that arrives during one loop() pass. When it
-// fills, the core arms a zero-length receive and the next packet wraps the queue, which drops or
-// replays up to a queue's worth of bytes. A pass reads at most one request (protocol::pollPassDone),
-// so the queue holds the one waiting and the one arriving; build.sh sets the packet count.
+// A full CDC receive queue makes the host wait until loop() reads (board/cdc_receive.cpp). A pass
+// reads at most one request (protocol::pollPassDone), so a queue that holds the one waiting and the
+// one arriving keeps a steady sender from waiting on every pass; build.sh sets the packet count.
 static_assert(CDC_RECEIVE_QUEUE_BUFFER_SIZE >= 2 * protocol::kMaxLine,
               "raise CDC_RECEIVE_QUEUE_BUFFER_PACKET_NUMBER in build.sh to hold two maximum-length requests");
 

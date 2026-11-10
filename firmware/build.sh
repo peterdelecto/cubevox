@@ -149,9 +149,8 @@ python3 -I "$REPO/tools/bench_ops_check.py"
 # "board/x.h", "ui/x.h" from cubevox/src; the font editor's export as "cubevox_fonts.h".
 INC="-I$REPO -I$FW/cubevox/src -I$REPO/tools/font-editor/fonts"
 # The box is self-powered: the USB configuration descriptor says so (spec 2026-10-08 step 0).
-# The core's CDC receive queue must hold every byte that arrives during one loop() pass. When it
-# fills, the core arms a zero-length receive and the next packet wraps the queue, which drops or
-# replays up to a queue's worth of bytes. 32 packets (2 KB) hold two 768-byte requests.
+# A full CDC receive queue makes the host wait until loop() reads (board/cdc_receive.cpp).
+# 32 packets (2 KB) hold two 768-byte requests, so a steady sender rarely waits.
 # arduino-cli hands the quotes of CUBEVOX_FW_VERSION to the compiler as they stand, so one level
 # of escaping makes the macro a string literal. A second level put quote characters in the string.
 DEFS="-DUSBD_SELF_POWERED=1 -DCDC_RECEIVE_QUEUE_BUFFER_PACKET_NUMBER=32 -DCUBEVOX_FW_VERSION=\"$VERSION\""

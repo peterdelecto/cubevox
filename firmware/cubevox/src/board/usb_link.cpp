@@ -2,6 +2,7 @@
 
 #include <Arduino.h>
 
+#include "board/cdc_receive.h"
 #include "board/pins.h"
 #include "core/debounce.h"
 
@@ -41,6 +42,7 @@ void usbLinkPoll(uint32_t nowMs) {
   if (wanted == gStarted) return;
 
   if (wanted) {
+    cdcReceiveInstall();
     Serial.begin();  // USBD init holds SDIS, USBD_Start clears it
   } else {
     Serial.end();  // HAL_PCD_Stop sets SDIS before the device is torn down

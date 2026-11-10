@@ -28,6 +28,7 @@ report) and from DIAG.TXT on the update drive, so it needs the bootloader, and t
   ./bringup.py --board 1                 # USB checks, then the manual questions
   ./bringup.py --board 1 --faults --dfu  # also the fault drill and the BOOT0 ROM DFU entry (reflashes)
   ./bringup.py --board 1 --panel         # also the panel walk: pots, toggles, K103, mute, OLED
+  ./bringup.py --board 1 --flood         # also 10 s of status requests at full speed, then a hello
   ./bringup.py --board 1 --faults --update   # also the update drills; log board-1.md
   ./bringup.py --board 1 --stream-faults --no-prompt   # the stream fault drills, hands-free
 """
@@ -40,6 +41,7 @@ import functools
 import importlib.util
 import os
 import re
+import select
 import shutil
 import struct
 import subprocess
@@ -221,6 +223,40 @@ def check_audio(log, port, seconds=20.0):
               f"{rate:.1f} blocks/s against {BLOCK_RATE_HZ:.0f} blocks/s ({err:+.2f} %)")
     log.check("late blocks and overruns", b[2] == 0 and b[3] == 0,
               f"{b[2]} late, {b[3]} overruns in {b[1]} blocks")
+
+
+FLOOD_S = 10
+FLOOD_ID = 900
+FLOOD_REQUEST = b'{"id":900,"cmd":"status"}\n'
+FLOOD_BATCH = 64
+
+
+def flood_drill(log, port):
+    """Status requests as fast as the port takes them for FLOOD_S, then a hello. The box answers in every
+    second of the flood and after it; a receive path that sticks under a full queue answers nothing.
+    Requests go out in batches, so the box's receive queue fills and the host waits on it."""
+    per_second = [0] * FLOOD_S
+    written = 0
+    pending = b""
+    start = time.monotonic()
+    while (now := time.monotonic()) - start < FLOOD_S:
+        pending = pending or FLOOD_REQUEST * FLOOD_BATCH
+        if select.select([], [port.fd], [], 0.01)[1]:
+            try:
+                n = os.write(port.fd, pending)
+                pending = pending[n:]
+                written += n
+            except BlockingIOError:
+                pass
+        while (line := port.read_line(0.001)) is not None:
+            if line.startswith(f'{{"id":{FLOOD_ID},'):
+                per_second[min(int(now - start), FLOOD_S - 1)] += 1
+    port.read(2.0)  # the replies still on their way
+    log.check("serial flood: replies every second", min(per_second) > 0,
+              f"{written // len(FLOOD_REQUEST)} requests in {FLOOD_S} s, replies per second {per_second}")
+    reply = port.ask("hello", 3.0)
+    log.check("serial flood: hello after it", reply is not None and "_unparsed" not in reply,
+              "answered" if reply else "no reply in 3 s")
 
 
 PANEL_POT = re.compile(r"^\[panel\] (raw )?pot (\d+) slot (\d) ([AB]) (\d\.\d\d)")
@@ -1554,6 +1590,7 @@ def main():
                     help="drill stream fault restarts, the reset past the budget and a failed restart (needs the bootloader)")
     ap.add_argument("--dfu", action="store_true", help="drill ROM DFU entry by BOOT0 and flash back over it")
     ap.add_argument("--panel", action="store_true", help="walk every pot and toggle, then K103, mute and OLED")
+    ap.add_argument("--flood", action="store_true", help="10 s of status requests at full speed, then a hello")
     ap.add_argument("--update", action="store_true",
                     help="run the 13 update drills against the bootloader's drive; the log is board-N.md")
     ap.add_argument("--no-prompt", action="store_true", help="skip every question to the operator")
@@ -1587,6 +1624,8 @@ def run_checks(log, a):
 
     check_boot(log, boot_report(port), not a.no_oled)
     check_audio(log, port)
+    if a.flood:
+        flood_drill(log, port)
     if a.panel:
         panel_test(log, port, not a.no_prompt, not a.no_oled)
     if a.faults:
