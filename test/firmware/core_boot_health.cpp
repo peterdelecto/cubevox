@@ -78,10 +78,10 @@ void checkStallSkipsStoppedStream() {
   AudioStallWatch idle;
   check(!idle.update(5000, false, 0, 0) && !idle.update(9000, false, 0, 0), "stall: no stream, no stall");
 
-  AudioStallWatch latched;
-  latched.update(0, true, 0, 0);
-  check(!latched.update(50, false, 0, 0) && !latched.update(50 + 10 * kAudioStallMs, false, 0, 0),
-        "stall: a stream the audio module latched is not a stall");
+  AudioStallWatch resetting;
+  resetting.update(0, true, 0, 0);
+  check(!resetting.update(50, false, 0, 0) && !resetting.update(50 + 10 * kAudioStallMs, false, 0, 0),
+        "stall: a stream with a planned reset pending is not a stall");
 
   AudioStallWatch restarted;
   restarted.update(0, true, 0, 0);

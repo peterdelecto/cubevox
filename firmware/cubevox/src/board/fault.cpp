@@ -306,20 +306,35 @@ void faultWatchdogStart() {
 
 void faultWatchdogKick() { LL_IWDG_ReloadCounter(IWDG1); }
 
-// A stream the audio module latched has stopped on purpose and is not a stall; a restart arms the
-// watch afresh, and a restart that failed leaves the watch armed on a stream that is down. A stall mutes at once and resets once the flash is idle, so DIAG.TXT gets the entry
-// and the sound comes back about a second later.
-void faultAudioWatch(uint32_t nowMs, bool audioRunning) {
+namespace {
+
+// The one way an audio fault ends the run: mute at once, an audio entry naming the cause, and a
+// planned reset once the flash is idle. The box comes back on the power-on path.
+void resetForAudio(uint32_t nowMs, const char* cause) {
+  muteLatch();
+  diagNoteAudioFault(cause);
+  plannedResetStart(PlannedReset::AudioStall, nowMs);
+}
+
+}  // namespace
+
+// A restart arms the stall watch afresh. Once a reset is pending the watch stands down, so one
+// fault writes one entry.
+void faultAudioWatch(uint32_t nowMs, bool audioRunning, AudioEvent event) {
+  switch (event) {
+    case AudioEvent::None: break;
+    case AudioEvent::Restarted: diagNoteAudioFault("stream restarted"); break;
+    case AudioEvent::OutOfRestarts: resetForAudio(nowMs, "repeated stream faults"); break;
+    case AudioEvent::RestartFailed: resetForAudio(nowMs, "stream restart failed"); break;
+  }
   if (!audioRunning) return;
   reportTransferErrors(nowMs);
   const AudioHealth health = audioHealth();
-  if (!gStallWatch.update(nowMs, !health.latched, health.restarts, audioBlockCount())) return;
-  muteLatch();
+  if (!gStallWatch.update(nowMs, !plannedResetPending(), health.restarts, audioBlockCount())) return;
   serialOut().print("[ERROR] audio stalled after ");
   serialOut().print(gStallWatch.blocks());
   serialOut().println(" blocks, output muted; resetting");
-  diagNoteAudioFault();
-  plannedResetStart(PlannedReset::AudioStall, nowMs);
+  resetForAudio(nowMs, "audio stalled");
 }
 
 bool faultAudioStalled() { return gStallWatch.stalled(); }

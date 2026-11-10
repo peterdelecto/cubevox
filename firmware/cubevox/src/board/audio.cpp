@@ -647,13 +647,6 @@ void printFaultCause(Print& out) {
   out.print(gSaiErrorCodes, HEX);
 }
 
-void latchAfterFault(const char* why) {
-  muteLatch();
-  serialOut().print("[ERROR] audio: ");
-  serialOut().print(why);
-  serialOut().println("; output muted until reset");
-}
-
 AudioEvent restartAfterFault() {
   Print& out = serialOut();
   out.print("[WARN] audio: restarting the stream after ");
@@ -662,10 +655,9 @@ AudioEvent restartAfterFault() {
   if (!restartStream()) {
     gStreamUp = false;
     gRecovery.fail();
-    muteLatch();
     out.print("[ERROR] audio: ");
     out.print(gError);
-    out.println("; output muted, the stall watch resets the box");
+    out.println("; resetting");
     return AudioEvent::RestartFailed;
   }
   muteTripClear(MuteReason::Audio);
@@ -692,9 +684,9 @@ AudioEvent audioPoll(uint32_t nowMs) {
   switch (action) {
     case StreamRecovery::Action::None: break;
     case StreamRecovery::Action::Restart: return restartAfterFault();
-    case StreamRecovery::Action::Latch:
-      latchAfterFault("another fault inside a minute of three restarts");
-      return AudioEvent::Latched;
+    case StreamRecovery::Action::Reset:
+      serialOut().println("[ERROR] audio: another fault inside a minute of three restarts; resetting");
+      return AudioEvent::OutOfRestarts;
   }
   return AudioEvent::None;
 }
@@ -724,7 +716,6 @@ void audioReport(Print& out) {
     out.print(h.nanBlocks);
     out.println(" NaN blocks since boot");
   }
-  if (h.latched) out.println("[ERROR] audio: a fault past the restart budget latched the mute");
 }
 
 AudioErrors audioErrors() {
@@ -742,7 +733,6 @@ AudioHealth audioHealth() {
   h.nanBlocks = gCounts.nanBlocks;
   NVIC_EnableIRQ(SWPMI1_IRQn);
   h.restarts = gRecovery.restarts();
-  h.latched = gRecovery.latched();
   return h;
 }
 

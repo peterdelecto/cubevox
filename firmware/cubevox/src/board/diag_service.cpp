@@ -103,7 +103,13 @@ void diagPoll() {
 
 void diagNoteUpdateRequest() { queueLive(CvDiagKindUpdateRequest); }
 
-void diagNoteAudioFault() { queueLive(CvDiagKindAudioFault); }
+void diagNoteAudioFault(const char* cause) {
+  CvDiagEntry e = makeEntry(CvDiagKindAudioFault);
+  e.uptimeS = millis() / 1000;
+  memset(e.fault, 0, sizeof e.fault);
+  copyText(e.fault, sizeof e.fault, cause, SIZE_MAX);
+  queue(e);
+}
 
 bool diagBusy() { return gLog.busy(); }
 

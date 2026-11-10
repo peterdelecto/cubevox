@@ -26,8 +26,8 @@ constexpr uint32_t kLoadLedFlashMs = 100;
 constexpr uint32_t kLoadLedNoTrouble = UINT32_MAX;
 
 // The LED level, 0 to 1. `meanPercent` is the mean block time as a percent of the block budget and
-// `limitPercent` the load that reads full. `audioLive` is false while audio is stopped, stalled or
-// latched, and the LED is dark whatever else is true. `msSinceTrouble` is the time since the last
+// `limitPercent` the load that reads full. `audioLive` is false while audio is stopped or stalled,
+// and the LED is dark whatever else is true. `msSinceTrouble` is the time since the last
 // late, dry or overrun block, or kLoadLedNoTrouble.
 inline float loadLedLevel(int meanPercent, int limitPercent, bool audioLive, uint32_t msSinceTrouble) {
   if (!audioLive) return 0.0f;

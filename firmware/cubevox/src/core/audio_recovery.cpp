@@ -11,8 +11,8 @@ StreamRecovery::Action StreamRecovery::update(uint32_t nowMs, bool fault, bool f
     case State::Running:
       if (!fault) return Action::None;
       if (!budgetLeft(nowMs)) {
-        state_ = State::Latched;
-        return Action::Latch;
+        state_ = State::Resetting;
+        return Action::Reset;
       }
       state_ = State::Waiting;
       [[fallthrough]];
@@ -22,8 +22,7 @@ StreamRecovery::Action StreamRecovery::update(uint32_t nowMs, bool fault, bool f
       ++restarts_;
       state_ = State::Running;
       return Action::Restart;
-    case State::Latched:
-    case State::Failed: break;
+    case State::Resetting: break;
   }
   return Action::None;
 }
