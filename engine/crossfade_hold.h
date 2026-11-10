@@ -22,7 +22,7 @@ namespace cv {
 class CrossfadeHold {
  public:
   static constexpr float kMinGain = 0.5f;  // -6 dB
-  static constexpr float kMaxGain = 4.0f;  // +12 dB
+  static constexpr float kMaxGain = 2.0f;  // +6 dB
 
   // Gain 1 and the running powers clear. The stream's sample count carries on.
   void reset() {
