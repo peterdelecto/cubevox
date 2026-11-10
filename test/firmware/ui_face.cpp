@@ -388,8 +388,8 @@ Canvas openMenuOverReadout(FaceRig& r, Menu& ref, Canvas& readout) {
   r.turn(4, 0, kTime160);
   r.ticks(4);
   readout = r.live;
-  r.menu.update(clickInput(), r.now);
-  ref.update(clickInput(), r.now);
+  r.menu.update(clickInput(), r.now, r.layout);
+  ref.update(clickInput(), r.now, r.layout);
   Canvas menuScreen;
   ref.draw(r.ctx(), menuScreen);
   return menuScreen;
@@ -424,8 +424,8 @@ void checkMenuMovesAndCloses() {
 
   UiInput down;
   down.detents = 1;
-  r.menu.update(down, r.now);
-  ref.update(down, r.now);
+  r.menu.update(down, r.now, r.layout);
+  ref.update(down, r.now, r.layout);
   Canvas moved;
   ref.draw(r.ctx(), moved);
   r.tick();
@@ -433,8 +433,8 @@ void checkMenuMovesAndCloses() {
 
   UiInput toExit;
   toExit.detents = 11;  // from the second item to Exit, the thirteenth
-  r.menu.update(toExit, r.now);
-  r.menu.update(clickInput(), r.now);
+  r.menu.update(toExit, r.now, r.layout);
+  r.menu.update(clickInput(), r.now, r.layout);
   check(!r.menu.open(), "face: Exit closed the menu");
   const Canvas lastMenu = r.live;
   r.tick();
@@ -447,9 +447,9 @@ void checkMenuMovesAndCloses() {
 // what a click opened.
 void checkMenuListensOnceFaceDraws() {
   FaceRig r;
-  check(r.menu.update(clickInput(), r.now) == UiAction::None && !r.menu.open(), "face: before its first tick a click opens no menu");
+  check(r.menu.update(clickInput(), r.now, r.layout) == UiAction::None && !r.menu.open(), "face: before its first tick a click opens no menu");
   r.tick();
-  r.menu.update(clickInput(), r.now);
+  r.menu.update(clickInput(), r.now, r.layout);
   check(r.menu.open(), "face: after its first tick a click opens the menu");
 }
 
@@ -482,18 +482,18 @@ void checkMenuReopens() {
   UiInput toExit;
   toExit.detents = 12;  // from the first item to Exit, the thirteenth
   for (int round = 0; round < 3; ++round) {
-    r.menu.update(click, r.now);
-    ref.update(click, r.now);
+    r.menu.update(click, r.now, r.layout);
+    ref.update(click, r.now, r.layout);
     Canvas menuScreen;
     ref.invalidate();
     ref.draw(r.ctx(), menuScreen);
     r.ticks(4);
     check(sameCanvas(r.live, menuScreen), "face: the menu shows again each time it opens");
 
-    r.menu.update(toExit, r.now);
-    r.menu.update(click, r.now);
-    ref.update(toExit, r.now);
-    ref.update(click, r.now);
+    r.menu.update(toExit, r.now, r.layout);
+    r.menu.update(click, r.now, r.layout);
+    ref.update(toExit, r.now, r.layout);
+    ref.update(click, r.now, r.layout);
     r.ticks(4);
     check(!r.menu.open() && sameCanvas(r.live, lineScreen()), "face: the voice shows again each time it closes");
   }
@@ -702,8 +702,8 @@ void checkLoadFigureAbsent() {
   menu.settings.debug = true;
   menu.loadPercent = 42;
   menu.ticks(3);
-  menu.menu.update(clickInput(), menu.now);
-  ref.update(clickInput(), menu.now);
+  menu.menu.update(clickInput(), menu.now, menu.layout);
+  ref.update(clickInput(), menu.now, menu.layout);
   Canvas menuScreen;
   ref.draw(menu.ctx(), menuScreen);
   menu.ticks(4);
@@ -863,7 +863,7 @@ void checkNoBarOffTheVoice() {
       {"toggle", [](FaceRig& r) { r.flip(5, true); }, 14},
       {"MUTED", [](FaceRig& r) { r.switchOn = true; }, 8},
       {"BYPASS", [](FaceRig& r) { r.settings.topSwitch = TopSwitch::Bypass; r.switchOn = true; }, 8},
-      {"menu", [](FaceRig& r) { r.menu.update(clickInput(), r.now); }, -1},
+      {"menu", [](FaceRig& r) { r.menu.update(clickInput(), r.now, r.layout); }, -1},
   };
   const float loud = dbToLinear(-6.0f);
   for (const Scene& s : scenes) {

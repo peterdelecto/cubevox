@@ -161,7 +161,7 @@ void Box::tick(const PanelInput& in, uint32_t nowMs) {
 
   const UiInput menuIn{in.detents, in.click, in.hold, in.press};
   if (menuIn.detents != 0 || menuIn.click || menuIn.hold || menuIn.press) dim_.noteActivity(nowMs);
-  const bool settingsChanged = applyAction(menu_.update(menuIn, nowMs));
+  const bool settingsChanged = applyAction(menu_.update(menuIn, nowMs, layout_));
   const bool changed = knobs_.takeChanged() || toggleChanged_;
   toggleChanged_ = false;
   if (publish_.take(knobs_.seeded(), changed || settingsChanged)) publishSnapshot();
