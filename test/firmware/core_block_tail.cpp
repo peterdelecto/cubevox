@@ -1,5 +1,5 @@
 // Checks the audio block's tail on the host: the output gain ramp, the soft ceiling ahead of the trim,
-// the loop that shapes a block for the DAC, the guard in front of the polish stages, and the block
+// the loop that shapes a block for the DAC, the guard in front of VOX EQ's back half, and the block
 // flow the board and the host share (the late block's dry pass and its blends, the runaway block that
 // the guard cuts, and the engines that restart clean after it).
 
@@ -234,13 +234,12 @@ struct StillClock {
   uint32_t operator()() { return 0; }
 };
 
-// Every knob at 0.5 and every toggle on, with the polish stages as given.
-ChainSnapshot snapshotOf(const Layout& layout, bool comp, bool eq, bool mic) {
+// Every knob at 0.5 and every toggle on, with VOX EQ (at ON+CUTS) and OUTPUT PAD as given.
+ChainSnapshot snapshotOf(const Layout& layout, bool eq, bool mic) {
   PanelReading panel;
   panel.toggle.fill(true);
   for (auto& slot : panel.knob) slot.fill(0.5f);
   Settings settings;
-  settings.polishComp = comp;
   settings.voxEq = eq ? VoxEq::Cuts : VoxEq::Off;
   if (mic) settings.outputLevel = OutputLevel::Mic;
   return composeSnapshot(layout, panel, settings, BenchOverrides());
@@ -304,7 +303,7 @@ Block blended(const Block& a, float from) {
 // output stage, the dry counter reads 1, and the block after runs the chain again. Each join blends in
 // from the last sample over kLateBlendSamples samples.
 void checkLateBlockPassesDry() {
-  const ChainSnapshot snap = snapshotOf(distortionOnly(), true, true, true);
+  const ChainSnapshot snap = snapshotOf(distortionOnly(), true, true);
   Rig rig;
   Rig reference;
   Rig other;
@@ -370,10 +369,11 @@ Block runWithPoison(const ChainSnapshot& snap, int blocks, int poisonAt, const B
   return p.out;
 }
 
-// A slot's runaway block, whatever its shape, is cut and counted. The comp restarts from rest and the
-// box then plays exactly what a clean box plays.
+// A slot's runaway block, whatever its shape, is cut and counted, and the box then plays exactly what
+// a clean box plays. VOX EQ is off, because the poison enters at the input and would reach its front
+// half, which the ADC cannot do.
 void checkRunawayRecovers() {
-  const ChainSnapshot snap = snapshotOf(emptyLayout(), true, false, false);
+  const ChainSnapshot snap = snapshotOf(emptyLayout(), false, false);
   int clean = 0;
   const Block want = runWithPoison(snap, 600, -1, Block{}, clean);
   Block alternating{};
@@ -400,7 +400,7 @@ void checkRunawayRecovers() {
 
 // After a discard the layout fade cuts, so the next blocks are silent while the engines clear.
 void checkDiscardCuts() {
-  const ChainSnapshot snap = snapshotOf(emptyLayout(), true, false, false);
+  const ChainSnapshot snap = snapshotOf(emptyLayout(), false, false);
   Rig rig;
   BlockFlow flow;
   play(flow, rig, snap, tone(0, 0.3f));
@@ -425,7 +425,7 @@ Block newestBlock(const ScopeRing& ring) {
 // gain, so the fade-out blocks still write the full signal. A silent block, a dry block and a cut
 // block write zeros.
 void checkScopeRingAdvances() {
-  const ChainSnapshot snap = snapshotOf(emptyLayout(), false, false, false);
+  const ChainSnapshot snap = snapshotOf(emptyLayout(), false, false);
   Rig rig;
   BlockFlow flow;
   bool content = true;
@@ -455,11 +455,11 @@ void checkScopeRingAdvances() {
   check(content, "scope ring: the newest block follows every audio block through a swap, a late block and a NaN cut; chain blocks write the chain output, even while the output fades, and silent, dry and cut blocks write zeros");
 }
 
-// POLISH COMP changes the output and leaves the ring as it was, since the scope reads the chain
-// output ahead of it.
-void checkScopeAheadOfPolish() {
-  const ChainSnapshot plain = snapshotOf(emptyLayout(), false, false, false);
-  const ChainSnapshot polished = snapshotOf(emptyLayout(), true, false, false);
+// OUTPUT PAD changes the output and leaves the ring as it was, since the scope reads the chain
+// output ahead of the output trim.
+void checkScopeAheadOfTrim() {
+  const ChainSnapshot line = snapshotOf(emptyLayout(), false, false);
+  const ChainSnapshot mic = snapshotOf(emptyLayout(), false, true);
   Rig rigA;
   Rig rigB;
   BlockFlow flowA;
@@ -468,15 +468,15 @@ void checkScopeAheadOfPolish() {
   bool outputsDiffer = false;
   for (int b = 0; b < 400; ++b) {
     const Block in = tone(b, 1.2f);
-    const Played pa = play(flowA, rigA, plain, in);
-    const Played pb = play(flowB, rigB, polished, in);
+    const Played pa = play(flowA, rigA, line, in);
+    const Played pb = play(flowB, rigB, mic, in);
     same = same && newestBlock(flowA.scope()) == newestBlock(flowB.scope());
     outputsDiffer = outputsDiffer || pa.out != pb.out;
   }
-  check(same && outputsDiffer, "scope ring: a POLISH COMP setting that changes the output leaves the ring the same");
+  check(same && outputsDiffer, "scope ring: an OUTPUT PAD setting that changes the output leaves the ring the same");
 }
 
-// The default layout with every knob at 0.5 and the toggles as given, polish stages off.
+// The default layout with every knob at 0.5 and the toggles as given, VOX EQ off.
 ChainSnapshot defaultWith(const Layout& layout, const std::array<bool, kSlotCount>& on) {
   PanelReading panel;
   panel.toggle = on;
@@ -572,6 +572,6 @@ void checkBlockTail() {
   checkRunawayRecovers();
   checkDiscardCuts();
   checkScopeRingAdvances();
-  checkScopeAheadOfPolish();
+  checkScopeAheadOfTrim();
   checkSwapClearsReengaged();
 }

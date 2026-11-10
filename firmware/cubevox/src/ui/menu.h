@@ -27,7 +27,6 @@ struct UiInput {
 // What the sketch must do after an update. The menu never edits settings itself.
 enum class UiAction : uint8_t {
   None,
-  TogglePolishComp,
   CycleVoxEq,
   ToggleOutput,
   ToggleInputJack,

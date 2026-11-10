@@ -27,7 +27,7 @@ constexpr int kLeftX = 1;
 constexpr int kRightX = 126;
 constexpr int kFitWidth = kRightX - kLeftX + 1;
 constexpr int kMinGap = 3;
-constexpr int kItemCount = 12;
+constexpr int kItemCount = 11;
 
 struct Item {
   const char* full;
@@ -42,7 +42,6 @@ const std::vector<Item>& items() {
       {"OUTPUT", nullptr, {"LINE", "MIC"}},
       {"TOP SWITCH", "TOGGLE", {"MUTE", "BYPASS"}},
       {"REVERB", nullptr, {"SPRING", "CHASM", "NONE"}},
-      {"POLISH COMP", "COMP", {"ON", "OFF"}},
       {"VOX EQ", "EQ", {"OFF", "ON", "ON+CUTS"}},
       {"DEBUG", nullptr, {"ON", "OFF"}},
       {"HPF", nullptr, {"OFF", "80", "100", "120", "150"}},
@@ -55,7 +54,7 @@ const std::vector<Item>& items() {
 }
 
 // What the panel shows in the three frames. Toggles read OFF, the widest value, throughout.
-const char* const kShown[kItemCount] = {"MIC", "LINE", "BYPASS", "SPRING", "OFF", "OFF",
+const char* const kShown[kItemCount] = {"MIC", "LINE", "BYPASS", "SPRING", "OFF",
                                         "OFF", "120", "12k", "", "", ""};
 
 struct Candidate {
@@ -168,7 +167,7 @@ std::string frameValue(int i) { return kShown[i]; }
 // The list scrolls like Menu::onTurn: the cursor stays in view, nothing more. Frame 2 gets there
 // turning down from the top. Frame 3 turns down to LPF first and then up one to HPF, so both show.
 int topFor(const Candidate& c, int frame) {
-  const int downTo = frame == 1 ? 0 : (frame == 2 ? 10 : 8);
+  const int downTo = frame == 1 ? 0 : (frame == 2 ? 9 : 7);
   int top = 0;
   for (int cur = 0; cur <= downTo; ++cur) {
     if (cur >= top + c.rows) top = cur - c.rows + 1;
@@ -176,7 +175,7 @@ int topFor(const Candidate& c, int frame) {
   return top;
 }
 
-int cursorFor(int frame) { return frame == 1 ? 0 : (frame == 2 ? 10 : 7); }
+int cursorFor(int frame) { return frame == 1 ? 0 : (frame == 2 ? 9 : 6); }
 
 struct Rendered {
   Canvas canvas;

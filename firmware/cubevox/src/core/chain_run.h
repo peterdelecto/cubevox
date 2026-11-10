@@ -38,19 +38,17 @@ struct ChainEngines {
   cv::Bloom bloom;  // the Chatter card's engine, 46 kB, three slices; reads inputGate's detector as its word key
   cv::Growl growl;  // keeps a 15 kB ring of its own input and a tracker for when no Autotune sits ahead
 
-  cv::PolishComp comp;
-  cv::Polish polish;
+  cv::Polish polish;  // VOX EQ
 };
 
 // Clears the state of engine `e`. Empty (kNoEngine) clears nothing. The Formant engine's reset clears
 // the Apraxia follower's envelope too.
 void resetEngine(ChainEngines& engines, Engine e);
 
-// Holds the cycles each stage of one pass took, with one entry per slot and then one each for
-// POLISH COMP and VOX EQ. The EQ entry sums its front half ahead of slot 1 and its back half.
+// Holds the cycles each stage of one pass took, with one entry per slot and one for VOX EQ. The EQ
+// entry sums its front half ahead of slot 1 and its back half.
 struct ChainCycles {
   std::array<uint32_t, kSlotCount> slot{};
-  uint32_t comp = 0;
   uint32_t eq = 0;
 };
 
@@ -169,14 +167,13 @@ struct NoTap {
 };
 
 // Walks one block through the chain. The front half of VOX EQ runs first, ahead of slot 1. The
-// slots run in order, then the NaN guard, then POLISH COMP and the back half of VOX EQ. POLISH
-// COMP and both EQ halves run always, and each is a bit-exact copy once settled off. `a` holds
-// the input and takes the finished block; `b` is scratch. `cycleClock` returns a free-running cycle
-// count and times each stage into `cycles`. `fades` carries the slot toggle crossfades from block to
-// block. `tap(block)` sees the block the guard passed, ahead of POLISH COMP, which is what the scope
-// draws. Returns false when a slot produced a NaN, an infinity or a sample past the guard's bound. The
-// block was then silenced before the polish stages, so the caller cuts the output and clears the
-// engines, POLISH COMP and VOX EQ.
+// slots run in order, then the NaN guard, then the back half of VOX EQ. Both EQ halves run always,
+// and each is a bit-exact copy once settled off. `a` holds the input and takes the finished block;
+// `b` is scratch. `cycleClock` returns a free-running cycle count and times each stage into `cycles`.
+// `fades` carries the slot toggle crossfades from block to block. `tap(block)` sees the block the
+// guard passed, ahead of the back half, which is what the scope draws. Returns false when a slot
+// produced a NaN, an infinity or a sample past the guard's bound. The block was then silenced before
+// the back half, so the caller cuts the output and clears the engines and VOX EQ.
 template <typename Clock, typename Tap = NoTap>
 bool runChain(ChainEngines& engines, SlotFades& fades, float* a, float* b, int n, const ChainSnapshot& snap,
               Clock cycleClock, ChainCycles& cycles, Tap&& tap = NoTap()) {
@@ -194,15 +191,9 @@ bool runChain(ChainEngines& engines, SlotFades& fades, float* a, float* b, int n
   }
   const bool finite = guardBlock(a, n);
   tap(a);
-  const uint32_t compStart = cycleClock();
-  engines.comp.process(a, b, n, p.comp);
-  const uint32_t eqStart = cycleClock();
-  engines.polish.processBack(b, a, n, p.eq);
-  cycles.comp = eqStart - compStart;
-  cycles.eq = frontCycles + (cycleClock() - eqStart);
-  if (a != result) {
-    for (int i = 0; i < n; ++i) result[i] = a[i];
-  }
+  const uint32_t backStart = cycleClock();
+  engines.polish.processBack(a, result, n, p.eq);  // runs in place when `a` is `result`
+  cycles.eq = frontCycles + (cycleClock() - backStart);
   return finite;
 }
 

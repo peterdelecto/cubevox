@@ -407,7 +407,7 @@ void checkDim(const CheckClips& clips, std::vector<std::string>& failed) {
   constexpr uint8_t kMax = 255;
   constexpr uint8_t kLow = 48;
   constexpr uint8_t kDimmed = 8;
-  constexpr int32_t kBrightnessItem = 10;  // the OLED BRIGHT row of the menu list, counted from 0
+  constexpr int32_t kBrightnessItem = 9;  // the OLED BRIGHT row of the menu list, counted from 0
   constexpr uint32_t kSettleMs = 1000;    // long enough for a control to reach the face
 
   Rig rig;

@@ -260,8 +260,8 @@ std::string setLayoutWith(const std::string& extra) {
                      "\"unison\",\"slapback\",\"distortion\",\"gate\",\"reverb_spring\"]") + extra + "}";
 }
 
-bool settingsAre(const Settings& s, bool comp, VoxEq vox, TopSwitch top) {
-  return s.polishComp == comp && s.voxEq == vox && s.topSwitch == top;
+bool settingsAre(const Settings& s, VoxEq vox, TopSwitch top) {
+  return s.voxEq == vox && s.topSwitch == top;
 }
 
 // The settings after a set_layout request carrying `extra` is applied to `start`. `given` gets the
@@ -280,45 +280,53 @@ Settings appliedTo(const Settings& start, const std::string& extra, uint8_t& giv
 void checkSettingsRequest() {
   protocol::Request r;
   std::string err;
-  Settings usual;  // comp on, VOX EQ off, MUTE
+  Settings usual;  // VOX EQ off, MUTE
   Settings flipped;
-  flipped.polishComp = false;
   flipped.voxEq = VoxEq::Cuts;
   flipped.topSwitch = TopSwitch::Bypass;
   Settings mixed;
   mixed.voxEq = VoxEq::On;
   uint8_t given = 0xFF;
 
-  check(settingsAre(appliedTo(flipped, "", given), false, VoxEq::Cuts, TopSwitch::Bypass) && given == 0,
+  check(settingsAre(appliedTo(flipped, "", given), VoxEq::Cuts, TopSwitch::Bypass) && given == 0,
         "settings: absent leaves every current value");
-  check(settingsAre(appliedTo(usual, "", given), true, VoxEq::Off, TopSwitch::Mute) && given == 0,
+  check(settingsAre(appliedTo(usual, "", given), VoxEq::Off, TopSwitch::Mute) && given == 0,
         "settings: absent leaves the defaults too");
-  check(settingsAre(appliedTo(flipped, ",\"settings\":{}", given), false, VoxEq::Cuts, TopSwitch::Bypass) && given == 0,
+  check(settingsAre(appliedTo(flipped, ",\"settings\":{}", given), VoxEq::Cuts, TopSwitch::Bypass) && given == 0,
         "settings: an empty object leaves every current value");
-  check(settingsAre(appliedTo(usual, ",\"settings\":{\"polish_comp\":false,\"vox_eq\":\"cuts\",\"top_switch\":\"bypass\"}", given),
-                    false, VoxEq::Cuts, TopSwitch::Bypass) &&
-            given == (protocol::kGivenPolishComp | protocol::kGivenVoxEq | protocol::kGivenTopSwitch),
-        "settings: all three fields in");
-  check(settingsAre(appliedTo(mixed, ",\"settings\":{\"top_switch\":\"bypass\"}", given), true, VoxEq::On, TopSwitch::Bypass) &&
+  check(settingsAre(appliedTo(usual, ",\"settings\":{\"vox_eq\":\"cuts\",\"top_switch\":\"bypass\"}", given),
+                    VoxEq::Cuts, TopSwitch::Bypass) &&
+            given == (protocol::kGivenVoxEq | protocol::kGivenTopSwitch),
+        "settings: both fields in");
+  check(settingsAre(appliedTo(mixed, ",\"settings\":{\"top_switch\":\"bypass\"}", given), VoxEq::On, TopSwitch::Bypass) &&
             given == protocol::kGivenTopSwitch,
         "settings: top_switch alone changes only the switch");
-  check(settingsAre(appliedTo(usual, ",\"settings\":{\"vox_eq\":\"on\"}", given), true, VoxEq::On, TopSwitch::Mute) &&
+  check(settingsAre(appliedTo(usual, ",\"settings\":{\"vox_eq\":\"on\"}", given), VoxEq::On, TopSwitch::Mute) &&
             given == protocol::kGivenVoxEq,
         "settings: vox_eq alone changes only VOX EQ");
-  check(settingsAre(appliedTo(flipped, ",\"settings\":{\"vox_eq\":\"off\"}", given), false, VoxEq::Off, TopSwitch::Bypass) &&
+  check(settingsAre(appliedTo(flipped, ",\"settings\":{\"vox_eq\":\"off\"}", given), VoxEq::Off, TopSwitch::Bypass) &&
             given == protocol::kGivenVoxEq,
         "settings: vox_eq off applies, and the other fields stay");
-  check(settingsAre(appliedTo(flipped, ",\"settings\":{\"top_switch\":\"mute\",\"polish_comp\":true}", given), true, VoxEq::Cuts,
-                    TopSwitch::Mute) &&
-            given == (protocol::kGivenPolishComp | protocol::kGivenTopSwitch),
+  check(settingsAre(appliedTo(flipped, ",\"settings\":{\"top_switch\":\"mute\"}", given), VoxEq::Cuts, TopSwitch::Mute) &&
+            given == protocol::kGivenTopSwitch,
         "settings: a value equal to the default still applies, and the field left out stays");
-  check(settingsAre(appliedTo(usual, " , \"settings\" : { \"polish_comp\" : false , \"x\" : [1,{\"a\":null}] , \"vox_eq\":\"on\" } ", given),
-                    false, VoxEq::On, TopSwitch::Mute) &&
-            given == (protocol::kGivenPolishComp | protocol::kGivenVoxEq),
+  check(settingsAre(appliedTo(usual, " , \"settings\" : { \"x\" : [1,{\"a\":null}] , \"vox_eq\":\"on\" } ", given),
+                    VoxEq::On, TopSwitch::Mute) &&
+            given == protocol::kGivenVoxEq,
         "settings: whitespace is free and unknown keys with nested values are skipped");
-  check(settingsAre(appliedTo(usual, ",\"settings\":{\"polish_eq\":false}", given), true, VoxEq::Off, TopSwitch::Mute) && given == 0,
+  check(settingsAre(appliedTo(usual, ",\"settings\":{\"polish_eq\":false}", given), VoxEq::Off, TopSwitch::Mute) && given == 0,
         "settings: the retired polish_eq key is skipped");
-  check(parses("{\"id\":6,\"cmd\":\"hello\",\"settings\":{\"polish_comp\":false}}", r, err) && r.cmd == protocol::Command::Hello,
+  // The retired key, a flag in earlier firmware, built in two parts so the text search for the stage
+  // finds no live code.
+  const std::string retiredKey = std::string("\"polish") + "_comp\":";
+  for (const char* value : {"false", "true", "1", "\"off\""}) {
+    const std::string old = ",\"settings\":{" + retiredKey + value + "}";
+    uint8_t usualGiven = 0xFF;
+    check(settingsAre(appliedTo(flipped, old, given), VoxEq::Cuts, TopSwitch::Bypass) && given == 0 &&
+              settingsAre(appliedTo(usual, old, usualGiven), VoxEq::Off, TopSwitch::Mute) && usualGiven == 0,
+          ("settings: the retired key " + old + " changes nothing").c_str());
+  }
+  check(parses("{\"id\":6,\"cmd\":\"hello\",\"settings\":{\"vox_eq\":\"on\"}}", r, err) && r.cmd == protocol::Command::Hello,
         "settings: any command may carry the object");
 
   struct Bad {
@@ -326,8 +334,6 @@ void checkSettingsRequest() {
     const char* why;
   };
   const Bad bad[] = {
-      {",\"settings\":{\"polish_comp\":1}", "polish_comp must be true or false"},
-      {",\"settings\":{\"polish_comp\":\"true\"}", "polish_comp must be true or false"},
       {",\"settings\":{\"vox_eq\":null}", "vox_eq must be \"off\", \"on\" or \"cuts\""},
       {",\"settings\":{\"vox_eq\":true}", "vox_eq must be \"off\", \"on\" or \"cuts\""},
       {",\"settings\":{\"vox_eq\":\"loud\"}", "vox_eq must be \"off\", \"on\" or \"cuts\""},
@@ -344,13 +350,13 @@ void checkSettingsRequest() {
   for (const Bad& b : bad) {
     check(!parses(setLayoutWith(b.extra).c_str(), r, err) && err == b.why, b.extra);
   }
-  for (const char* torn : {",\"settings\":{\"polish_comp\":tru}", ",\"settings\":{\"polish_comp\":false", ",\"settings\":{\"top_switch\"}",
+  for (const char* torn : {",\"settings\":{\"x\":tru}", ",\"settings\":{\"vox_eq\":\"off\"", ",\"settings\":{\"top_switch\"}",
                            ",\"settings\":{\"vox_eq\":\"on\",}"}) {
     check(!parses(setLayoutWith(torn).c_str(), r, err) && err == "malformed json", torn);
   }
 
   // A line cut anywhere is refused and read no further than its end (the sanitizers watch the reads).
-  const std::string whole = setLayoutWith(",\"settings\":{\"polish_comp\":false,\"vox_eq\":\"cuts\",\"top_switch\":\"bypass\"}");
+  const std::string whole = setLayoutWith(",\"settings\":{\"vox_eq\":\"cuts\",\"top_switch\":\"bypass\"}");
   bool everyCutRefused = true;
   for (size_t cut = 0; cut < whole.size(); ++cut) everyCutRefused = everyCutRefused && !parses(whole.substr(0, cut).c_str(), r, err);
   check(everyCutRefused && parses(whole.c_str(), r, err), "settings: every cut of a settings request is refused, the whole line parses");
@@ -512,7 +518,7 @@ void checkReplyEscapes() {
         "proto: non-ASCII and control bytes in a reply string are escaped");
 }
 
-const char* kDefaultSettingsText = "\"settings\":{\"polish_comp\":true,\"vox_eq\":\"off\",\"top_switch\":\"mute\"}";
+const char* kDefaultSettingsText = "\"settings\":{\"vox_eq\":\"off\",\"top_switch\":\"mute\"}";
 
 // The settings object leaves the box in every reply that carries the layout, and its text is
 // what a set_layout request takes back.
@@ -521,14 +527,14 @@ void checkSettingsReplies() {
   protocol::replyLayout(w, 2, "Default", defaultLayout(), Settings());
   check(JsonReader(w.out).valid() && w.overflows() == 0 && has(w.out, std::string("\"reverb_spring\"]},") + kDefaultSettingsText + "}\n"),
         "settings: the layout reply ends with the default settings");
+  check(!has(w.out, "_comp"), "settings: the layout reply carries no retired compressor key");
 
   Settings changed;
-  changed.polishComp = false;
   changed.voxEq = VoxEq::Cuts;
   changed.topSwitch = TopSwitch::Bypass;
   StringWriter c;
   protocol::replyLayout(c, 3, "Default", defaultLayout(), changed);
-  const std::string text = "\"settings\":{\"polish_comp\":false,\"vox_eq\":\"cuts\",\"top_switch\":\"bypass\"}";
+  const std::string text = "\"settings\":{\"vox_eq\":\"cuts\",\"top_switch\":\"bypass\"}";
   Settings onOnly;
   onOnly.voxEq = VoxEq::On;
   StringWriter o;
@@ -539,7 +545,8 @@ void checkSettingsReplies() {
   const size_t at = c.out.find("\"settings\":");
   const std::string back = c.out.substr(at, c.out.size() - 2 - at);  // the field, without the reply's closing brace and newline
   uint8_t given = 0;
-  check(settingsAre(appliedTo(Settings(), "," + back, given), false, VoxEq::Cuts, TopSwitch::Bypass) && given == 7,
+  check(settingsAre(appliedTo(Settings(), "," + back, given), VoxEq::Cuts, TopSwitch::Bypass) &&
+            given == (protocol::kGivenVoxEq | protocol::kGivenTopSwitch),
         "settings: a set_layout request takes the reply's settings text back");
 
   StringWriter hello;

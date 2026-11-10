@@ -1,6 +1,6 @@
-// Menu proof. The eight-row menu of 2026-10-24-polish-design.md, opened, walked, and clicked row
-// by row, drawn through the firmware's own Canvas and 5x7 font at 25 frames a second. Every
-// screen change is the GUI's 2-frame dissolve. Ten scenes, each on its own clock from a clean
+// Menu proof. A seven-row menu in the 5x7 font, opened, walked, and clicked row by row, drawn
+// through the firmware's own Canvas and 5x7 font at 25 frames a second. Every screen change is
+// the GUI's 2-frame dissolve. Nine scenes, each on its own clock from a clean
 // screen; motion_gif.py cuts one GIF per scene.
 //
 //   clang++ -std=c++17 -O2 -I firmware/cubevox/src -I tools/font-editor/fonts \
@@ -32,8 +32,8 @@ constexpr int kCapH = 16;
 constexpr int kCapPages = kCapH / 8;
 constexpr int kDissolveFrames = 2;  // every screen change, as in the GUI proof
 
-// Menu grid: eight rows of 5x7 at an 8 px pitch. 1 + 8 * 8 = 65, one more than the screen, so
-// the top keeps its 1 px and the EXIT row sits on the bottom edge. Flagged to the owner.
+// Menu grid: seven rows of 5x7 at an 8 px pitch from y 1, so the top keeps its 1 px pad.
+constexpr int kMenuRows = 7;
 constexpr int kRowPitch = 8;
 constexpr int kRowTop = 1;
 constexpr int kCursorX = kPad;                        // the `>` in character column 0
@@ -91,7 +91,6 @@ void text(Frame& f, int x, int y, const char* s) {
 // Screens.
 
 struct Settings {
-  bool comp = true;
   bool eq = true;
   int out = 0;  // LINE, INSTRUMENT
   int in = 0;   // MIC, PEDAL
@@ -100,20 +99,19 @@ struct Settings {
 
 std::string rowText(int row, const Settings& s) {
   switch (row) {
-    case 0: return std::string("POLISH COMP ") + (s.comp ? "ON" : "OFF");
-    case 1: return std::string("VOX EQ ") + (s.eq ? "ON" : "OFF");
-    case 2: return std::string("OUT ") + (s.out ? "INSTRUMENT" : "LINE");
-    case 3: return std::string("INPUT ") + (s.in ? "PEDAL" : "MIC");
-    case 4: return std::string("TOP SWITCH ") + (s.top ? "BYPASS" : "MUTE");
-    case 5: return "CHAIN ORDER";
-    case 6: return "UPDATE FIRMWARE";
+    case 0: return std::string("VOX EQ ") + (s.eq ? "ON" : "OFF");
+    case 1: return std::string("OUT ") + (s.out ? "INSTRUMENT" : "LINE");
+    case 2: return std::string("INPUT ") + (s.in ? "PEDAL" : "MIC");
+    case 3: return std::string("TOP SWITCH ") + (s.top ? "BYPASS" : "MUTE");
+    case 4: return "CHAIN ORDER";
+    case 5: return "UPDATE FIRMWARE";
     default: return "EXIT";
   }
 }
 
 Frame menuScreen(int cursor, const Settings& s) {
   Frame f;
-  for (int row = 0; row < 8; ++row) {
+  for (int row = 0; row < kMenuRows; ++row) {
     const int y = kRowTop + row * kRowPitch;
     if (row == cursor) text(f, kCursorX, y, ">");
     text(f, kTextX, y, rowText(row, s).c_str());
@@ -179,7 +177,7 @@ Frame atTime(const std::vector<Key>& keys, float t, const char*& caption) {
   return dissolve(keys[k - 1].frame, keys[k].frame, dissolveProgress(t - keys[k].t));
 }
 
-// Rows 1 to 5: click flips the value, click flips it back.
+// Rows 1 to 4: click flips the value, click flips it back.
 Scene toggleScene(const char* number, const char* slug, const char* title, int row,
                   Settings first, Settings second, const char* to, const char* back) {
   Settings start;
@@ -199,34 +197,32 @@ std::vector<Scene> buildScenes() {
 
   Scene walk{"2", "navigate", "2  NAVIGATE", 6.0f, {}};
   walk.keys.push_back({0.0f, menuScreen(0, s), "TURN MOVES THE CURSOR"});
-  for (int row = 1; row < 8; ++row)
-    walk.keys.push_back({0.5f * row, menuScreen(row, s), row == 7 ? "ROW 8, NO WRAP" : "TURN, DOWN ONE ROW"});
-  walk.keys.push_back({4.3f, menuScreen(6, s), "TURN, UP ONE ROW"});
-  walk.keys.push_back({4.8f, menuScreen(5, s), "TURN, UP ONE ROW"});
+  for (int row = 1; row < kMenuRows; ++row)
+    walk.keys.push_back({0.5f * row, menuScreen(row, s), row == kMenuRows - 1 ? "ROW 7, NO WRAP" : "TURN, DOWN ONE ROW"});
+  walk.keys.push_back({4.3f, menuScreen(5, s), "TURN, UP ONE ROW"});
+  walk.keys.push_back({4.8f, menuScreen(4, s), "TURN, UP ONE ROW"});
   scenes.push_back(walk);
 
   Settings a = s, b = s;
-  a.comp = false;
-  scenes.push_back(toggleScene("R1", "polish-comp", "R1  POLISH COMP", 0, a, b, "CLICK, ON TO OFF", "CLICK, OFF TO ON"));
-  a = s; a.eq = false;
-  scenes.push_back(toggleScene("R2", "polish-eq", "R2  VOX EQ", 1, a, b, "CLICK, ON TO OFF", "CLICK, OFF TO ON"));
+  a.eq = false;
+  scenes.push_back(toggleScene("R1", "vox-eq", "R1  VOX EQ", 0, a, b, "CLICK, ON TO OFF", "CLICK, OFF TO ON"));
   a = s; a.out = 1;
-  scenes.push_back(toggleScene("R3", "out", "R3  OUT", 2, a, b, "CLICK, TO INSTRUMENT", "CLICK, TO LINE"));
+  scenes.push_back(toggleScene("R2", "out", "R2  OUT", 1, a, b, "CLICK, TO INSTRUMENT", "CLICK, TO LINE"));
   a = s; a.in = 1;
-  scenes.push_back(toggleScene("R4", "input", "R4  INPUT", 3, a, b, "CLICK, TO PEDAL", "CLICK, TO MIC"));
+  scenes.push_back(toggleScene("R3", "input", "R3  INPUT", 2, a, b, "CLICK, TO PEDAL", "CLICK, TO MIC"));
   a = s; a.top = 1;
-  scenes.push_back(toggleScene("R5", "top-switch", "R5  TOP SWITCH", 4, a, b, "CLICK, TO BYPASS", "CLICK, TO MUTE"));
+  scenes.push_back(toggleScene("R4", "top-switch", "R4  TOP SWITCH", 3, a, b, "CLICK, TO BYPASS", "CLICK, TO MUTE"));
 
-  scenes.push_back({"R6", "chain-order", "R6  CHAIN ORDER", 5.0f,
-                    {{0.0f, menuScreen(5, s), "CLICK OPENS THE VIEW"},
+  scenes.push_back({"R5", "chain-order", "R5  CHAIN ORDER", 5.0f,
+                    {{0.0f, menuScreen(4, s), "CLICK OPENS THE VIEW"},
                      {1.0f, chainScreen(), "READ-ONLY, EIGHT SLOTS"},
-                     {3.5f, menuScreen(5, s), "CLICK, BACK TO MENU"}}});
-  scenes.push_back({"R7", "update-firmware", "R7  UPDATE FIRMWARE", 5.0f,
-                    {{0.0f, menuScreen(6, s), "CLICK OPENS CONFIRM"},
+                     {3.5f, menuScreen(4, s), "CLICK, BACK TO MENU"}}});
+  scenes.push_back({"R6", "update-firmware", "R6  UPDATE FIRMWARE", 5.0f,
+                    {{0.0f, menuScreen(5, s), "CLICK OPENS CONFIRM"},
                      {1.0f, confirmScreen(), "CONFIRM SCREEN"},
-                     {3.5f, menuScreen(6, s), "TURN CANCELS"}}});
-  scenes.push_back({"R8", "exit", "R8  EXIT", 2.5f,
-                    {{0.0f, menuScreen(7, s), "CLICK CLOSES THE MENU"},
+                     {3.5f, menuScreen(5, s), "TURN CANCELS"}}});
+  scenes.push_back({"R7", "exit", "R7  EXIT", 2.5f,
+                    {{0.0f, menuScreen(6, s), "CLICK CLOSES THE MENU"},
                      {1.0f, voiceScreen(), "BACK TO THE VOICE"}}});
   return scenes;
 }

@@ -22,7 +22,6 @@ void BlockFlow::discard(ChainEngines& engines, const ChainSnapshot& held) {
   resetMask_ = kAllEngines;
   fade_.cut();
   slots_.settle(held.slotOn);  // the output is cut and the engines clear, so no slot fades
-  engines.comp.reset();
   engines.polish.reset();
 }
 

@@ -400,8 +400,8 @@ def syntax_failures():
 
 STATS_SAMPLE = [
     "[audio] blocks 1000 late 0 overruns 0 dry 0 avg 320000 worst 360000 of 640000 cycles",
-    "[audio] per slot 10000 20000 30000 40000 50000 60000 70000 80000 COMP 17000 EQ 12000",
-    "[audio] slot worst 11000 21000 31000 41000 51000 61000 71000 81000 COMP 18000 EQ 13000",
+    "[audio] per slot 10000 20000 30000 40000 50000 60000 70000 80000 EQ 12000",
+    "[audio] slot worst 11000 21000 31000 41000 51000 61000 71000 81000 EQ 13000",
 ]
 
 
@@ -410,8 +410,8 @@ def stress_failures():
     stress = load("stress", os.path.join(FW, "stress.py"))
     failed = []
     st = stress.parse_stats(STATS_SAMPLE)
-    if (st.comp_avg, st.eq_avg, st.comp_worst, st.eq_worst) != (17000, 12000, 18000, 13000):
-        failed.append(f"stress.py parse_stats reads the COMP and EQ buckets as {st[9:]}")
+    if (st.slot_avg[7], st.eq_avg, st.slot_worst[7], st.eq_worst) != (80000, 12000, 81000, 13000):
+        failed.append(f"stress.py parse_stats reads the last slot and the EQ bucket as {st[7:]}")
     slots = ["input_gate", "autotune", "octave", "unison", "slapback", "distortion", "gate", "reverb_spring"]
     labels = [s.label for s in stress.sweeps(slots)]
     for want in ("Input gate Threshold", "Input gate Decay", "Gate Threshold", "Gate Decay", "Unison Rate",
@@ -431,7 +431,7 @@ def stress_failures():
         failed.append(f"stress.py fixed-stage levers {sorted(ops)} are not bench ops it needs")
     rows = stress.read_rows()
     if rows["kFixed"] != tuple(sum(rows[n][i] for n in stress.FIXED_PARTS) for i in (0, 1)):
-        failed.append("stress.py read_rows() does not make kFixed the sum of the four fixed rows")
+        failed.append("stress.py read_rows() does not make kFixed the sum of the three fixed rows")
     failed += stress_judge_failures(stress, rows)
     failed += stress_vox_eq_failures(stress)
     code, out = run([sys.executable, "-I", os.path.join(FW, "stress.py"), "--dry-run", "--layouts", "default"])
@@ -480,14 +480,13 @@ def stress_vox_eq_failures(stress):
 def stress_judge_failures(stress, rows):
     """judge_fixed() passes a fixed path inside its rows and names a bucket that runs over."""
     cycles = stress.CYCLES_PER_PERCENT
-    inside = {"eq_mean": 1.0 * cycles, "eq_worst": 1.5 * cycles, "comp_mean": 2.0 * cycles, "comp_worst": 2.5 * cycles,
-              "fixed_mean": 5.0 * cycles, "fixed_worst": 6.0 * cycles}
+    inside = {"eq_mean": 1.0 * cycles, "eq_worst": 1.5 * cycles, "fixed_mean": 5.0 * cycles, "fixed_worst": 6.0 * cycles}
     failed = []
     for what, agg, want in (("inside", inside, True), ("EQ over", {**inside, "eq_worst": 9.0 * cycles}, False)):
         table, gates = [], []
         stress.judge_fixed(agg, rows, "check", table, gates)
         ok = all(g.ok for g in gates)
-        if ok != want or len(gates) != 6 or [row[1] for row in table] != ["VOX EQ", "POLISH COMP", "fixed path"]:
+        if ok != want or len(gates) != 4 or [row[1] for row in table] != ["VOX EQ", "fixed path"]:
             failed.append(f"stress.py judge_fixed() {what}: {len(gates)} gates, all ok {ok}, wanted {want}")
     return failed
 

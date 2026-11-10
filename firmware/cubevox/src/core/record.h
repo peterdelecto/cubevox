@@ -23,13 +23,13 @@ constexpr size_t kOffSequence = 8;
 constexpr size_t kOffName = 12;
 constexpr size_t kOffSlots = kOffName + kLayoutNameBytes;
 constexpr size_t kOffSettings = kOffSlots + kSlotCount * kRecordCardFieldBytes;
-constexpr size_t kSettingsBytes = 16;  // output level, input jack, polish comp, retired, top switch, debug, 2 retired, brightness, VOX EQ, 6 reserved
+constexpr size_t kSettingsBytes = 16;  // output level, input jack, 2 retired, top switch, debug, 2 retired, brightness, VOX EQ, 6 reserved
 constexpr size_t kOffCrc = kOffSettings + kSettingsBytes;
 
 // Byte offsets of the settings, in file order. A v1 record has the first two.
 constexpr size_t kOffOutputLevel = kOffSettings;
 constexpr size_t kOffInputJack = kOffSettings + 1;
-constexpr size_t kOffPolishComp = kOffSettings + 2;
+constexpr size_t kOffRetiredComp = kOffSettings + 2;  // written 0, ignored on read whatever it holds; earlier firmware reads 0 as OFF
 constexpr size_t kOffRetiredPolishEq = kOffSettings + 3;  // POLISH EQ's ON/OFF until VOX EQ replaced it; written 0, ignored on read
 constexpr size_t kOffTopSwitch = kOffSettings + 4;
 constexpr size_t kOffDebug = kOffSettings + 5;  // a record written before it existed holds 0 here, which reads as OFF
@@ -68,8 +68,8 @@ using RecordBytes = std::array<uint8_t, kRecordBytes>;
 
 RecordBytes encodeRecord(const RecordData& rec);
 
-// False when magic, schema, CRC or a settings byte is wrong. A v1 record decodes with the default
-// polish settings; encodeRecord always writes v2. Unknown card ids decode to Card::Empty and set
+// False when magic, schema, CRC or a settings byte is wrong. A v1 record decodes with the later
+// settings at their defaults; encodeRecord always writes v2. Unknown card ids decode to Card::Empty and set
 // `out.unknownCard`.
 bool decodeRecord(const uint8_t* bytes, RecordData& out);
 

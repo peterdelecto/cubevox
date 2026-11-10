@@ -1,6 +1,6 @@
 // cubevox-render: loop in, the front half of VOX EQ, gates + autotune + formant + octave + crowd +
-// unison + slapback + growl + distortion + gate + lofi + bloom + reverb, then the polish tail (comp, the
-// back half of eq) and the output ceiling like the box, processed mono 48 kHz f32 WAV out.
+// unison + slapback + growl + distortion + gate + lofi + bloom + reverb, then the back half of VOX EQ
+// and the output ceiling like the box, processed mono 48 kHz f32 WAV out.
 
 #include <cmath>
 #include <cstdio>
@@ -20,7 +20,6 @@
 #include "engine/octave_fx.h"
 #include "engine/pitch_params.h"
 #include "engine/polish.h"
-#include "engine/polish_comp.h"
 #include "engine/reverb.h"
 #include "engine/slapback.h"
 #include "engine/soft_ceiling.h"
@@ -47,10 +46,8 @@ struct RenderParams {
   bool lofiOn = false;
   bool bloomOn = false;
   bool reverbOn = false;
-  bool compOn = true;  // the polish tail runs as on the box unless switched off
   bool eqOn = true;
-  bool compStats = false;  // print the comp's gain reduction after the render
-  const char* compName = "firm";  // the tuning in rp.comp; the default tuning is firm
+  bool ceilingStats = false;  // print the output ceiling's peaks after the render
   const char* drivePath = nullptr;  // where Apraxia's drive goes, one value a sample
   const char* shiftPath = nullptr;  // where the glided SHIFT goes, -7..0 st onto -1..0, one value a sample
   cv::GateParams inGate;
@@ -65,7 +62,6 @@ struct RenderParams {
   cv::LofiParams lofi;
   cv::BloomParams bloom;
   cv::ReverbParams reverb;
-  cv::PolishCompParams comp;
   cv::PolishParams eq;
 };
 
@@ -87,7 +83,7 @@ int usage() {
                "       [--ingate <-80..-30 dB>] [--gate <-70..-10 dB>]\n"
                "       [--lofi <0..1>, the AMOUNT pot] [--lofi-tone <0..1>, the TONE pot]\n"
                "       [--amount <0..1>] [--length <20..3000 ms>]\n"
-               "       [--polish-comp firm|off] [--vox-eq off|on|cuts] [--comp-stats]\n"
+               "       [--vox-eq off|on|cuts] [--ceiling-stats]\n"
                "       [--eqdip <150..600 hz>,<-6..0 db>] [--eqpres <2000..6000 hz>,<0..6 db>]\n"
                "  autotune runs with --autotune, formant with --formant, octave with --octave, in that order, each on the\n"
                "  output of the one before it\n"
@@ -109,18 +105,17 @@ int usage() {
                "  lofi runs with --lofi or --lofi-tone (the other one defaults to 0.5), where the gate sits\n"
                "  at least one stage must run; order is eq front, ingate, autotune, formant, octave, crowd, unison, slapback,\n"
                "  growl, distortion,\n"
-               "  gate, lofi, bloom, reverb, comp, eq back\n"
+               "  gate, lofi, bloom, reverb, eq back\n"
                "  bloom, the Chatter card, runs with --amount (AMOUNT, default 0.5) or --length (LENGTH, default 300 ms); with --ingate its\n"
                "  word key is the input gate's open state, otherwise it listens to its own input; it cuts its slices from\n"
                "  its own input, which is also its dry path\n"
                "  the box's output ceiling, bit-exact below -2 dBFS, always runs after the last stage\n"
                "  ingate and gate run only with their flag; a flag enables that gate at that threshold\n"
                "  VOX EQ's front half (40 Hz subsonic high-pass, de-esser, and with cuts the 70 Hz high-pass and 6 kHz low-pass) runs ahead of every\n"
-               "  stage and its back half (300 Hz dip, 3.5 kHz presence, trim) runs after the comp\n"
-               "  comp and eq run by default, the comp at its firm tuning and the eq at cuts (the box's menu default is off)\n"
-               "  --polish-comp off and --vox-eq off\n"
-               "  switch them out for A/B listening, --vox-eq off for both halves, --vox-eq on for the eq without the cuts\n"
-               "  --comp-stats prints the comp's average and peak gain reduction, read once per block, and the ceiling's peaks\n"
+               "  stage and its back half (300 Hz dip, 3.5 kHz presence, trim) runs after the last stage\n"
+               "  the eq runs by default at cuts (the box's menu default is off); --vox-eq off switches both halves out\n"
+               "  for A/B listening, --vox-eq on runs the eq without the cuts\n"
+               "  --ceiling-stats prints the output ceiling's peaks in and out and the samples past its knee\n"
                "  k: baseDelayMs0 baseDelayMs1 lfoHz0 lfoHz1 swingMinMs swingMaxMs wetMaxDb trimDb\n"
                "     topFrom topSwingGain topWetDb\n"
                "     (the Unison keys: the taps must stay on the line, lfoHz 0..20, the dB keys -24..24, topFrom 0..1,\n"
@@ -180,16 +175,6 @@ bool parseFloat(const char* s, float* out) {
   char* end = nullptr;
   *out = std::strtof(s, &end);
   return end != s && *end == '\0' && std::isfinite(*out);
-}
-
-// firm or on runs the comp at its one tuning, off switches it out.
-bool parseCompChoice(const char* s, RenderParams* rp) {
-  if (std::strcmp(s, "off") == 0) {
-    rp->compOn = false;
-    return true;
-  }
-  rp->compOn = true;
-  return std::strcmp(s, "on") == 0 || std::strcmp(s, "firm") == 0;
 }
 
 // "hz,db", each a finite number.
@@ -559,10 +544,8 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
           rp.bloom.lengthMs > cv::Bloom::kLengthMaxMs)
         return false;
       haveBloom = true;
-    } else if (std::strcmp(a, "--comp-stats") == 0) {
-      rp.compStats = true;
-    } else if (std::strcmp(a, "--polish-comp") == 0 && i + 1 < argc) {
-      if (!parseCompChoice(argv[++i], &rp)) return false;
+    } else if (std::strcmp(a, "--ceiling-stats") == 0) {
+      rp.ceilingStats = true;
     } else if (std::strcmp(a, "--vox-eq") == 0 && i + 1 < argc) {
       const char* v = argv[++i];
       if (std::strcmp(v, "cuts") == 0) {
@@ -683,7 +666,6 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
   rp.lofi.on = haveLofi;
   rp.reverbOn = haveReverb;
   rp.reverb.on = haveReverb;
-  rp.comp.on = rp.compOn;
   rp.eq.on = rp.eqOn;
   rp.inGateOn = haveInGate;
   rp.inGate.on = haveInGate;
@@ -695,7 +677,7 @@ bool parseArgs(int argc, char** argv, const char** in, const char** out,
   return rp.inGateOn || rp.gateOn || rp.autotuneOn || rp.formantOn || rp.octaveOn || rp.crowdOn || rp.unisonOn || rp.slapOn || rp.growlOn || rp.distOn || rp.lofiOn ||
          rp.bloomOn ||
          rp.reverbOn ||
-         rp.compOn || rp.eqOn;
+         rp.eqOn;
 }
 
 // Writes `frames` mono frames from `x`; false when the encoder takes fewer.
@@ -767,7 +749,6 @@ int render(const char* inPath, const char* outPath, const RenderParams& rp) {
   static cv::Lofi lofi;
   static cv::Bloom bloom;
   static cv::Reverb reverb;
-  static cv::PolishComp polishComp;
   static cv::Polish polish;
   inGate.reset();
   gate.reset();
@@ -783,16 +764,12 @@ int render(const char* inPath, const char* outPath, const RenderParams& rp) {
   lofi.reset();
   bloom.reset();
   reverb.reset();
-  polishComp.reset();
   polish.reset();
 
   float inBuf[cv::kBlock];
   float bufA[cv::kBlock];
   float bufB[cv::kBlock];
   float* const scratch[2] = {bufA, bufB};
-  double reductionSum = 0.0;  // comp gain reduction in dB, read at the end of each block, weighted by its length
-  double reductionPeak = 0.0;
-  double reductionSamples = 0.0;
   double ceilingPeakIn = 0.0;  // largest sample into the output ceiling and out of it
   double ceilingPeakOut = 0.0;
   double ceilingTouched = 0.0;  // samples past the ceiling's knee
@@ -893,15 +870,6 @@ int render(const char* inPath, const char* outPath, const RenderParams& rp) {
         src = scratch[next];
         next ^= 1;
       }
-      if (rp.compOn) {
-        polishComp.process(src, scratch[next], n, rp.comp);
-        const double reduction = polishComp.gainReductionDb();
-        reductionSum += reduction * n;
-        reductionSamples += n;
-        if (reduction > reductionPeak) reductionPeak = reduction;
-        src = scratch[next];
-        next ^= 1;
-      }
       if (rp.eqOn) {
         polish.processBack(src, scratch[next], n, rp.eq);
         src = scratch[next];
@@ -938,13 +906,7 @@ int render(const char* inPath, const char* outPath, const RenderParams& rp) {
     if (e != nullptr) ma_encoder_uninit(e);
   }
   ma_decoder_uninit(&dec);
-  if (rc == 0 && rp.compStats) {
-    if (rp.compOn && reductionSamples > 0.0) {
-      std::printf("comp %s: average gain reduction %.2f dB, peak %.2f dB\n", rp.compName, reductionSum / reductionSamples,
-                  reductionPeak);
-    } else {
-      std::printf("comp: off\n");
-    }
+  if (rc == 0 && rp.ceilingStats) {
     std::printf("ceiling: peak in %.3f (%+.2f dBFS), out %.3f (%+.2f dBFS), %.0f of %.0f samples past the %.0f dBFS knee\n",
                 ceilingPeakIn, 20.0 * std::log10(ceilingPeakIn), ceilingPeakOut, 20.0 * std::log10(ceilingPeakOut),
                 ceilingTouched, ceilingSamples, 20.0 * std::log10(cv::kSoftCeilingKnee));

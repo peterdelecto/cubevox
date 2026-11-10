@@ -38,7 +38,6 @@
 #include "test/pitch_series.h"
 #include "engine/slapback.h"
 #include "engine/polish.h"
-#include "engine/polish_comp.h"
 #include "engine/reverb.h"
 #include "engine/soft_ceiling.h"
 #include "engine/unison.h"
@@ -89,7 +88,6 @@ struct ProtoParams {
   cv::SlapbackParams slapback{true, kStartSlapMix, {}};
   cv::DistortionParams distortion{true, kStartDrive, kStartTone, {}};
   cv::ReverbParams reverb;
-  cv::PolishCompParams comp;  // the chain tail, always on here like the box default: comp, then eq
   cv::PolishParams eq;
   // Cmd+Shift+D shows our test control: Advanced.
   bool dev = false;
@@ -174,7 +172,6 @@ cv::Unison gUnison;
 cv::Slapback gSlapback;
 cv::Distortion gDistortion;
 cv::Reverb gReverb;
-cv::PolishComp gPolishComp;
 cv::Polish gPolish;
 cv::stagefb::StageFeedback gStageFeedback;
 LoopBuffer* gLastLoop = nullptr;
@@ -268,7 +265,6 @@ void dataCallback(ma_device*, void* output, const void* input, ma_uint32 frameCo
     gSlapback.reset();
     gDistortion.reset();
     gReverb.reset();
-    gPolishComp.reset();
     gPolish.reset();
     gStageFeedback.reset(1u);
   }
@@ -315,8 +311,7 @@ void dataCallback(ma_device*, void* output, const void* input, ma_uint32 frameCo
     gDistortion.process(tmp.data(), mono.data(), n, params.distortion);
     gGate.process(mono.data(), tmp.data(), n, params.gate);
     gReverb.process(tmp.data(), mono.data(), n, params.reverb);
-    gPolishComp.process(mono.data(), tmp.data(), n, params.comp);
-    gPolish.processBack(tmp.data(), mono.data(), n, params.eq);
+    gPolish.processBack(mono.data(), mono.data(), n, params.eq);
     // The box's output ceiling, last in the chain.
     for (int i = 0; i < n; ++i) mono[i] = cv::softCeiling(mono[i]);
     // Mute: silence out, so the wedge loop hears exactly what a muted box would send.
@@ -1210,7 +1205,7 @@ void drawGateTuning(cv::GateParams& g, const char* block) {
 }
 
 // Four plain controls; the band frequencies live under Advanced. Mud cut runs
-// right = more cut. The two de-esser controls act ahead of slot 1, the others after the comp.
+// right = more cut. The two de-esser controls act ahead of slot 1, the others after the last slot.
 void drawEqTuning(cv::PolishParams& e) {
   if (!tuningHeader("eq")) return;
   const ImGuiSliderFlags log = ImGuiSliderFlags_Logarithmic;

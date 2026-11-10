@@ -43,7 +43,6 @@ enum class Item : uint8_t {
   DistortionGrowl,
   Slot7Card,
   Reverb,
-  PolishComp,
   VoxEq,
   Output,
   TopSwitch,
@@ -107,7 +106,6 @@ const char* itemLabel(Item it, const Layout& layout, char* buf, size_t size) {
     case Item::UnisonCrowd:
     case Item::DistortionGrowl:
     case Item::Slot7Card: return slotLabel(swapSlotOf(layout, swapSlotOfItem(it)), buf, size);
-    case Item::PolishComp: return "POLISH COMP";
     case Item::VoxEq: return "VOX EQ";
     case Item::Debug: return "DEBUG";
     case Item::UpdateFirmware: return "UPDATE FIRMWARE";
@@ -139,7 +137,6 @@ const char* itemValue(Item it, const UiContext& ctx) {
     case Item::UnisonCrowd:
     case Item::DistortionGrowl:
     case Item::Slot7Card: return swapWord(ctx.layout, swapSlotOfItem(it));
-    case Item::PolishComp: return onOff(s.polishComp);
     case Item::VoxEq: return voxEqValue(s.voxEq);
     case Item::Debug: return onOff(s.debug);
     case Item::UpdateFirmware: return ">";
@@ -225,7 +222,6 @@ UiAction Menu::onClick() {
         case Item::UnisonCrowd: return UiAction::SwapUnisonCrowd;
         case Item::DistortionGrowl: return UiAction::SwapDistortionGrowl;
         case Item::Slot7Card: return UiAction::CycleSlot7Card;
-        case Item::PolishComp: return UiAction::TogglePolishComp;
         case Item::VoxEq: return UiAction::CycleVoxEq;
         case Item::Debug: return UiAction::ToggleDebug;
         case Item::UpdateFirmware: mode_ = Mode::ConfirmDfu; break;

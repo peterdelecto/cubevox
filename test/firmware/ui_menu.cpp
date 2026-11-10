@@ -113,7 +113,7 @@ bool sameCanvas(const Canvas& a, const Canvas& b) {
 }
 
 bool sameSettings(const Settings& a, const Settings& b) {
-  return a.outputLevel == b.outputLevel && a.inputJack == b.inputJack && a.polishComp == b.polishComp &&
+  return a.outputLevel == b.outputLevel && a.inputJack == b.inputJack &&
          a.voxEq == b.voxEq && a.topSwitch == b.topSwitch && a.brightness == b.brightness && a.debug == b.debug;
 }
 
@@ -159,10 +159,10 @@ struct MenuRig {
   }
 };
 
-// The list rows, top to bottom (spec 2026-10-24-polish-design.md). The list shows kVisible of them
-// at a time and scrolls.
+// The list rows, top to bottom (specs 2026-10-24-polish-design.md and 2026-11-10-comp-removal-design.md).
+// The list shows kVisible of them at a time and scrolls.
 enum Row {
-  kInput, kOctaveFormant, kUnisonCrowd, kDistortionGrowl, kSlot7Card, kReverb, kPolishComp, kVoxEq, kOutput, kTopSwitch,
+  kInput, kOctaveFormant, kUnisonCrowd, kDistortionGrowl, kSlot7Card, kReverb, kVoxEq, kOutput, kTopSwitch,
   kBrightness, kDebug, kUpdate, kExit, kRowCount
 };
 constexpr int kVisible = 4;
@@ -185,10 +185,10 @@ constexpr int rowOnScreen(int item) { return item < kVisible ? item : kVisible -
 // The label of each item, and the value it shows for the default settings and the default layout,
 // which holds Octave in slot 3, Unison in slot 4, Distortion in slot 6, Gate in slot 7 and Spring in
 // slot 8. Exit has no value and Update firmware shows a chevron.
-const char* const kLabel[kRowCount] = {"INPUT PAD",   "SLOT 3",    "SLOT 4", "SLOT 6",     "SLOT 7",
-                                       "SLOT 8",      "POLISH COMP", "VOX EQ", "OUTPUT PAD", "TOP SWITCH",
-                                       "OLED BRIGHT", "DEBUG",     "UPDATE FIRMWARE", "EXIT"};
-const char* const kDefaultValue[kRowCount] = {"OFF", "OCTAVE", "UNISON", "DISTORTION", "GATE", "SPRING", "ON",
+const char* const kLabel[kRowCount] = {"INPUT PAD",   "SLOT 3", "SLOT 4", "SLOT 6",          "SLOT 7",
+                                       "SLOT 8",      "VOX EQ", "OUTPUT PAD", "TOP SWITCH",
+                                       "OLED BRIGHT", "DEBUG",  "UPDATE FIRMWARE", "EXIT"};
+const char* const kDefaultValue[kRowCount] = {"OFF", "OCTAVE", "UNISON", "DISTORTION", "GATE", "SPRING",
                                               "OFF", "OFF",    "MUTE",   "HIGH",       "OFF",  ">",      ""};
 
 // The row as the test names it: the label, then the value after a space.
@@ -234,7 +234,7 @@ void checkMenuList() {
   MenuRig m;
   m.step(0, true);
   m.draw();
-  check(kRowCount == 14, "menu: the list holds fourteen items");
+  check(kRowCount == 13, "menu: the list holds thirteen items");
   for (int r = 0; r < kVisible; ++r) {
     const std::string name = rowName(r, kDefaultValue[r]);
     check(listRowIs(m.canvas, r, kLabel[r], kDefaultValue[r], r == kInput), name.c_str());
@@ -272,7 +272,7 @@ void checkMenuListGeometry() {
             lineIs(m.canvas, 47, false) && lineIs(m.canvas, 48, false),
         "menu: a bar on row 2 covers lines 32 to 45 and no line beside them");
 
-  // Every item shown on a row without the bar, so its ink is measured as lit pixels. Six views,
+  // Every item shown on a row without the bar, so its ink is measured as lit pixels. Seven views,
   // each a cursor position and the window top it gives, put each of the thirteen items on such a row.
   struct View {
     int jumpTo;
@@ -281,7 +281,7 @@ void checkMenuListGeometry() {
   };
   const View views[] = {{kInput, 0, 0},
                         {kOctaveFormant, 0, 0},
-                        {kPolishComp, 0, kPolishComp - (kVisible - 1)},
+                        {kVoxEq, 0, kVoxEq - (kVisible - 1)},
                         {kTopSwitch, 0, kTopSwitch - (kVisible - 1)},
                         {kBrightness, 0, kBrightness - (kVisible - 1)},
                         {kExit, 0, kLastTop},
@@ -322,7 +322,6 @@ void checkMenuListGeometry() {
       {kDistortionGrowl, {"DISTORTION", "DEEPTHROAT"}},
       {kSlot7Card, {"GATE", "LO-FI", "CHATTER"}},
       {kReverb, {"SPRING", "CHASM"}},
-      {kPolishComp, {"ON", "OFF"}},
       {kVoxEq, {"OFF", "ON", "ON+CUTS"}},
       {kOutput, {"OFF", "ON"}},
       {kTopSwitch, {"MUTE", "BYPASS"}},
@@ -343,12 +342,12 @@ void checkMenuListGeometry() {
 }
 
 // The window starts at the top and moves only when the cursor leaves it, by one row for a step.
-// Going down it scrolls at items 4 to 13; coming back up it holds until the cursor passes its top
-// row, so it scrolls at items 9 to 0. The window top runs from 0 to 10. Each expected canvas is
+// Going down it scrolls at items 4 to 12; coming back up it holds until the cursor passes its top
+// row, so it scrolls at items 8 to 0. The window top runs from 0 to 9. Each expected canvas is
 // composed from literal y values.
 void checkMenuScroll() {
-  static const int kTopGoingDown[kRowCount] = {0, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
-  static const int kTopComingBack[kRowCount] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 10, 10, 10};
+  static const int kTopGoingDown[kRowCount] = {0, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+  static const int kTopComingBack[kRowCount] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 9, 9, 9};
 
   MenuRig m;
   m.step(0, true);
@@ -468,11 +467,10 @@ struct Click {
   const char* back;
 };
 
-const std::array<Click, 7> kClicks = {{
+const std::array<Click, 6> kClicks = {{
     {kInput, UiAction::ToggleInputJack, ui::ApplyResult::SettingsChanged, "ON", "OFF"},
     {kOctaveFormant, UiAction::SwapOctaveFormant, ui::ApplyResult::LayoutChanged, "FORMANT", "APRAXIA"},
     {kReverb, UiAction::SwapReverb, ui::ApplyResult::LayoutChanged, "CHASM", "SPRING"},
-    {kPolishComp, UiAction::TogglePolishComp, ui::ApplyResult::SettingsChanged, "OFF", "ON"},
     {kOutput, UiAction::ToggleOutput, ui::ApplyResult::SettingsChanged, "ON", "OFF"},
     {kTopSwitch, UiAction::CycleTopSwitch, ui::ApplyResult::SettingsChanged, "BYPASS", "MUTE"},
     {kDebug, UiAction::ToggleDebug, ui::ApplyResult::SettingsChanged, "ON", "OFF"},
@@ -501,9 +499,9 @@ Settings clickEveryRow(MenuRig& m) {
 void checkMenuClicks() {
   MenuRig m;
   const Settings flipped = clickEveryRow(m);
-  check(!flipped.polishComp && flipped.voxEq == VoxEq::Off && flipped.outputLevel == OutputLevel::Mic &&
+  check(flipped.voxEq == VoxEq::Off && flipped.outputLevel == OutputLevel::Mic &&
             flipped.inputJack == InputJack::Line && flipped.topSwitch == TopSwitch::Bypass && flipped.debug,
-        "menu: five clicks flipped the five two-state settings");
+        "menu: four clicks flipped the four two-state settings");
   check(m.layout.card[kReverbSlot] == Card::ReverbChasm, "menu: the reverb click swapped the reverb card");
   check(m.layout.card[kOctaveSlot] == Card::Formant, "menu: the Octave and Formant click swapped Octave for Formant");
   int at = kDebug;
@@ -520,7 +518,7 @@ void checkMenuClicks() {
   }
   Layout followed = defaultLayout();
   followed.card[kOctaveSlot] = Card::FormantFollower;
-  check(m.settings.polishComp && m.settings.voxEq == VoxEq::Off && m.settings.outputLevel == OutputLevel::Line &&
+  check(m.settings.voxEq == VoxEq::Off && m.settings.outputLevel == OutputLevel::Line &&
             m.settings.inputJack == InputJack::Mic && m.settings.topSwitch == TopSwitch::Mute && !m.settings.debug &&
             m.layout == followed,
         "menu: a second click on each row restores the defaults, and slot 3 moves on to Apraxia");
@@ -994,13 +992,13 @@ void checkMenuDebugRow() {
   check(!m.settings.debug, "menu: a second click turns it OFF");
 }
 
-// The fourteen rows in list order, with the labels written out and the cursor walked down one step at
+// The thirteen rows in list order, with the labels written out and the cursor walked down one step at
 // a time. The input filters are not on the list, the five SLOT rows run in slot order from SLOT 3 to
-// SLOT 8 between INPUT PAD and POLISH COMP, and OLED BRIGHT sits between TOP SWITCH and DEBUG.
+// SLOT 8 between INPUT PAD and VOX EQ, and OLED BRIGHT sits between TOP SWITCH and DEBUG.
 void checkMenuRowOrder() {
-  static const char* const kSpecOrder[kRowCount] = {"INPUT PAD",   "SLOT 3",      "SLOT 4",    "SLOT 6", "SLOT 7",
-                                                    "SLOT 8",      "POLISH COMP", "VOX EQ", "OUTPUT PAD", "TOP SWITCH",
-                                                    "OLED BRIGHT", "DEBUG",       "UPDATE FIRMWARE", "EXIT"};
+  static const char* const kSpecOrder[kRowCount] = {"INPUT PAD",   "SLOT 3", "SLOT 4",          "SLOT 6",     "SLOT 7",
+                                                    "SLOT 8",      "VOX EQ", "OUTPUT PAD",      "TOP SWITCH",
+                                                    "OLED BRIGHT", "DEBUG",  "UPDATE FIRMWARE", "EXIT"};
   MenuRig m;
   m.step(0, true);
   bool inOrder = true;
@@ -1009,8 +1007,8 @@ void checkMenuRowOrder() {
     m.draw();
     inOrder = inOrder && listRowIs(m.canvas, rowOnScreen(cursor), kSpecOrder[cursor], kDefaultValue[cursor], true);
   }
-  check(inOrder && kRowCount == 14,
-        "menu: the rows run INPUT PAD, SLOT 3, SLOT 4, SLOT 6, SLOT 7, SLOT 8, POLISH COMP, VOX EQ, OUTPUT PAD, "
+  check(inOrder && kRowCount == 13,
+        "menu: the rows run INPUT PAD, SLOT 3, SLOT 4, SLOT 6, SLOT 7, SLOT 8, VOX EQ, OUTPUT PAD, "
         "TOP SWITCH, OLED BRIGHT, DEBUG, UPDATE FIRMWARE, EXIT");
 }
 
@@ -1022,7 +1020,7 @@ void checkMenuVoxEqSavedAndPlayed() {
   m.draw();
   check(cursorRowIs(m.canvas, rowOnScreen(kVoxEq), kVoxEq, "OFF"), "menu: the VOX EQ row starts at OFF");
   ChainSnapshot snap = composeSnapshot(m.layout, m.panel, m.settings, BenchOverrides());
-  check(!snap.params.eq.on && snap.params.comp.on, "menu: at OFF the stage does not run and POLISH COMP stays on");
+  check(!snap.params.eq.on, "menu: at OFF the stage does not run");
 
   struct Step {
     const char* value;
@@ -1037,7 +1035,7 @@ void checkMenuVoxEqSavedAndPlayed() {
     m.draw();
     check(cursorRowIs(m.canvas, rowOnScreen(kVoxEq), kVoxEq, s.value), (std::string("menu: the VOX EQ row reads ") + s.value).c_str());
     snap = composeSnapshot(m.layout, m.panel, m.settings, BenchOverrides());
-    check(snap.params.eq.on == s.on && (!s.on || snap.params.eq.cuts == s.cuts) && snap.params.comp.on,
+    check(snap.params.eq.on == s.on && (!s.on || snap.params.eq.cuts == s.cuts),
           (std::string("menu: at ") + s.value + " the snapshot carries the stage and the cuts as set").c_str());
   }
 
@@ -1047,7 +1045,7 @@ void checkMenuVoxEqSavedAndPlayed() {
   saved.layout = m.layout;
   const RecordBytes bytes = encodeRecord(saved);
   RecordData loaded;
-  check(decodeRecord(bytes.data(), loaded) && loaded.settings.voxEq == VoxEq::Cuts && loaded.settings.polishComp,
+  check(decodeRecord(bytes.data(), loaded) && loaded.settings.voxEq == VoxEq::Cuts,
         "menu: the record keeps VOX EQ at ON+CUTS");
 
   MenuRig again;
@@ -1083,19 +1081,18 @@ void checkMenuClicksSavedAndPlayed() {
   saved.settings = flipped;
   saved.layout = m.layout;
   RecordData loaded;
-  check(decodeRecord(encodeRecord(saved).data(), loaded) && loaded.settings.polishComp == flipped.polishComp &&
+  check(decodeRecord(encodeRecord(saved).data(), loaded) &&
             loaded.settings.voxEq == flipped.voxEq && loaded.settings.outputLevel == flipped.outputLevel &&
             loaded.settings.inputJack == flipped.inputJack && loaded.settings.topSwitch == flipped.topSwitch &&
             loaded.settings.debug && loaded.layout == m.layout && loaded.layout.card[7] == Card::ReverbChasm,
         "menu: the flipped settings and the swapped reverb card survive a save and a reload");
   const ChainSnapshot snap = composeSnapshot(m.layout, m.panel, flipped, BenchOverrides());
-  check(!snap.params.comp.on && !snap.params.eq.on && snap.outputGain < 0.3f,
+  check(!snap.params.eq.on && snap.outputGain < 0.3f,
         "menu: the flipped settings reach the audio snapshot");
   check(snap.params.reverb.engine == cv::kReverbChasm && snap.layout == m.layout,
         "menu: the swapped reverb card reaches the audio snapshot");
   const ChainSnapshot fresh = composeSnapshot(m.layout, m.panel, Settings(), BenchOverrides());
-  check(fresh.params.comp.on && !fresh.params.eq.on && fresh.outputGain == 1.0f,
-        "menu: the default snapshot has POLISH COMP on and VOX EQ off");
+  check(!fresh.params.eq.on && fresh.outputGain == 1.0f, "menu: the default snapshot has VOX EQ off");
 }
 
 // A click that changes the layout, OLED BRIGHT or DEBUG leaves a record in flash that the next boot
@@ -1144,10 +1141,10 @@ void checkMenuDeafUntilListening() {
 
 void checkMenuWrapAndCombo() {
   MenuRig m;
-  m.openListAt(kRowCount + kPolishComp);  // a full lap and more detents lands on POLISH COMP
+  m.openListAt(kRowCount + kVoxEq);  // a full lap and more detents lands on VOX EQ
   m.draw();
-  check(cursorRowIs(m.canvas, rowOnScreen(kPolishComp), kPolishComp, "ON"), "menu: a lap and six detents wraps around the list");
-  m.step(-(kRowCount + kPolishComp), false);  // back by the same lands on item 0
+  check(cursorRowIs(m.canvas, rowOnScreen(kVoxEq), kVoxEq, "OFF"), "menu: a lap and six detents wraps around the list");
+  m.step(-(kRowCount + kVoxEq), false);  // back by the same lands on item 0
   m.draw();
   check(cursorRowIs(m.canvas, kInput, kInput, "OFF"), "menu: a lap and six detents back wraps the other way");
 
@@ -1447,6 +1444,15 @@ void checkScreenshots() {
   scrolled.draw();
   check(sameCanvas(scrolled.canvas, listCanvas(kLastTop, kExit)), "screens: scrolled menu rows");
   writePgm(scrolled.canvas, "oled-menu-scrolled.pgm");
+
+  // The VOX EQ row with the cursor on it, directly below SLOT 8.
+  MenuRig vox;
+  vox.openListAt(kVoxEq);
+  vox.draw();
+  check(cursorRowIs(vox.canvas, rowOnScreen(kVoxEq), kVoxEq, "OFF") &&
+            listRowIs(vox.canvas, rowOnScreen(kVoxEq) - 1, kLabel[kReverb], kDefaultValue[kReverb]),
+        "screens: menu rows with the cursor on VOX EQ, directly below SLOT 8");
+  writePgm(vox.canvas, "oled-menu-vox-eq.pgm");
 
   m.menu.showChainView();
   m.draw();

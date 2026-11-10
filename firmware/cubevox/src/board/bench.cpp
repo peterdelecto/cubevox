@@ -12,15 +12,13 @@
 
 namespace {
 
-// The eight slots in order, then the two polish stages under their names.
+// The eight slots in order, then VOX EQ under its name.
 void printSlotRow(const char* label, const std::array<uint32_t, kStatBuckets>& values) {
   serialOut().print(label);
   for (int s = 0; s < kSlotCount; ++s) {
     serialOut().print(' ');
     serialOut().print(values[s]);
   }
-  serialOut().print(" COMP ");
-  serialOut().print(values[kStatComp]);
   serialOut().print(" EQ ");
   serialOut().print(values[kStatEq]);
 }

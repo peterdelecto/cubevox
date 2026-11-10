@@ -34,9 +34,6 @@ ApplyResult cycleCard(Layout& layout, SwapSlot which) {
 
 ApplyResult applyAction(const UiAction& action, Settings& settings, Layout& layout) {
   switch (action) {
-    case UiAction::TogglePolishComp:
-      settings.polishComp = !settings.polishComp;
-      return ApplyResult::SettingsChanged;
     case UiAction::CycleVoxEq:
       settings.voxEq = nextVoxEq(settings.voxEq);
       return ApplyResult::SettingsChanged;

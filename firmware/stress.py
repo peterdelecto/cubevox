@@ -14,25 +14,23 @@ glide, the costliest moving block), both Chatter knobs, both Lo-fi knobs, both A
 RANGE), both Deepthroat knobs (GROWL, MIX) and, when Crowd is placed, both Crowd
 knobs from 0 % to 100 % of travel in steps of 10 %, 1 s each, reading the counters after each sweep.
 It then flips the toggle of every Echo, Input gate, Gate, Unison, Chatter, Apraxia and Deepthroat
-slot ten times, 0.3 s apart, so the engine starts from reset five times, and reads the counters again. The last step flips BYPASS,
-POLISH COMP and VOX EQ the same way (bench ops bypass, polish_comp, vox_eq; each leaves the box
-as it found it) and reads the counters once more. The VOX EQ flips force the stage off and back on
-from ON+CUTS.
+slot ten times, 0.3 s apart, so the engine starts from reset five times, and reads the counters again. The last step flips BYPASS
+and VOX EQ the same way (bench ops bypass, vox_eq; each leaves the box as it found it) and reads the
+counters once more. The VOX EQ flips force the stage off and back on from ON+CUTS.
 
 Per slot the mean is pass 1's mean and the worst is the largest worst over both passes. Across runs
 the mean is the mean of the run means and the worst is the lowest run worst, which is the rule in
 core/costs.h, so a block that caught an interrupt does not count. The fixed path is read the same
-way. POLISH COMP and VOX EQ come from the COMP and EQ buckets of the stats lines. The fixed path
-is the block total less the slot sum for the mean, and for the worst the two buckets at their worst
-plus the rest of the fixed path (ceiling, BYPASS mix, conversion) at its mean.
+way. VOX EQ comes from the EQ bucket of the stats lines. The fixed path is the block total less the
+slot sum for the mean, and for the worst the EQ bucket at its worst plus the rest of the fixed path
+(ceiling, BYPASS mix, conversion) at its mean.
 
 Gates (each named in the output when it fails, exit 1 if any fails):
   1. late blocks, overruns and dry blocks are 0 for the whole run
   2. each placed card's mean % and worst % stay at or under its costs.h row
   3. each layout's block mean stays under 75 % and its block worst under 95 %
-  4. each layout's VOX EQ (at ON+CUTS) and POLISH COMP buckets stay at or under kVoxEq and kPolishComp, and
-     its fixed path mean % and worst % at or under kFixed, the sum of kVoxEq, kPolishComp,
-     kSoftCeiling and kBypassMix
+  4. each layout's VOX EQ bucket (at ON+CUTS) stays at or under kVoxEq, and its fixed path mean %
+     and worst % at or under kFixed, the sum of kVoxEq, kSoftCeiling and kBypassMix
 Each card's slot is held to its own row. A slot that runs a tracker adds the tracker row: Autotune's slot,
 a Formant or Apraxia slot that does not sit directly behind Autotune, and a Mob or Deepthroat slot with no
 Autotune ahead of it.
@@ -92,7 +90,6 @@ FLIPPED_CARDS = ("slapback", "input_gate", "gate", "unison", "bloom", "formant_f
 # The fixed stages' levers, as (bench op, label, the line the box prints with the flag set, with it clear).
 FIXED_LEVERS = (
     ("bypass", "BYPASS", "[bench] BYPASS held on", "[bench] BYPASS follows the top switch"),
-    ("polish_comp", "POLISH COMP", "[bench] POLISH COMP forced off", "[bench] POLISH COMP follows the menu"),
     ("vox_eq", "VOX EQ", "[bench] VOX EQ forced off", "[bench] VOX EQ follows the menu"),
 )
 # The words of the protocol's vox_eq setting, and the one every layout runs at: ON+CUTS is the heaviest
@@ -120,19 +117,18 @@ FORMANT_CARDS = ("formant", "formant_follow")  # Formant and Apraxia play one vo
 READERS = ("crowd", "growl")  # cards that read Autotune's tracker when one sits ahead and run their own otherwise
 NEEDED_OPS = ("slots_live", "all_on", "slot_off", "knobs_live", "pin_knobs", "set_knob", "reset_peaks", "stats",
               "clip", "chasm", *(lever[0] for lever in FIXED_LEVERS))
-# The fixed path's rows: VOX EQ and POLISH COMP are read from their buckets, and the four add to kFixed.
-FIXED_PARTS = ("kVoxEq", "kPolishComp", "kSoftCeiling", "kBypassMix")
+# The fixed path's rows: VOX EQ is read from its bucket, and the three add to kFixed.
+FIXED_PARTS = ("kVoxEq", "kSoftCeiling", "kBypassMix")
 FIXED_ROW = "kFixed"
 
 COST_ROW = re.compile(r"constexpr\s+Cost\s+(k\w+)\s*\{\s*(\d+)\s*,\s*(\d+)\s*,\s*(?:true|false)\s*\}")
 BLOCKS_LINE = re.compile(r"\[audio\] blocks (\d+) late (\d+) overruns (\d+) dry (\d+) avg (\d+) worst (\d+) of (\d+) cycles")
-PER_SLOT_LINE = re.compile(r"\[audio\] per slot ((?:\d+ )+)COMP (\d+) EQ (\d+)")
-SLOT_WORST_LINE = re.compile(r"\[audio\] slot worst ((?:\d+ )+)COMP (\d+) EQ (\d+)")
+PER_SLOT_LINE = re.compile(r"\[audio\] per slot ((?:\d+ )+)EQ (\d+)")
+SLOT_WORST_LINE = re.compile(r"\[audio\] slot worst ((?:\d+ )+)EQ (\d+)")
 CLIP_LINE = re.compile(r"\[bench\] vocal clip (on|off)")
 CHASM_LINE = re.compile(r"\[bench\] reverb slot runs (Chasm|its card's engine)")
 
-Stats = collections.namedtuple("Stats", "blocks late overruns dry avg worst budget slot_avg slot_worst comp_avg eq_avg "
-                                        "comp_worst eq_worst")
+Stats = collections.namedtuple("Stats", "blocks late overruns dry avg worst budget slot_avg slot_worst eq_avg eq_worst")
 # One sweep: the slot index, the knob (1 or 2) it moves, its label, the other knobs pinned first as (knob,
 # percent of travel) pairs and, for a glide, the partner knob that steps from 0 to 100 % and back inside it.
 Sweep = collections.namedtuple("Sweep", "slot knob label held partner", defaults=((), None))
@@ -277,8 +273,7 @@ def parse_stats(lines):
     if len(slot_avg) != SLOTS or len(slot_worst) != SLOTS:
         raise StressError(f"the stats lines carry {len(slot_avg)} and {len(slot_worst)} slots, not {SLOTS}")
     b = [int(v) for v in blocks.groups()]
-    return Stats(b[0], b[1], b[2], b[3], b[4], b[5], b[6], slot_avg, slot_worst,
-                 int(per.group(2)), int(per.group(3)), int(worst.group(2)), int(worst.group(3)))
+    return Stats(b[0], b[1], b[2], b[3], b[4], b[5], b[6], slot_avg, slot_worst, int(per.group(2)), int(worst.group(2)))
 
 
 class Box:
@@ -520,22 +515,20 @@ def measure_run(box, slots, seconds):
     box.bench_ok("reset_peaks")
     later = pass_two(box, slots)
     every = [first, *later]
-    # The fixed path less its two buckets (ceiling, BYPASS mix, conversion) is read from the mean only.
+    # The fixed path less its EQ bucket (ceiling, BYPASS mix, conversion) is read from the mean only.
     fixed_mean = first.avg - sum(first.slot_avg)
-    rest = max(0, fixed_mean - first.comp_avg - first.eq_avg)
-    comp_worst, eq_worst = max(s.comp_worst for s in every), max(s.eq_worst for s in every)
+    rest = max(0, fixed_mean - first.eq_avg)
+    eq_worst = max(s.eq_worst for s in every)
     return {
         "blocks": first.blocks,
         "block_mean": first.avg,
         "block_worst": max(s.worst for s in every),
         "slot_mean": first.slot_avg,
         "slot_worst": [max(s.slot_worst[i] for s in every) for i in range(SLOTS)],
-        "comp_mean": first.comp_avg,
         "eq_mean": first.eq_avg,
-        "comp_worst": comp_worst,
         "eq_worst": eq_worst,
         "fixed_mean": fixed_mean,
-        "fixed_worst": comp_worst + eq_worst + rest,
+        "fixed_worst": eq_worst + rest,
         "late": first.late + (later[-1].late if later else 0),
         "overruns": first.overruns + (later[-1].overruns if later else 0),
         "dry": first.dry + (later[-1].dry if later else 0),
@@ -547,8 +540,8 @@ def aggregate(runs):
     """Mean of the means, lowest of the worsts, and the counters summed."""
     n = len(runs)
     mean_of = {key: sum(r[key] for r in runs) / n
-               for key in ("block_mean", "comp_mean", "eq_mean", "fixed_mean")}
-    low_of = {key: min(r[key] for r in runs) for key in ("block_worst", "comp_worst", "eq_worst", "fixed_worst")}
+               for key in ("block_mean", "eq_mean", "fixed_mean")}
+    low_of = {key: min(r[key] for r in runs) for key in ("block_worst", "eq_worst", "fixed_worst")}
     return {
         "runs": n,
         **mean_of,
@@ -588,10 +581,9 @@ def run_layout(box, name, slots, chasm, runs, seconds):
 # -- gates and reports
 
 def judge_fixed(agg, rows, label, table, gates):
-    """Adds the fixed stages to the table and holds each to its row: the EQ and COMP buckets to kVoxEq
-    and kPolishComp, and the fixed path to kFixed, the sum of the four fixed rows."""
-    parts = (("VOX EQ", "eq", "kVoxEq"), ("POLISH COMP", "comp", "kPolishComp"),
-             ("fixed path", "fixed", FIXED_ROW))
+    """Adds the fixed stages to the table and holds each to its row: the EQ bucket to kVoxEq, and the
+    fixed path to kFixed, the sum of the three fixed rows."""
+    parts = (("VOX EQ", "eq", "kVoxEq"), ("fixed path", "fixed", FIXED_ROW))
     for name, key, row_name in parts:
         row_mean, row_worst = rows[row_name]
         over = []

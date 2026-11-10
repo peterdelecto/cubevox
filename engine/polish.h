@@ -11,12 +11,11 @@
 
 // VOX EQ voiced for Adam's voice, one stage in two places under one menu row with three settings.
 // The front half runs ahead of slot 1 and holds a 40 Hz subsonic high-pass and a de-esser, plus a
-// 70 Hz high-pass and a 6 kHz low-pass (the cuts) when `cuts` is set. The back half runs after
-// POLISH COMP and holds a 300 Hz dip, a 3.5 kHz presence peak and the trim.
+// 70 Hz high-pass and a 6 kHz low-pass (the cuts) when `cuts` is set. The back half runs after the
+// last slot and holds a 300 Hz dip, a 3.5 kHz presence peak and the trim.
 //
 // The subsonic high-pass sits below any note Adam sings. Rumble and breath wind down there carry
-// no loudness, but they count in RMS and POLISH COMP's makeup lifts them in the pauses, so without
-// the filter the stage reads up to 1 dB high on a rumbly take.
+// no loudness but still count in the level, so the filter takes them out.
 //
 // Each half crossfades with its input through its own 20 ms smoother on `on`, so a click fades both
 // together. The cuts crossfade through a smoother of their own on `on` and `cuts`, so a change

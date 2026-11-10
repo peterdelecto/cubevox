@@ -188,7 +188,6 @@ void addSlotTime(int index, uint32_t cycles) {
 // Folds the stage times of one pass into the per-bucket totals and worsts.
 void addChainCycles(const ChainCycles& cycles) {
   for (int s = 0; s < kSlotCount; ++s) addSlotTime(s, cycles.slot[s]);
-  addSlotTime(kStatComp, cycles.comp);
   addSlotTime(kStatEq, cycles.eq);
 }
 

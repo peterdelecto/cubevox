@@ -15,10 +15,9 @@
 #include "core/level.h"
 #include "core/scope.h"
 
-// Cycle buckets: one per slot, then one each for POLISH COMP and VOX EQ (both of its halves).
-constexpr int kStatComp = kSlotCount;
-constexpr int kStatEq = kSlotCount + 1;
-constexpr int kStatBuckets = kSlotCount + 2;
+// Cycle buckets: one per slot, then one for VOX EQ (both of its halves).
+constexpr int kStatEq = kSlotCount;
+constexpr int kStatBuckets = kSlotCount + 1;
 
 struct AudioStats {
   uint32_t blocks = 0;        // blocks processed
@@ -65,7 +64,7 @@ struct AudioHealth {
   AudioErrors errors;
   uint32_t overruns = 0;   // blocks never started before their half came round again
   uint32_t restarts = 0;   // stream restarts after a fault
-  uint32_t nanBlocks = 0;  // blocks discarded before the polish stages for a NaN or an infinity
+  uint32_t nanBlocks = 0;  // blocks discarded before VOX EQ's back half for a NaN or an infinity
 };
 AudioHealth audioHealth();
 
