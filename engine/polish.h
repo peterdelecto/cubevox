@@ -9,7 +9,7 @@
 #include "engine/dsp.h"
 #include "engine/smooth.h"
 
-// VOX EQ voiced for Adam's voice, one stage in two places under one menu row with three settings.
+// CLEANUP EQ voiced for Adam's voice, one stage in two places under one menu row with three settings.
 // The front half runs ahead of slot 1 and holds a 40 Hz subsonic high-pass and a de-esser, plus a
 // 70 Hz high-pass and a 6 kHz low-pass (the cuts) when `cuts` is set. The back half runs after the
 // last slot and holds a 300 Hz dip, a 3.5 kHz presence peak and the trim.
@@ -19,10 +19,10 @@
 //
 // Each half crossfades with its input through its own 20 ms smoother on `on`, so a click fades both
 // together. The cuts crossfade through a smoother of their own on `on` and `cuts`, so a change
-// between ON and ON+CUTS fades too. Settled off, each half is a bit-exact copy and holds no filter
+// between LIGHT and STRONG fades too. Settled off, each half is a bit-exact copy and holds no filter
 // state, and settled without the cuts the front half holds no filter state for them.
 // RBJ biquads, TDF-II. The back half rebuilds its coefficients only when a setting changes.
-// Specs docs/specs/2026-10-31-polish-eq-adam-voice-design.md and docs/specs/2026-11-05-vox-eq-design.md.
+// Specs docs/specs/2026-10-31-polish-eq-adam-voice-design.md and docs/specs/2026-11-10-cleanup-eq-design.md.
 
 namespace cv {
 

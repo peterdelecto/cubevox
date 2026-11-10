@@ -1,4 +1,4 @@
-// VOX EQ checks: both halves bit-exact when off, the front response with and without the cuts, the cuts'
+// CLEANUP EQ checks: both halves bit-exact when off, the front response with and without the cuts, the cuts'
 // fade, the whole stage's fade on every switch, the back response, the de-esser behind the low-pass, flat, call splitting, the setting ranges, no-alloc. No window, no audio device.
 
 #include <algorithm>
@@ -113,7 +113,7 @@ bool testFront() {
                 g50, g70, g97, g1k, g6k, g10k);
 }
 
-// ON runs the front half without the cuts: only the 40 Hz subsonic high-pass takes anything off the low
+// LIGHT runs the front half without the cuts: only the 40 Hz subsonic high-pass takes anything off the low
 // end, so 97 Hz and 10 kHz pass, with the de-esser off and live.
 bool testFrontNoCuts() {
   cv::PolishParams filters = filtersOnly();
@@ -128,7 +128,7 @@ bool testFrontNoCuts() {
                 f97, f10k, v97, v10k);
 }
 
-// The subsonic high-pass at ON: 4th-order Butterworth at 40 Hz, so 3 dB down at 40 Hz and 20 dB or more
+// The subsonic high-pass at LIGHT: 4th-order Butterworth at 40 Hz, so 3 dB down at 40 Hz and 20 dB or more
 // down at 20 Hz, under any note Adam sings. It takes less than 1 dB off 50 Hz, the octave below his G2.
 bool testSubsonic() {
   cv::PolishParams p = filtersOnly();
@@ -139,7 +139,7 @@ bool testSubsonic() {
   return report("subsonic", ok, "cuts off, 20/40/50 Hz = %.2f / %.2f / %.2f dB (<=-20, -3, -0.3 to -1)", g20, g40, g50);
 }
 
-// Steps from ON to ON+CUTS and back on a 40 Hz sine, which the high-pass takes 19 dB off, and measures the
+// Steps from LIGHT to STRONG and back on a 40 Hz sine, which the high-pass takes 19 dB off, and measures the
 // largest sample-to-sample step of the output around each switch against the sine's own largest step.
 bool testCutsFade() {
   const int half = kSecond;
@@ -165,12 +165,12 @@ bool testCutsFade() {
   }
   const double settled = rmsOf(out, half * 2 - 4800, half * 2) / rmsOf(in, half * 2 - 4800, half * 2);
   return report("cuts fade", worst <= 2.0 * natural && settled < 0.2,
-                "ON to ON+CUTS to ON on 40 Hz: largest step %.5f against the sine's %.5f, ON+CUTS level %.3f of the input (<= 2x, < 0.2)",
+                "LIGHT to STRONG to LIGHT on 40 Hz: largest step %.5f against the sine's %.5f, STRONG level %.3f of the input (<= 2x, < 0.2)",
                 worst, natural, settled);
 }
 
-// Both halves in series on 40 Hz + 300 Hz + 6.5 kHz, stepped OFF, ON, ON+CUTS, OFF for 10 ms and back,
-// OFF, and ON+CUTS again. Every switch fades the whole stage: the output's largest second difference, the
+// Both halves in series on 40 Hz + 300 Hz + 6.5 kHz, stepped OFF, LIGHT, STRONG, OFF for 10 ms and back,
+// OFF, and STRONG again. Every switch fades the whole stage: the output's largest second difference, the
 // change in its slope from one sample to the next, stays within 2x the input's own. The tones' own second
 // difference stays small (the 6.5 kHz tone sits 34 dB under the others), so a hard switch in either half
 // shows past the bound. The last switch-on comes after 750 ms OFF, and from it the output equals a fresh
@@ -230,7 +230,7 @@ bool testStageFade() {
   bool same = true;
   for (size_t i = 0; i < clean.size(); ++i) same = same && out[static_cast<size_t>(kLastOn) + i] == clean[i];
   return report("stage fade", worst <= 2.0 * natural && same,
-                "OFF/ON/ON+CUTS/OFF 10 ms/OFF/ON+CUTS: largest second difference %.5f against the input's %.5f (<= 2x); "
+                "OFF/LIGHT/STRONG/OFF 10 ms/OFF/STRONG: largest second difference %.5f against the input's %.5f (<= 2x); "
                 "switch-on after OFF matches a fresh stage: %.0f (1)",
                 worst, natural, same ? 1.0 : 0.0);
 }
@@ -283,7 +283,7 @@ bool testFrontEss() {
   return report("front ess", cut >= 3.5 && cut <= 5.5, "band noise over a voice: the 3 kHz and up content cuts %.2f dB (4.5 +-1)", cut);
 }
 
-// The same voice at ON, where the de-esser reads the band at full level because the 6 kHz low-pass is out.
+// The same voice at LIGHT, where the de-esser reads the band at full level because the 6 kHz low-pass is out.
 bool testFrontEssNoCuts() {
   const std::vector<float> in = voiceWithEss(2 * kSecond);
   cv::PolishParams ref = filtersOnly();
@@ -295,7 +295,7 @@ bool testFrontEssNoCuts() {
   gEq.reset();
   const std::vector<float> on = run(gEq, Half::Front, in, voiced);
   const double cut = 20.0 * std::log10(sibilantRms(off) / sibilantRms(on));
-  return report("front ess no cuts", cut >= 3.5 && cut <= 7.0, "same voice at ON: the 3 kHz and up content cuts %.2f dB (3.5 to 7)", cut);
+  return report("front ess no cuts", cut >= 3.5 && cut <= 7.0, "same voice at LIGHT: the 3 kHz and up content cuts %.2f dB (3.5 to 7)", cut);
 }
 
 // A call of any size gives the back half the same samples, because it holds no block state.

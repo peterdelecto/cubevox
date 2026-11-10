@@ -81,14 +81,14 @@ void reseal(RecordBytes& b) {
 RecordBytes asV1(RecordBytes b) {
   b[kOffSchema] = static_cast<uint8_t>(kRecordSchemaV1);
   b[kOffSchema + 1] = 0;
-  for (size_t off : {kOffRetiredComp, kOffRetiredPolishEq, kOffTopSwitch, kOffVoxEq}) b[off] = 0;
+  for (size_t off : {kOffRetiredComp, kOffRetiredPolishEq, kOffTopSwitch, kOffCleanupEq}) b[off] = 0;
   reseal(b);
   return b;
 }
 
 void checkRecordSchemaV2() {
   Settings changed;
-  changed.voxEq = VoxEq::Cuts;
+  changed.cleanupEq = CleanupEq::Strong;
   changed.topSwitch = TopSwitch::Bypass;
   RecordData in = makeRec(9, OutputLevel::Mic);
   in.settings = changed;
@@ -96,11 +96,11 @@ void checkRecordSchemaV2() {
   const RecordBytes b = encodeRecord(in);
   RecordData out;
   check(b[kOffSchema] == kRecordSchema && b[kOffRetiredComp] == 0 && b[kOffRetiredPolishEq] == 0 &&
-            b[kOffVoxEq] == static_cast<uint8_t>(VoxEq::Cuts) && b[kOffTopSwitch] == static_cast<uint8_t>(TopSwitch::Bypass),
-        "record v2: bytes 2 and 3 are written 0, the top switch sits at byte 4 and VOX EQ at byte 9");
-  check(decodeRecord(b.data(), out) && out.settings.voxEq == VoxEq::Cuts &&
+            b[kOffCleanupEq] == static_cast<uint8_t>(CleanupEq::Strong) && b[kOffTopSwitch] == static_cast<uint8_t>(TopSwitch::Bypass),
+        "record v2: bytes 2 and 3 are written 0, the top switch sits at byte 4 and CLEANUP EQ at byte 9");
+  check(decodeRecord(b.data(), out) && out.settings.cleanupEq == CleanupEq::Strong &&
             out.settings.topSwitch == TopSwitch::Bypass && out.settings.outputLevel == OutputLevel::Mic,
-        "record v2: round trip keeps VOX EQ and the top switch");
+        "record v2: round trip keeps CLEANUP EQ and the top switch");
 
   // A record saved with byte 2 at 0, 1 or any other value loads with every other setting kept, and
   // the next save writes the byte as 0.
@@ -112,7 +112,7 @@ void checkRecordSchemaV2() {
     char what[96];
     std::snprintf(what, sizeof what, "record v2: retired byte 2 at %u is ignored and saved back as 0",
                   static_cast<unsigned>(held));
-    check(decodeRecord(old.data(), loaded) && loaded.settings.voxEq == in.settings.voxEq &&
+    check(decodeRecord(old.data(), loaded) && loaded.settings.cleanupEq == in.settings.cleanupEq &&
               loaded.settings.topSwitch == in.settings.topSwitch && loaded.settings.outputLevel == in.settings.outputLevel &&
               loaded.settings.inputJack == in.settings.inputJack && loaded.settings.debug == in.settings.debug &&
               loaded.settings.brightness == in.settings.brightness && loaded.layout == in.layout &&
@@ -120,45 +120,53 @@ void checkRecordSchemaV2() {
           what);
   }
 
-  for (const VoxEq v : {VoxEq::Off, VoxEq::On, VoxEq::Cuts}) {
+  // Byte 9 holds 0 for OFF, 1 for LIGHT and 2 for STRONG, so a saved setting loads as the same setting.
+  struct EqByte {
+    CleanupEq setting;
+    uint8_t byte;
+  };
+  for (const EqByte e : {EqByte{CleanupEq::Off, 0}, EqByte{CleanupEq::Light, 1}, EqByte{CleanupEq::Strong, 2}}) {
     RecordData each = makeRec(3);
-    each.settings.voxEq = v;
+    each.settings.cleanupEq = e.setting;
     const RecordBytes eachBytes = encodeRecord(each);
-    check(decodeRecord(eachBytes.data(), out) && out.settings.voxEq == v, "record v2: each VOX EQ setting round trips");
+    char what[80];
+    std::snprintf(what, sizeof what, "record v2: CLEANUP EQ at byte value %u round trips", static_cast<unsigned>(e.byte));
+    check(eachBytes[kOffCleanupEq] == e.byte && decodeRecord(eachBytes.data(), out) && out.settings.cleanupEq == e.setting,
+          what);
   }
 
   const RecordBytes defaults = encodeRecord(makeRec(1));
-  check(decodeRecord(defaults.data(), out) && out.settings.voxEq == VoxEq::Off &&
+  check(decodeRecord(defaults.data(), out) && out.settings.cleanupEq == CleanupEq::Off &&
             out.settings.topSwitch == TopSwitch::Mute,
-        "record v2: default settings are VOX EQ off, MUTE");
+        "record v2: default settings are CLEANUP EQ off, MUTE");
 
   RecordBytes oldOn = defaults;  // a record written while POLISH EQ was an ON/OFF row, stored ON
   oldOn[kOffRetiredPolishEq] = 1;
-  oldOn[kOffVoxEq] = 0;
+  oldOn[kOffCleanupEq] = 0;
   reseal(oldOn);
-  check(decodeRecord(oldOn.data(), out) && out.settings.voxEq == VoxEq::Off,
-        "record v2: an old record with POLISH EQ stored ON loads with VOX EQ OFF");
+  check(decodeRecord(oldOn.data(), out) && out.settings.cleanupEq == CleanupEq::Off,
+        "record v2: an old record with POLISH EQ stored ON loads with CLEANUP EQ OFF");
   RecordBytes junkRetired = encodeRecord(in);
   junkRetired[kOffRetiredPolishEq] = 0x7F;
   reseal(junkRetired);
-  check(decodeRecord(junkRetired.data(), out) && out.settings.voxEq == VoxEq::Cuts,
+  check(decodeRecord(junkRetired.data(), out) && out.settings.cleanupEq == CleanupEq::Strong,
         "record v2: the retired POLISH EQ byte is ignored, whatever it holds");
 
   RecordData wasV1 = makeRec(4, OutputLevel::Mic);
   wasV1.settings.inputJack = InputJack::Line;
   const RecordBytes v1 = asV1(encodeRecord(wasV1));
   check(decodeRecord(v1.data(), out) && out.sequence == 4 && out.settings.outputLevel == OutputLevel::Mic &&
-            out.settings.inputJack == InputJack::Line && out.settings.voxEq == VoxEq::Off &&
+            out.settings.inputJack == InputJack::Line && out.settings.cleanupEq == CleanupEq::Off &&
             out.settings.topSwitch == TopSwitch::Mute,
         "record v1: decodes with the later settings at their defaults");
   check(classifyRecordEntry(v1.data()) == EntryState::Valid, "record v1: still a valid entry");
   check(encodeRecord(out)[kOffSchema] == kRecordSchema, "record v1: the next save writes v2");
 
   RecordBytes junk = v1;  // a v1 reserved byte is not a setting, whatever it holds
-  junk[kOffVoxEq] = 0x7F;
+  junk[kOffCleanupEq] = 0x7F;
   junk[kOffTopSwitch] = 0xFF;
   reseal(junk);
-  check(decodeRecord(junk.data(), out) && out.settings.voxEq == VoxEq::Off && out.settings.topSwitch == TopSwitch::Mute,
+  check(decodeRecord(junk.data(), out) && out.settings.cleanupEq == CleanupEq::Off && out.settings.topSwitch == TopSwitch::Mute,
         "record v1: bytes past the two settings are ignored");
 
   for (size_t off : {kOffOutputLevel, kOffInputJack, kOffTopSwitch, kOffDebug}) {
@@ -167,10 +175,10 @@ void checkRecordSchemaV2() {
     reseal(bad);
     check(!decodeRecord(bad.data(), out), "record v2: a settings byte out of range is rejected");
   }
-  RecordBytes badVox = b;
-  badVox[kOffVoxEq] = 3;
-  reseal(badVox);
-  check(!decodeRecord(badVox.data(), out), "record v2: a VOX EQ byte past ON+CUTS is rejected");
+  RecordBytes badEq = b;
+  badEq[kOffCleanupEq] = 3;
+  reseal(badEq);
+  check(!decodeRecord(badEq.data(), out), "record v2: a CLEANUP EQ byte past STRONG is rejected");
 }
 
 // DEBUG sits in the first reserved settings byte, so the schema stays 2. A record that holds 0 there,
@@ -257,7 +265,7 @@ void checkRecordRetiredBytes() {
         "record: settings bytes 6 and 7 are the retired pair");
 
   RecordData in = makeRec(2);
-  in.settings.voxEq = VoxEq::On;
+  in.settings.cleanupEq = CleanupEq::Light;
   in.settings.debug = true;
   const RecordBytes saved = encodeRecord(in);
   check(saved[kOffSchema] == kRecordSchema && saved[kOffRetired] == 0 && saved[kOffRetired + 1] == 0,
@@ -268,7 +276,7 @@ void checkRecordRetiredBytes() {
   earlier[kOffRetired] = 4;
   earlier[kOffRetired + 1] = 7;
   reseal(earlier);
-  check(decodeRecord(earlier.data(), out) && out.settings.voxEq == in.settings.voxEq &&
+  check(decodeRecord(earlier.data(), out) && out.settings.cleanupEq == in.settings.cleanupEq &&
             out.settings.topSwitch == in.settings.topSwitch && out.settings.debug && out.layout == in.layout &&
             out.sequence == in.sequence,
         "record: a record from the earlier firmware loads with every other setting intact");
@@ -278,7 +286,7 @@ void checkRecordRetiredBytes() {
     odd[kOffRetired] = byte;
     odd[kOffRetired + 1] = byte;
     reseal(odd);
-    check(decodeRecord(odd.data(), out) && out.settings.voxEq == in.settings.voxEq && out.settings.debug,
+    check(decodeRecord(odd.data(), out) && out.settings.cleanupEq == in.settings.cleanupEq && out.settings.debug,
           "record: whatever bytes 6 and 7 hold, the record stays valid");
   }
 
@@ -894,7 +902,7 @@ void checkSequenceFloor() {
     if (schema) {
       later[kOffSchema] = 3;
     } else {
-      later[kOffVoxEq] = 3;  // a VOX EQ value this build does not have
+      later[kOffCleanupEq] = 3;  // a CLEANUP EQ value this build does not have
     }
     reseal(later);
     std::memcpy(&f.mem[0][3 * kRecordBytes], later.data(), kRecordBytes);
@@ -906,7 +914,7 @@ void checkSequenceFloor() {
     runToIdle(store, f, t);
     check(store.status().sequence == 10,
           schema ? "floor: the save after a schema 3 record takes sequence 10, past it"
-                 : "floor: the save after a record with VOX EQ 3 takes sequence 10, past it");
+                 : "floor: the save after a record with CLEANUP EQ 3 takes sequence 10, past it");
     RecordStore reboot(f);
     check(reboot.begin(out) && out.sequence == 10 && out.settings.outputLevel == OutputLevel::Mic,
           "floor: and that save loads at the next start");

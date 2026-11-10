@@ -114,7 +114,7 @@ bool sameCanvas(const Canvas& a, const Canvas& b) {
 
 bool sameSettings(const Settings& a, const Settings& b) {
   return a.outputLevel == b.outputLevel && a.inputJack == b.inputJack &&
-         a.voxEq == b.voxEq && a.topSwitch == b.topSwitch && a.brightness == b.brightness && a.debug == b.debug;
+         a.cleanupEq == b.cleanupEq && a.topSwitch == b.topSwitch && a.brightness == b.brightness && a.debug == b.debug;
 }
 
 std::string chainRow(const Layout& layout, int slot) {
@@ -162,7 +162,7 @@ struct MenuRig {
 // The list rows, top to bottom (specs 2026-10-24-polish-design.md and 2026-11-10-comp-removal-design.md).
 // The list shows kVisible of them at a time and scrolls.
 enum Row {
-  kInput, kOctaveFormant, kUnisonCrowd, kDistortionGrowl, kSlot7Card, kReverb, kVoxEq, kOutput, kTopSwitch,
+  kInput, kOctaveFormant, kUnisonCrowd, kDistortionGrowl, kSlot7Card, kReverb, kCleanupEq, kOutput, kTopSwitch,
   kBrightness, kDebug, kUpdate, kExit, kRowCount
 };
 constexpr int kVisible = 4;
@@ -186,7 +186,7 @@ constexpr int rowOnScreen(int item) { return item < kVisible ? item : kVisible -
 // which holds Octave in slot 3, Unison in slot 4, Distortion in slot 6, Gate in slot 7 and Spring in
 // slot 8. Exit has no value and Update firmware shows a chevron.
 const char* const kLabel[kRowCount] = {"INPUT PAD",   "SLOT 3", "SLOT 4", "SLOT 6",          "SLOT 7",
-                                       "SLOT 8",      "VOX EQ", "OUTPUT PAD", "TOP SWITCH",
+                                       "SLOT 8",      "CLEANUP EQ", "OUTPUT PAD", "TOP SWITCH",
                                        "OLED BRIGHT", "DEBUG",  "UPDATE FIRMWARE", "EXIT"};
 const char* const kDefaultValue[kRowCount] = {"OFF", "OCTAVE", "UNISON", "DISTORTION", "GATE", "SPRING",
                                               "OFF", "OFF",    "MUTE",   "HIGH",       "OFF",  ">",      ""};
@@ -281,7 +281,7 @@ void checkMenuListGeometry() {
   };
   const View views[] = {{kInput, 0, 0},
                         {kOctaveFormant, 0, 0},
-                        {kVoxEq, 0, kVoxEq - (kVisible - 1)},
+                        {kCleanupEq, 0, kCleanupEq - (kVisible - 1)},
                         {kTopSwitch, 0, kTopSwitch - (kVisible - 1)},
                         {kBrightness, 0, kBrightness - (kVisible - 1)},
                         {kExit, 0, kLastTop},
@@ -322,7 +322,7 @@ void checkMenuListGeometry() {
       {kDistortionGrowl, {"DISTORTION", "DEEPTHROAT"}},
       {kSlot7Card, {"GATE", "LO-FI", "CHATTER"}},
       {kReverb, {"SPRING", "CHASM"}},
-      {kVoxEq, {"OFF", "ON", "ON+CUTS"}},
+      {kCleanupEq, {"OFF", "LIGHT", "STRONG"}},
       {kOutput, {"OFF", "ON"}},
       {kTopSwitch, {"MUTE", "BYPASS"}},
       {kBrightness, {"LOW", "MID", "HIGH", "MAX"}},
@@ -499,7 +499,7 @@ Settings clickEveryRow(MenuRig& m) {
 void checkMenuClicks() {
   MenuRig m;
   const Settings flipped = clickEveryRow(m);
-  check(flipped.voxEq == VoxEq::Off && flipped.outputLevel == OutputLevel::Mic &&
+  check(flipped.cleanupEq == CleanupEq::Off && flipped.outputLevel == OutputLevel::Mic &&
             flipped.inputJack == InputJack::Line && flipped.topSwitch == TopSwitch::Bypass && flipped.debug,
         "menu: four clicks flipped the four two-state settings");
   check(m.layout.card[kReverbSlot] == Card::ReverbChasm, "menu: the reverb click swapped the reverb card");
@@ -518,7 +518,7 @@ void checkMenuClicks() {
   }
   Layout followed = defaultLayout();
   followed.card[kOctaveSlot] = Card::FormantFollower;
-  check(m.settings.voxEq == VoxEq::Off && m.settings.outputLevel == OutputLevel::Line &&
+  check(m.settings.cleanupEq == CleanupEq::Off && m.settings.outputLevel == OutputLevel::Line &&
             m.settings.inputJack == InputJack::Mic && m.settings.topSwitch == TopSwitch::Mute && !m.settings.debug &&
             m.layout == followed,
         "menu: a second click on each row restores the defaults, and slot 3 moves on to Apraxia");
@@ -994,10 +994,10 @@ void checkMenuDebugRow() {
 
 // The thirteen rows in list order, with the labels written out and the cursor walked down one step at
 // a time. The input filters are not on the list, the five SLOT rows run in slot order from SLOT 3 to
-// SLOT 8 between INPUT PAD and VOX EQ, and OLED BRIGHT sits between TOP SWITCH and DEBUG.
+// SLOT 8 between INPUT PAD and CLEANUP EQ, and OLED BRIGHT sits between TOP SWITCH and DEBUG.
 void checkMenuRowOrder() {
   static const char* const kSpecOrder[kRowCount] = {"INPUT PAD",   "SLOT 3", "SLOT 4",          "SLOT 6",     "SLOT 7",
-                                                    "SLOT 8",      "VOX EQ", "OUTPUT PAD",      "TOP SWITCH",
+                                                    "SLOT 8",      "CLEANUP EQ", "OUTPUT PAD",  "TOP SWITCH",
                                                     "OLED BRIGHT", "DEBUG",  "UPDATE FIRMWARE", "EXIT"};
   MenuRig m;
   m.step(0, true);
@@ -1008,17 +1008,17 @@ void checkMenuRowOrder() {
     inOrder = inOrder && listRowIs(m.canvas, rowOnScreen(cursor), kSpecOrder[cursor], kDefaultValue[cursor], true);
   }
   check(inOrder && kRowCount == 13,
-        "menu: the rows run INPUT PAD, SLOT 3, SLOT 4, SLOT 6, SLOT 7, SLOT 8, VOX EQ, OUTPUT PAD, "
+        "menu: the rows run INPUT PAD, SLOT 3, SLOT 4, SLOT 6, SLOT 7, SLOT 8, CLEANUP EQ, OUTPUT PAD, "
         "TOP SWITCH, OLED BRIGHT, DEBUG, UPDATE FIRMWARE, EXIT");
 }
 
-// The VOX EQ row starts at OFF and steps OFF, ON, ON+CUTS and back to OFF. ON runs the stage without
-// the cuts and ON+CUTS runs it with them, the record keeps the setting, and a reload shows the row.
-void checkMenuVoxEqSavedAndPlayed() {
+// The CLEANUP EQ row starts at OFF and steps OFF, LIGHT, STRONG and back to OFF. LIGHT runs the stage
+// without the cuts and STRONG runs it with them, the record keeps the setting, and a reload shows the row.
+void checkMenuCleanupEqSavedAndPlayed() {
   MenuRig m;
-  m.openListAt(kVoxEq);
+  m.openListAt(kCleanupEq);
   m.draw();
-  check(cursorRowIs(m.canvas, rowOnScreen(kVoxEq), kVoxEq, "OFF"), "menu: the VOX EQ row starts at OFF");
+  check(cursorRowIs(m.canvas, rowOnScreen(kCleanupEq), kCleanupEq, "OFF"), "menu: the CLEANUP EQ row starts at OFF");
   ChainSnapshot snap = composeSnapshot(m.layout, m.panel, m.settings, BenchOverrides());
   check(!snap.params.eq.on, "menu: at OFF the stage does not run");
 
@@ -1027,36 +1027,38 @@ void checkMenuVoxEqSavedAndPlayed() {
     bool on;
     bool cuts;
   };
-  const Step steps[] = {{"ON", true, false}, {"ON+CUTS", true, true}};
+  const Step steps[] = {{"LIGHT", true, false}, {"STRONG", true, true}};
   for (const Step& s : steps) {
     const UiAction a = m.step(0, true);
-    check(a == UiAction::CycleVoxEq && ui::applyAction(a, m.settings, m.layout) == ui::ApplyResult::SettingsChanged,
-          "menu: a click on VOX EQ asks for the next setting");
+    check(a == UiAction::CycleCleanupEq && ui::applyAction(a, m.settings, m.layout) == ui::ApplyResult::SettingsChanged,
+          "menu: a click on CLEANUP EQ asks for the next setting");
     m.draw();
-    check(cursorRowIs(m.canvas, rowOnScreen(kVoxEq), kVoxEq, s.value), (std::string("menu: the VOX EQ row reads ") + s.value).c_str());
+    check(cursorRowIs(m.canvas, rowOnScreen(kCleanupEq), kCleanupEq, s.value),
+          (std::string("menu: the CLEANUP EQ row reads ") + s.value).c_str());
     snap = composeSnapshot(m.layout, m.panel, m.settings, BenchOverrides());
     check(snap.params.eq.on == s.on && (!s.on || snap.params.eq.cuts == s.cuts),
           (std::string("menu: at ") + s.value + " the snapshot carries the stage and the cuts as set").c_str());
   }
 
-  // m now sits at ON+CUTS.
+  // m now sits at STRONG.
   RecordData saved;
   saved.settings = m.settings;
   saved.layout = m.layout;
   const RecordBytes bytes = encodeRecord(saved);
   RecordData loaded;
-  check(decodeRecord(bytes.data(), loaded) && loaded.settings.voxEq == VoxEq::Cuts,
-        "menu: the record keeps VOX EQ at ON+CUTS");
+  check(decodeRecord(bytes.data(), loaded) && loaded.settings.cleanupEq == CleanupEq::Strong,
+        "menu: the record keeps CLEANUP EQ at STRONG");
 
   MenuRig again;
   again.settings = loaded.settings;
-  again.openListAt(kVoxEq);
+  again.openListAt(kCleanupEq);
   again.draw();
-  check(cursorRowIs(again.canvas, rowOnScreen(kVoxEq), kVoxEq, "ON+CUTS"), "menu: after the reload the VOX EQ row reads ON+CUTS");
+  check(cursorRowIs(again.canvas, rowOnScreen(kCleanupEq), kCleanupEq, "STRONG"),
+        "menu: after the reload the CLEANUP EQ row reads STRONG");
   again.step(0, true);
-  ui::applyAction(UiAction::CycleVoxEq, again.settings, again.layout);
+  ui::applyAction(UiAction::CycleCleanupEq, again.settings, again.layout);
   again.draw();
-  check(cursorRowIs(again.canvas, rowOnScreen(kVoxEq), kVoxEq, "OFF"), "menu: one more step from ON+CUTS reads OFF");
+  check(cursorRowIs(again.canvas, rowOnScreen(kCleanupEq), kCleanupEq, "OFF"), "menu: one more step from STRONG reads OFF");
 
   // Through the flash store, the way the sketch saves after the debounce.
   FakeFlash flash;
@@ -1070,7 +1072,7 @@ void checkMenuVoxEqSavedAndPlayed() {
   std::memcpy(rebooted.mem[0].data(), flash.mem[0].data(), kRecordBytes);
   RecordStore reboot(rebooted);
   RecordData out;
-  check(reboot.begin(out) && out.settings.voxEq == VoxEq::Cuts, "menu: the next boot loads VOX EQ at ON+CUTS");
+  check(reboot.begin(out) && out.settings.cleanupEq == CleanupEq::Strong, "menu: the next boot loads CLEANUP EQ at STRONG");
 }
 
 // What the box saves and plays is what the menu showed.
@@ -1082,7 +1084,7 @@ void checkMenuClicksSavedAndPlayed() {
   saved.layout = m.layout;
   RecordData loaded;
   check(decodeRecord(encodeRecord(saved).data(), loaded) &&
-            loaded.settings.voxEq == flipped.voxEq && loaded.settings.outputLevel == flipped.outputLevel &&
+            loaded.settings.cleanupEq == flipped.cleanupEq && loaded.settings.outputLevel == flipped.outputLevel &&
             loaded.settings.inputJack == flipped.inputJack && loaded.settings.topSwitch == flipped.topSwitch &&
             loaded.settings.debug && loaded.layout == m.layout && loaded.layout.card[7] == Card::ReverbChasm,
         "menu: the flipped settings and the swapped reverb card survive a save and a reload");
@@ -1092,7 +1094,7 @@ void checkMenuClicksSavedAndPlayed() {
   check(snap.params.reverb.engine == cv::kReverbChasm && snap.layout == m.layout,
         "menu: the swapped reverb card reaches the audio snapshot");
   const ChainSnapshot fresh = composeSnapshot(m.layout, m.panel, Settings(), BenchOverrides());
-  check(!fresh.params.eq.on && fresh.outputGain == 1.0f, "menu: the default snapshot has VOX EQ off");
+  check(!fresh.params.eq.on && fresh.outputGain == 1.0f, "menu: the default snapshot has CLEANUP EQ off");
 }
 
 // A click that changes the layout, OLED BRIGHT or DEBUG leaves a record in flash that the next boot
@@ -1141,10 +1143,10 @@ void checkMenuDeafUntilListening() {
 
 void checkMenuWrapAndCombo() {
   MenuRig m;
-  m.openListAt(kRowCount + kVoxEq);  // a full lap and more detents lands on VOX EQ
+  m.openListAt(kRowCount + kCleanupEq);  // a full lap and more detents lands on CLEANUP EQ
   m.draw();
-  check(cursorRowIs(m.canvas, rowOnScreen(kVoxEq), kVoxEq, "OFF"), "menu: a lap and six detents wraps around the list");
-  m.step(-(kRowCount + kVoxEq), false);  // back by the same lands on item 0
+  check(cursorRowIs(m.canvas, rowOnScreen(kCleanupEq), kCleanupEq, "OFF"), "menu: a lap and six detents wraps around the list");
+  m.step(-(kRowCount + kCleanupEq), false);  // back by the same lands on item 0
   m.draw();
   check(cursorRowIs(m.canvas, kInput, kInput, "OFF"), "menu: a lap and six detents back wraps the other way");
 
@@ -1445,14 +1447,33 @@ void checkScreenshots() {
   check(sameCanvas(scrolled.canvas, listCanvas(kLastTop, kExit)), "screens: scrolled menu rows");
   writePgm(scrolled.canvas, "oled-menu-scrolled.pgm");
 
-  // The VOX EQ row with the cursor on it, directly below SLOT 8.
-  MenuRig vox;
-  vox.openListAt(kVoxEq);
-  vox.draw();
-  check(cursorRowIs(vox.canvas, rowOnScreen(kVoxEq), kVoxEq, "OFF") &&
-            listRowIs(vox.canvas, rowOnScreen(kVoxEq) - 1, kLabel[kReverb], kDefaultValue[kReverb]),
-        "screens: menu rows with the cursor on VOX EQ, directly below SLOT 8");
-  writePgm(vox.canvas, "oled-menu-vox-eq.pgm");
+  // The CLEANUP EQ row with the cursor on it, directly below SLOT 8.
+  MenuRig eq;
+  eq.openListAt(kCleanupEq);
+  eq.draw();
+  check(cursorRowIs(eq.canvas, rowOnScreen(kCleanupEq), kCleanupEq, "OFF") &&
+            listRowIs(eq.canvas, rowOnScreen(kCleanupEq) - 1, kLabel[kReverb], kDefaultValue[kReverb]),
+        "screens: menu rows with the cursor on CLEANUP EQ, directly below SLOT 8");
+  writePgm(eq.canvas, "oled-menu-cleanup-eq.pgm");
+
+  // The CLEANUP EQ row at LIGHT and at STRONG with the cursor on SLOT 8 above it.
+  const struct {
+    CleanupEq setting;
+    const char* value;
+    const char* file;
+  } eqShots[] = {{CleanupEq::Light, "LIGHT", "oled-menu-cleanup-eq-light.pgm"},
+                 {CleanupEq::Strong, "STRONG", "oled-menu-cleanup-eq-strong.pgm"}};
+  for (const auto& shot : eqShots) {
+    MenuRig set;
+    set.settings.cleanupEq = shot.setting;
+    set.openListAt(kCleanupEq);
+    set.step(-1, false);
+    set.draw();
+    check(cursorRowIs(set.canvas, rowOnScreen(kCleanupEq) - 1, kReverb, kDefaultValue[kReverb]) &&
+              listRowIs(set.canvas, rowOnScreen(kCleanupEq), kLabel[kCleanupEq], shot.value),
+          (std::string("screens: menu rows with the CLEANUP EQ row at ") + shot.value + " below the cursor").c_str());
+    writePgm(set.canvas, shot.file);
+  }
 
   m.menu.showChainView();
   m.draw();
@@ -1501,7 +1522,7 @@ void checkMenu() {
   checkMenuBrightnessRow();
   checkMenuDebugRow();
   checkMenuRowOrder();
-  checkMenuVoxEqSavedAndPlayed();
+  checkMenuCleanupEqSavedAndPlayed();
   checkMenuClicksSavedAndPlayed();
   checkMenuSavedThroughStore();
   checkMenuWrapAndCombo();

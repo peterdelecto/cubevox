@@ -433,21 +433,21 @@ def stress_failures():
     if rows["kFixed"] != tuple(sum(rows[n][i] for n in stress.FIXED_PARTS) for i in (0, 1)):
         failed.append("stress.py read_rows() does not make kFixed the sum of the three fixed rows")
     failed += stress_judge_failures(stress, rows)
-    failed += stress_vox_eq_failures(stress)
+    failed += stress_cleanup_eq_failures(stress)
     code, out = run([sys.executable, "-I", os.path.join(FW, "stress.py"), "--dry-run", "--layouts", "default"])
-    if code != 0 or "bench op vox_eq" not in out or "Gate Threshold" not in out:
+    if code != 0 or "bench op cleanup_eq" not in out or "Gate Threshold" not in out:
         failed.append(f"stress.py --dry-run: exit {code}, '{out.strip()[-120:]}'")
-    if 'VOX EQ at ON+CUTS (vox_eq "cuts")' not in out:
-        failed.append("stress.py --dry-run does not plan the VOX EQ ON+CUTS setting")
+    if 'CLEANUP EQ at STRONG (cleanup_eq "strong")' not in out:
+        failed.append("stress.py --dry-run does not plan the CLEANUP EQ STRONG setting")
     return failed
 
 
 class FakeLink:
     """Answers stress.py's set_layout and get_layout from a settings dict, and records the requests."""
 
-    def __init__(self, vox_eq):
+    def __init__(self, cleanup_eq):
         self.sent = []
-        self.vox_eq = vox_eq
+        self.cleanup_eq = cleanup_eq
 
     def take_id(self):
         return len(self.sent) + 1
@@ -455,13 +455,13 @@ class FakeLink:
     def ask(self, cmd, wait_s, note, **fields):
         self.sent.append((cmd, fields))
         if cmd == "set_layout":
-            self.vox_eq = fields.get("settings", {}).get("vox_eq", self.vox_eq)
+            self.cleanup_eq = fields.get("settings", {}).get("cleanup_eq", self.cleanup_eq)
             return {"ok": True}
-        return {"ok": True, "layout": {"name": "saved", "slots": ["empty"] * 8}, "settings": {"vox_eq": self.vox_eq}}
+        return {"ok": True, "layout": {"name": "saved", "slots": ["empty"] * 8}, "settings": {"cleanup_eq": self.cleanup_eq}}
 
 
-def stress_vox_eq_failures(stress):
-    """A run sets VOX EQ to ON+CUTS with each layout, and the restore puts the box's own word back."""
+def stress_cleanup_eq_failures(stress):
+    """A run sets CLEANUP EQ to STRONG with each layout, and the restore puts the box's own word back."""
     failed = []
     link = FakeLink("off")
     box = stress.Box(link)
@@ -469,11 +469,11 @@ def stress_vox_eq_failures(stress):
     saved = box.get_layout()
     if saved != ("saved", ["empty"] * 8, "off"):
         failed.append(f"stress.py get_layout() reads {saved}")
-    if box.set_layout("stress default", ["empty"] * 8, stress.STRESS_VOX_EQ) is not None or link.vox_eq != "cuts":
-        failed.append(f"stress.py set_layout() leaves VOX EQ at {link.vox_eq}, wanted cuts")
+    if box.set_layout("stress default", ["empty"] * 8, stress.STRESS_CLEANUP_EQ) is not None or link.cleanup_eq != "strong":
+        failed.append(f"stress.py set_layout() leaves CLEANUP EQ at {link.cleanup_eq}, wanted strong")
     stress.restore_layout(box, *saved)
-    if link.vox_eq != "off":
-        failed.append(f"stress.py restore_layout() leaves VOX EQ at {link.vox_eq}, wanted off")
+    if link.cleanup_eq != "off":
+        failed.append(f"stress.py restore_layout() leaves CLEANUP EQ at {link.cleanup_eq}, wanted off")
     return failed
 
 
@@ -486,7 +486,7 @@ def stress_judge_failures(stress, rows):
         table, gates = [], []
         stress.judge_fixed(agg, rows, "check", table, gates)
         ok = all(g.ok for g in gates)
-        if ok != want or len(gates) != 4 or [row[1] for row in table] != ["VOX EQ", "fixed path"]:
+        if ok != want or len(gates) != 4 or [row[1] for row in table] != ["CLEANUP EQ", "fixed path"]:
             failed.append(f"stress.py judge_fixed() {what}: {len(gates)} gates, all ok {ok}, wanted {want}")
     return failed
 

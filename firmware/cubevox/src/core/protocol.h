@@ -95,14 +95,14 @@ struct Request {
   int slotCount = 0;  // ids present in "slots"
   std::array<std::array<char, kIdBytes>, kSlotCount> slot = {};
 
-  // The "settings" object: vox_eq ("off", "on" or "cuts") and top_switch. `settingsGiven` has a kGiven bit
+  // The "settings" object: cleanup_eq ("off", "light" or "strong") and top_switch. `settingsGiven` has a kGiven bit
   // for each field the request carried, and `settings` holds those values. A field the request
   // leaves out stays as the box has it. The output and input settings are not on the wire.
   Settings settings;
   uint8_t settingsGiven = 0;
 };
 
-constexpr uint8_t kGivenVoxEq = 1u << 0;
+constexpr uint8_t kGivenCleanupEq = 1u << 0;
 constexpr uint8_t kGivenTopSwitch = 1u << 1;
 
 // Copies the settings fields the request carried onto `current`; the others stay as they are.
@@ -133,7 +133,7 @@ struct Status {
   uint32_t overruns = 0;    // blocks the audio interrupt never started before their half came round again
   uint32_t saiErrors = 0;   // SAI and DMA errors the HAL reported
   uint32_t restarts = 0;    // audio stream restarts after a fault
-  uint32_t nanBlocks = 0;   // blocks discarded before VOX EQ's back half for a NaN or an infinity
+  uint32_t nanBlocks = 0;   // blocks discarded before CLEANUP EQ's back half for a NaN or an infinity
   uint32_t powerTrips = 0;  // power-fail mutes, 5VA under its trip level
   float floorDbfs = -120.0f;  // the Input gate's detector peak over the status interval, in dBFS
   bool stalled = false;       // the stall watch muted the output and started the reset

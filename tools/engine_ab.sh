@@ -57,7 +57,7 @@ CASES=(
   "chatter|--amount 0.5 --length 200"
   "spring|--reverb spring --time 0.5 --mix 0.5"
   "chasm|--reverb chasm --time 0.5 --mix 0.5"
-  "vox_eq|--vox-eq cuts"
+  "cleanup_eq|--cleanup-eq strong"
   "full_chain|--ingate -40 --autotune --response 100 --octave -12 --omix 0.5 --formant -3 --fmix 0.5 --follower 12 --sensitivity 0.5 --crowd --width 0.5 --voices 4 --on 1 --depth 0.5 --slap 0.5 --drive 0.5 --tone 0.5 --growl 0.5 --gdrive 0.5 --gate -40 --lofi 0.5 --lofi-tone 0.5 --amount 0.5 --length 200 --reverb spring --time 0.5 --mix 0.5"
 )
 for c in "${CASES[@]}"; do

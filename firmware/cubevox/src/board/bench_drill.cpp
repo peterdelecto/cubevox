@@ -126,8 +126,8 @@ BenchResult benchDrillRun(BenchOp op, const BenchArgs& args) {
     case BenchOp::Bypass:
       toggleForced(gBench.bypassOn, "[bench] BYPASS held on", "[bench] BYPASS follows the top switch");
       break;
-    case BenchOp::VoxEq:
-      toggleForced(gBench.eqOff, "[bench] VOX EQ forced off", "[bench] VOX EQ follows the menu");
+    case BenchOp::CleanupEq:
+      toggleForced(gBench.eqOff, "[bench] CLEANUP EQ forced off", "[bench] CLEANUP EQ follows the menu");
       r.republish = true;
       break;
     case BenchOp::Clip: r.error = toggleClip(); break;

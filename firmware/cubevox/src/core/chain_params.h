@@ -29,7 +29,7 @@ struct ChainParams {
   cv::LofiParams lofi;
   cv::BloomParams bloom;  // keyFromGate is set by placing the Input gate; runBloom passes the gate's state
   cv::ReverbParams reverb;
-  cv::PolishParams eq;  // VOX EQ: its front half runs ahead of slot 1, its back half after the last slot
+  cv::PolishParams eq;  // CLEANUP EQ: its front half runs ahead of slot 1, its back half after the last slot
 
   ChainParams();
 };

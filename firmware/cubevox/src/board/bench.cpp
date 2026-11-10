@@ -12,7 +12,7 @@
 
 namespace {
 
-// The eight slots in order, then VOX EQ under its name.
+// The eight slots in order, then CLEANUP EQ under its name.
 void printSlotRow(const char* label, const std::array<uint32_t, kStatBuckets>& values) {
   serialOut().print(label);
   for (int s = 0; s < kSlotCount; ++s) {

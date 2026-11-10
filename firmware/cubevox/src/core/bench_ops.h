@@ -36,7 +36,7 @@ enum class BenchOp : uint8_t {
   PanelMute,
   PanelOled,
   Bypass,
-  VoxEq,
+  CleanupEq,
   StreamFault,
   FailRestart,
   Count,

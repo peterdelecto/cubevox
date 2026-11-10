@@ -40,7 +40,7 @@ constexpr std::array<OpEntry, kBenchOpCount> kOps = {{
     {BenchOp::PanelMute, "panel_mute", OpClass::Bench},
     {BenchOp::PanelOled, "panel_oled", OpClass::Bench},
     {BenchOp::Bypass, "bypass", OpClass::Bench},
-    {BenchOp::VoxEq, "vox_eq", OpClass::Bench},
+    {BenchOp::CleanupEq, "cleanup_eq", OpClass::Bench},
     {BenchOp::StreamFault, "stream_fault", OpClass::Bench},
     {BenchOp::FailRestart, "fail_restart", OpClass::Bench},
 }};

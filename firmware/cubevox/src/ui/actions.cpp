@@ -4,12 +4,12 @@ namespace ui {
 
 namespace {
 
-// The VOX EQ setting after `v`, OFF to ON to ON+CUTS and back to OFF.
-VoxEq nextVoxEq(VoxEq v) {
+// The CLEANUP EQ setting after `v`, OFF to LIGHT to STRONG and back to OFF.
+CleanupEq nextCleanupEq(CleanupEq v) {
   switch (v) {
-    case VoxEq::Off: return VoxEq::On;
-    case VoxEq::On: return VoxEq::Cuts;
-    default: return VoxEq::Off;
+    case CleanupEq::Off: return CleanupEq::Light;
+    case CleanupEq::Light: return CleanupEq::Strong;
+    default: return CleanupEq::Off;
   }
 }
 
@@ -34,8 +34,8 @@ ApplyResult cycleCard(Layout& layout, SwapSlot which) {
 
 ApplyResult applyAction(const UiAction& action, Settings& settings, Layout& layout) {
   switch (action) {
-    case UiAction::CycleVoxEq:
-      settings.voxEq = nextVoxEq(settings.voxEq);
+    case UiAction::CycleCleanupEq:
+      settings.cleanupEq = nextCleanupEq(settings.cleanupEq);
       return ApplyResult::SettingsChanged;
     case UiAction::CycleTopSwitch:
       settings.topSwitch = settings.topSwitch == TopSwitch::Mute ? TopSwitch::Bypass : TopSwitch::Mute;
