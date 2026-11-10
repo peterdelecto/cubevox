@@ -130,6 +130,15 @@ void audioResetPeaks();
 // within a ring, because no block refills it.
 void audioStopForBench();
 
+// Raises a stream fault the way a DMA error that stops the stream arrives: the RX stream stops, and
+// the HAL's error callback counts the error, silences the TX ring and flags the fault. audioPoll
+// then restarts the stream, or resets the box once the restart budget is spent.
+void audioStreamFaultForBench();
+
+// Flips whether the next stream restart fails, as one whose DMA start is refused. Returns the new
+// state. A failed restart clears it.
+bool audioBenchToggleFailRestart();
+
 // Loops the clip compiled in by CUBEVOX_BENCH_CLIP in place of the SAI input. Returns the
 // new state; false when no clip is compiled in.
 bool audioBenchClip(bool on);

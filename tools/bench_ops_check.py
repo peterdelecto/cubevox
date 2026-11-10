@@ -3,7 +3,9 @@
 
 firmware/bench_ops.py against the op table in core/bench_ops.cpp, and firmware/bringup.py's
 panel thresholds, block rate and SAI kernel clock against core/panel_test.h, engine/common.h
-and board/audio.cpp. build.sh runs this, so a drift fails the build.
+and board/audio.cpp. The stream fault drills' restart budget, relay wait, software reset flag and
+audio entry causes against core/audio_recovery.h, core/timing.h, the bootloader's boot_decide.h
+and board/fault.cpp. build.sh runs this, so a drift fails the build.
 
   python3 -I tools/bench_ops_check.py
 """
@@ -22,6 +24,10 @@ SRC = os.path.join(ROOT, "firmware", "cubevox", "src")
 TABLE = os.path.join(SRC, "core", "bench_ops.cpp")
 PANEL_TEST_H = os.path.join(SRC, "core", "panel_test.h")
 AUDIO_CPP = os.path.join(SRC, "board", "audio.cpp")
+FAULT_CPP = os.path.join(SRC, "board", "fault.cpp")
+AUDIO_RECOVERY_H = os.path.join(SRC, "core", "audio_recovery.h")
+TIMING_H = os.path.join(SRC, "core", "timing.h")
+BOOT_DECIDE_H = os.path.join(ROOT, "firmware", "bootloader", "boards", "cubevox", "boot_decide.h")
 ENGINE_COMMON_H = os.path.join(ROOT, "engine", "common.h")
 ROW = re.compile(r'\{BenchOp::\w+,\s*"(\w+)",\s*OpClass::(Query|Bench)\}')
 
@@ -59,21 +65,44 @@ def constant_failures():
         ("BLOCK_RATE_HZ", bringup.BLOCK_RATE_HZ,
          constant(ENGINE_COMMON_H, "kSampleRate") / constant(ENGINE_COMMON_H, "kBlock")),
         ("SAI_HZ", bringup.SAI_HZ, constant(AUDIO_CPP, "kSaiKernelHz")),
+        ("RESTARTS_PER_WINDOW", bringup.RESTARTS_PER_WINDOW, constant(AUDIO_RECOVERY_H, "kRestartsPerWindow")),
+        ("RESTART_WINDOW_S", bringup.RESTART_WINDOW_S, constant(AUDIO_RECOVERY_H, "kRestartWindowMs") / 1000.0),
+        ("RELAY_AFTER_START_S", bringup.RELAY_AFTER_START_S, constant(TIMING_H, "kRelayCloseAfterPowerOnMs") / 1000.0),
+        ("SOFTWARE_RESET", bringup.SOFTWARE_RESET, software_reset_flag()),
     ]
     return [f"bringup.py {name} is {have}, firmware has {want}"
             for name, have, want in pairs if not math.isclose(have, want, rel_tol=1e-6)]
+
+
+def software_reset_flag():
+    """CV_RSR_SFTRSTF of the bootloader's boot_decide.h, written as (1u << N)."""
+    with open(BOOT_DECIDE_H) as f:
+        m = re.search(r"#define\s+CV_RSR_SFTRSTF\s+\(1u\s*<<\s*(\d+)\)", f.read())
+    if not m:
+        raise ValueError(f"{os.path.relpath(BOOT_DECIDE_H, ROOT)}: no CV_RSR_SFTRSTF")
+    return float(1 << int(m.group(1)))
+
+
+def cause_failures():
+    """The audio entry causes bringup.py looks for, each a string literal in board/fault.cpp."""
+    with open(FAULT_CPP) as f:
+        text = f.read()
+    causes = (bringup.CAUSE_RESTARTED, bringup.CAUSE_OUT_OF_RESTARTS, bringup.CAUSE_RESTART_FAILED)
+    return [f"bringup.py audio cause '{c}' is not a string in board/fault.cpp" for c in causes if f'"{c}"' not in text]
 
 
 def main():
     try:
         failed, n_ops = op_table_failures()
         failed += constant_failures()
-    except (OSError, ValueError) as e:
+        failed += cause_failures()
+    except (OSError, ValueError, AttributeError) as e:
         failed, n_ops = [f"cannot read firmware sources: {e}"], 0
     for msg in failed:
         print("FAIL", msg)
     if not failed:
-        print(f"PASS host tools match the firmware ({n_ops} bench ops, panel thresholds, block rate, SAI clock)")
+        print(f"PASS host tools match the firmware ({n_ops} bench ops, panel thresholds, block rate, SAI clock, "
+              "restart budget, relay wait, reset flag, audio causes)")
     return 1 if failed else 0
 
 

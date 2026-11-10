@@ -158,6 +158,9 @@ volatile bool gOverrunTripped = false;
 uint32_t gOverrunRun = 0;  // RX halves in a row that found their last block not yet run
 StreamRecovery gRecovery;
 bool gStreamUp = false;  // the stream started and no restart has failed since
+#if CUBEVOX_BENCH
+bool gFailNextRestart = false;  // the fail_restart op: the next restart refuses to start the stream
+#endif
 
 // The input's energy since the last audioTakeInputEnergy(), summed by the block interrupt.
 volatile float gInputSumSquares = 0.0f;
@@ -633,6 +636,13 @@ bool restartStream() {
   gNextHalf = 0;
   NVIC_ClearPendingIRQ(SWPMI1_IRQn);
   NVIC_EnableIRQ(SWPMI1_IRQn);
+#if CUBEVOX_BENCH
+  if (gFailNextRestart) {
+    gFailNextRestart = false;
+    gError = "SAI DMA start refused (bench fail_restart)";
+    return false;
+  }
+#endif
   return initPeripherals() && startStream();
 }
 
@@ -782,6 +792,23 @@ uint32_t audioTroubleBlocks() { return gCounts.late + gCounts.overruns + gFlow.d
 
 #if CUBEVOX_BENCH
 void audioStopForBench() { HAL_SAI_DMAStop(&gSaiRx); }
+
+void audioStreamFaultForBench() {
+  NVIC_DisableIRQ(SAI1_IRQn);
+  NVIC_DisableIRQ(DMA1_Stream0_IRQn);
+  NVIC_DisableIRQ(DMA1_Stream1_IRQn);
+  HAL_SAI_DMAStop(&gSaiRx);
+  gSaiRx.ErrorCode |= HAL_SAI_ERROR_DMA;
+  HAL_SAI_ErrorCallback(&gSaiRx);
+  NVIC_EnableIRQ(DMA1_Stream1_IRQn);
+  NVIC_EnableIRQ(DMA1_Stream0_IRQn);
+  NVIC_EnableIRQ(SAI1_IRQn);
+}
+
+bool audioBenchToggleFailRestart() {
+  gFailNextRestart = !gFailNextRestart;
+  return gFailNextRestart;
+}
 
 bool audioBenchClip(bool on) {
 #ifdef CUBEVOX_BENCH_CLIP

@@ -38,6 +38,8 @@ enum class BenchOp : uint8_t {
   Bypass,
   PolishComp,
   VoxEq,
+  StreamFault,
+  FailRestart,
   Count,
 };
 

@@ -19,10 +19,17 @@ Drill 13 is the release image check, so --update does not flash the release imag
 is hardware/bringup/board-N.md with the UID, the bootloader and firmware versions, the checks and
 the drill table.
 
+--stream-faults raises stream faults with the bench ops stream_fault and fail_restart, each drill
+from a fresh start past the 5 s healthy window: four faults inside 20 s give three restarts and then
+the reset, a fourth fault after the minute restarts plainly, and a failed restart resets the box.
+It reads the verdict from the port (the error lines, status `restarts` and `muted`, the next boot
+report) and from DIAG.TXT on the update drive, so it needs the bootloader, and the MUTE toggle up.
+
   ./bringup.py --board 1                 # USB checks, then the manual questions
   ./bringup.py --board 1 --faults --dfu  # also the fault drill and the BOOT0 ROM DFU entry (reflashes)
   ./bringup.py --board 1 --panel         # also the panel walk: pots, toggles, K103, mute, OLED
   ./bringup.py --board 1 --faults --update   # also the update drills; log board-1.md
+  ./bringup.py --board 1 --stream-faults --no-prompt   # the stream fault drills, hands-free
 """
 
 import argparse
@@ -1294,6 +1301,230 @@ def update_drills(log, port, a):
         ctx.drop_port()
 
 
+# -- stream fault drills (--stream-faults): the restart budget and the reset it ends in
+# The bench ops stream_fault and fail_restart raise the faults; the port and DIAG.TXT give the verdict.
+
+RESTARTS_PER_WINDOW = 3          # core/audio_recovery.h kRestartsPerWindow
+RESTART_WINDOW_S = 60.0          # core/audio_recovery.h kRestartWindowMs
+RELAY_AFTER_START_S = 6.0        # core/timing.h kRelayCloseAfterPowerOnMs
+SOFTWARE_RESET = 1 << 24         # RCC_RSR SFTRSTF, the bootloader's CV_RSR_SFTRSTF
+CAUSE_RESTARTED = "stream restarted"            # board/fault.cpp, the audio entries' fault text
+CAUSE_OUT_OF_RESTARTS = "repeated stream faults"
+CAUSE_RESTART_FAILED = "stream restart failed"
+FAULT_GAP_S = 2.0                # between faults: past the mute, the restart and the release
+WINDOW_MARGIN_S = 2.0            # past the minute, so the oldest restart has left the window
+RESET_GONE_S = 8.0               # the planned reset waits up to 3 s for the stores, then drops the port
+RELAY_MIN_S = RELAY_AFTER_START_S - 1.0   # from the port dropping to status muted false
+RELAY_MAX_S = RELAY_AFTER_START_S + 4.0   # plus the bootloader, setup and the relay settle
+RELAY_WAIT_S = 15.0
+RESTART_LINE = r"\[WARN\] audio: restarting the stream after"
+OUT_OF_RESTARTS_LINE = r"\[ERROR\] audio: another fault inside a minute of three restarts; resetting"
+RESTART_FAILED_LINE = r"\[ERROR\] audio: .*; resetting"
+RESET_LINE = r"^\[boot\] reset:.*software"
+
+DiagEntry = collections.namedtuple("DiagEntry", "sequence kind firmware up rst fails reason fault sai ovr")
+DIAG_ENTRY = re.compile(r"^#(\d+) (\S+) (\S+) up=(\S+) rst=(\S+) fails=(\S+) (\S+) fa=\S+ (.*?) "
+                        r"sai=(\S+) ovr=(\S+)(?: ob=.*)?$")
+
+
+def count_value(text):
+    """A decimal count field, or None for the '?' of a value nobody knew."""
+    return int(text) if text.isdigit() else None
+
+
+def parse_diag_entries(text):
+    """DIAG.TXT's entry lines (`#sequence kind firmware up= rst= fails= reason fa= fault sai= ovr=`), newest first."""
+    entries = []
+    for line in text.replace("\r", "").split("\n"):
+        m = DIAG_ENTRY.match(line.strip())
+        if m:
+            entries.append(DiagEntry(int(m.group(1)), m.group(2), m.group(3), m.group(4), hex_value(m.group(5)),
+                                     m.group(6), m.group(7), m.group(8), count_value(m.group(9)),
+                                     count_value(m.group(10))))
+    return entries
+
+
+def judge_stream_reset(entries, cause, restarts):
+    """Whether the entries, newest first, show a reset an audio fault started. Returns (ok, detail).
+
+    The newest audio entry names `cause`, a boot entry after a software reset sits above it, and the
+    `restarts` entries below it are audio entries reading CAUSE_RESTARTED. Update entries from the
+    drill's own trip to the drive may sit on top.
+    """
+    at = next((i for i, e in enumerate(entries) if e.kind == "audio"), None)
+    if at is None:
+        return False, "DIAG.TXT lists no audio entry"
+    fault = entries[at]
+    if fault.fault != cause:
+        return False, f"newest audio entry #{fault.sequence} reads '{fault.fault}', want '{cause}'"
+    boots = [e for e in entries[:at] if e.kind == "boot"]
+    if not boots:
+        return False, f"no boot entry after audio entry #{fault.sequence}"
+    boot = boots[-1]
+    if boot.rst is None or not boot.rst & SOFTWARE_RESET:
+        return False, f"boot entry #{boot.sequence} has rst={boot.rst}, want a software reset"
+    before = entries[at + 1:at + 1 + restarts]
+    if len(before) < restarts or any(e.kind != "audio" or e.fault != CAUSE_RESTARTED for e in before):
+        seen = [f"#{e.sequence} {e.kind} '{e.fault}'" for e in before]
+        return False, f"want {restarts} '{CAUSE_RESTARTED}' entries below #{fault.sequence}, DIAG.TXT has {seen}"
+    tail = f", below it {restarts} '{CAUSE_RESTARTED}'" if restarts else ""
+    return True, f"#{boot.sequence} boot after a software reset, #{fault.sequence} audio '{cause}'{tail}"
+
+
+def fresh_start(ctx):
+    """Resets the box by the watchdog op and waits past the healthy window, so the start counts healthy
+    and the restart budget is full."""
+    ctx.app()
+    trigger_reset(ctx, "w", RESET_WAIT_S)
+    if wait_state(ctx, UPDATE_WAIT_S) != "app":
+        raise DrillError("the application did not come back after the watchdog reset")
+    ctx.port = Port(wait_s=2.0)
+    time.sleep(contract_value("CV_HEALTHY_MS") / 1000.0 + HEALTHY_MARGIN_S)
+    return ctx.port
+
+
+def raise_fault(port, expect):
+    """Sends stream_fault and returns the first line matching `expect`, or None after FAULT_WAIT_S."""
+    port.send(bench_ops.op_line("stream_fault"))
+    return find(port.read(FAULT_WAIT_S, until=expect), expect)
+
+
+def status_field(port, name):
+    reply = port.ask("status", 2.0)
+    if not isinstance(reply, dict) or name not in reply:
+        raise DrillError(f"status: no {name} in {str(reply)[:120]}")
+    return reply[name]
+
+
+def seconds_until_unmuted(port, since, seen):
+    """Seconds from `since` until status reads muted false, or None after RELAY_WAIT_S. Log lines go to `seen`."""
+    while time.monotonic() - since < RELAY_WAIT_S:
+        reply = port.ask("status", 1.0, on_text=seen.append)
+        if isinstance(reply, dict) and reply.get("muted") is False:
+            return time.monotonic() - since
+        time.sleep(PORT_POLL_S)
+    return None
+
+
+def follow_reset(ctx, expect):
+    """After the op that starts an audio reset: the error line, the port dropping, the software reset in
+    the next boot report, and the seconds from the drop until status reads muted false (or None)."""
+    path = ctx.port.path
+    line = find(ctx.port.read(RESET_GONE_S), expect)  # returns early when the reset drops the port
+    if line is None:
+        raise DrillError(f"no line matching '{expect}' before the reset")
+    ctx.drop_port()
+    if not wait_port_gone(path, 1.0):
+        raise DrillError(f"serial port still there {RESET_GONE_S:g} s after the fault")
+    gone = time.monotonic()
+    if wait_port(UPDATE_WAIT_S) is None:
+        raise DrillError(f"no serial port {UPDATE_WAIT_S:g} s after the reset")
+    ctx.port = Port(wait_s=1.0, settle_s=FAST_SETTLE_S)
+    seen = []
+    relay_s = seconds_until_unmuted(ctx.port, gone, seen)
+    if find(seen, RESET_LINE) is None and find(boot_report(ctx.port), RESET_LINE) is None:
+        raise DrillError("the boot report after the fault shows no software reset")
+    return line.group(0), relay_s
+
+
+def relay_note(relay_s):
+    """(ok, text) for the time from the reset until the output unmuted."""
+    if relay_s is None:
+        return False, f"status still reads muted {RELAY_WAIT_S:g} s after the reset (is the MUTE toggle down?)"
+    ok = RELAY_MIN_S <= relay_s <= RELAY_MAX_S
+    return ok, f"unmuted {relay_s:.1f} s after the reset, want {RELAY_MIN_S:g} to {RELAY_MAX_S:g} s"
+
+
+def diag_entries_now(ctx):
+    """DIAG.TXT's entries from the update drive; the bench image goes back on after."""
+    enter_update_mode(ctx, UPDATE_WAIT_S)
+    entries = parse_diag_entries(read_drive_text(ctx.volume(), "DIAG.TXT"))
+    install(ctx, ctx.files["bench"], COPY_NAME)
+    return entries
+
+
+def drill_restart_budget(ctx):
+    """Four faults inside 20 s, more than 5 s after a start: three restarts, then the reset."""
+    port = fresh_start(ctx)
+    for n in range(1, RESTARTS_PER_WINDOW + 1):
+        if raise_fault(port, RESTART_LINE) is None:
+            return False, f"fault {n}: no restart line in {FAULT_WAIT_S:g} s"
+        time.sleep(FAULT_GAP_S)
+    restarts = status_field(port, "restarts")
+    if restarts != RESTARTS_PER_WINDOW:
+        return False, f"status restarts {restarts} after {RESTARTS_PER_WINDOW} faults"
+    port.send(bench_ops.op_line("stream_fault"))
+    line, relay_s = follow_reset(ctx, OUT_OF_RESTARTS_LINE)
+    relay_ok, relay = relay_note(relay_s)
+    diag_ok, diag = judge_stream_reset(diag_entries_now(ctx), CAUSE_OUT_OF_RESTARTS, RESTARTS_PER_WINDOW)
+    return relay_ok and diag_ok, f"{RESTARTS_PER_WINDOW} restarts, then '{line}'; {relay}; DIAG.TXT: {diag}"
+
+
+def drill_budget_refills(ctx):
+    """Three faults, then a fourth once the minute has passed: a plain restart, no reset."""
+    port = fresh_start(ctx)
+    first = None
+    for n in range(1, RESTARTS_PER_WINDOW + 1):
+        if raise_fault(port, RESTART_LINE) is None:
+            return False, f"fault {n}: no restart line in {FAULT_WAIT_S:g} s"
+        first = first if first is not None else time.monotonic()
+        time.sleep(FAULT_GAP_S)
+    time.sleep(max(0.0, first + RESTART_WINDOW_S + WINDOW_MARGIN_S - time.monotonic()))
+    either = f"{RESTART_LINE}|{OUT_OF_RESTARTS_LINE}"
+    line = raise_fault(port, either)
+    if line is None or re.search(OUT_OF_RESTARTS_LINE, line.group(0)):
+        return False, f"the fault after the minute gave {line.group(0) if line else 'no line'}, want a restart"
+    restarts = status_field(port, "restarts")
+    if restarts != RESTARTS_PER_WINDOW + 1:
+        return False, f"status restarts {restarts}, want {RESTARTS_PER_WINDOW + 1}"
+    return True, f"a fault {RESTART_WINDOW_S + WINDOW_MARGIN_S:g} s after the first restarted the stream; restarts {restarts}"
+
+
+def drill_failed_restart(ctx):
+    """fail_restart, then one fault: the restart fails and the box resets."""
+    port = fresh_start(ctx)
+    port.send(bench_ops.op_line("fail_restart"))
+    if find(port.read(FAULT_WAIT_S, until=r"next stream restart fails"), r"next stream restart fails") is None:
+        return False, "fail_restart did not answer '[bench] the next stream restart fails'"
+    port.send(bench_ops.op_line("stream_fault"))
+    line, relay_s = follow_reset(ctx, RESTART_FAILED_LINE)
+    relay_ok, relay = relay_note(relay_s)
+    diag_ok, diag = judge_stream_reset(diag_entries_now(ctx), CAUSE_RESTART_FAILED, 0)
+    return relay_ok and diag_ok, f"'{line}'; {relay}; DIAG.TXT: {diag}"
+
+
+STREAM_DRILLS = (
+    ("stream faults past the budget reset the box", drill_restart_budget),
+    ("a fault after the minute restarts plainly", drill_budget_refills),
+    ("a failed restart resets the box", drill_failed_restart),
+)
+
+
+def stream_fault_drills(log, port):
+    """Runs the stream fault drills on the bench image. Takes over `port` and returns the open port of the
+    running application, or None when the box could not be brought back."""
+    with tempfile.TemporaryDirectory(prefix="cubevox-stream-") as tmp:
+        ctx = Ctx(log, False, tmp)
+        ctx.port = port
+        try:
+            ctx.files = {"bench": os.path.join(fw_outdir("bench"), "cubevox.uf2")}
+        except DrillError as e:
+            log.check("stream fault drills", False, str(e))
+            return ctx.port
+        for name, fn in STREAM_DRILLS:
+            try:
+                ok, detail = fn(ctx)
+            except (DrillError, *PORT_ERRORS) as e:
+                ok, detail = False, str(e)
+                ctx.drop_port()
+            log.check(name, ok, detail)
+        try:
+            return ctx.app()
+        except (DrillError, *PORT_ERRORS) as e:
+            log.check("back to the application after the stream drills", False, str(e))
+            return None
+
+
 MANUAL = [
     ("input current at 9.6 V", "Bench supply current at 9.6 V, before USB (mA): "),
     ("placement orientation", "U1, SOT-23s, diodes, polarised caps match the silkscreen? (y/n, note): "),
@@ -1319,6 +1550,8 @@ def main():
     ap.add_argument("--board", required=True, help="board number or label for the log name")
     ap.add_argument("--no-oled", action="store_true", help="skip the OLED check")
     ap.add_argument("--faults", action="store_true", help="drill audio stall, watchdog and bus fault")
+    ap.add_argument("--stream-faults", action="store_true",
+                    help="drill stream fault restarts, the reset past the budget and a failed restart (needs the bootloader)")
     ap.add_argument("--dfu", action="store_true", help="drill ROM DFU entry by BOOT0 and flash back over it")
     ap.add_argument("--panel", action="store_true", help="walk every pot and toggle, then K103, mute and OLED")
     ap.add_argument("--update", action="store_true",
@@ -1358,6 +1591,10 @@ def run_checks(log, a):
         panel_test(log, port, not a.no_prompt, not a.no_oled)
     if a.faults:
         port = fault_drill(log, port)
+    if a.stream_faults:
+        port = stream_fault_drills(log, port)
+        if port is None:
+            return
     if a.dfu:
         port = dfu_drill(log, port, not a.no_prompt)
         check_boot(log, boot_report(port), not a.no_oled)
