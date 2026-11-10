@@ -43,6 +43,7 @@ struct PanelInput {
   int32_t detents = 0;  // encoder turns since the last tick
   bool click = false;   // encoder released after a short press since the last tick
   bool hold = false;    // encoder press reached kMenuHoldMs since the last tick
+  bool press = false;   // encoder went down since the last tick
 
   PanelInput();
 };

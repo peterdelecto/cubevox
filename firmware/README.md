@@ -141,7 +141,7 @@ and dissolves between them).
 2. Audio: `audio` (SAI, DMA, the audio IRQ, the engines and the published snapshot, fade and engine reset on a
    layout change, per-stage cycle counts, SAI and DMA error handling with the stream restart).
 3. Panel: `controls` (mux scan on ADC3, toggles), `adc_setup` (one ADC brought up once, for `controls` and
-   `power_sense`), `input` (encoder, click and hold to `UiInput`), `mute`, `input_jack` (PAD_EN for relay K103).
+   `power_sense`), `input` (encoder, click, hold and press to `UiInput`), `mute`, `input_jack` (PAD_EN for relay K103).
 4. Display: `sh1106.c` (the SH1106 driver the bootloader compiles too) and `display_sh1106` (the bus from
    `pins.h`, boot starts with bus recovery, one page per loop pass under `PanelLink`).
 5. USB and protocol: `usb_link` (CDC gated on VBUS), `serial_link` (CDC bytes to JSON lines, reply writer, output

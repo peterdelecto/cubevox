@@ -159,6 +159,7 @@ void encoderKnob(Frame& f, ImVec2 center) {
   f.panel.input.detents += turns;
   f.panel.input.click = f.panel.input.click || press.click;
   f.panel.input.hold = f.panel.input.hold || press.hold;
+  f.panel.input.press = f.panel.input.press || press.press;
 
   const bool pressed = active || ImGui::GetTime() < e.flashUntil;
   ImDrawList* dl = f.dl;
@@ -576,6 +577,7 @@ void Window::draw(Box& box, Panel& panel, bool micAvailable) {
   panel.input.detents = 0;
   panel.input.click = false;
   panel.input.hold = false;
+  panel.input.press = false;
   ImGui::SetNextWindowPos(ImVec2(0, 0));
   ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
   ImGui::Begin(kWindowTitle, nullptr, kFaceFlags);

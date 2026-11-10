@@ -30,8 +30,10 @@ UX audit 2026-11-06 (`build/audit/scope-ux-audit.md`, 7 findings, 3 holds) is fo
 7. He flips an effect toggle. The trace changes shape as the card's sound comes in, over the slot fade.
 8. He flips MUTE or BYPASS. The MUTED or BYPASS screen hides the trace; the chain keeps running under
    MUTE, so the trace is live the moment the voice screen returns.
-9. He swaps a card from the menu. The output fades out over 50 ms and the trace shrinks with it, the
-   line shows while the chain is silent for the swap, then the trace grows back with the fade-in.
+9. He swaps a card from the menu. The open menu covers the scope, so he sees no trace during the swap.
+   The ring takes the chain output ahead of the 50 ms layout fade, and each frame fits its own scale, so
+   the trace keeps its full height through the fade, draws the line for the silent swap blocks, and
+   returns at full height. The scope is live when the menu closes.
 10. He shouts into the mic. The scale rises at once, so the shout fills the height and nothing
     flattens; the frames after it draw at 70 % and up while the scale settles.
 11. Goes wrong, room noise. Hiss under -54 dBFS draws the line, and a synth idling on the input or a noisy room
@@ -130,7 +132,9 @@ rows tall. The scale now fits each frame.
    two threads inside the C++ memory model. No interrupt mask on the box.
 5. The ring lives in `BlockFlow`, so the box and the emulator share it and the emulator draws the same
    trace from the same code.
-6. A frame is taken only while the voice screen shows.
+6. A frame is taken only while the voice screen shows. Off the voice screen the face drops the whole
+   frame, so the last good frame on return is the line and a failed first read never draws a trace
+   from before the readout, MUTED or the menu.
 
 ## 6. Code
 
@@ -162,7 +166,10 @@ rows tall. The scale now fits each frame.
    at half the previous frame's peak draws at 70 % (the 3 dB fall); a frame 12 dB under fills the
    height by the fourth frame; a sine at -48 dBFS draws at 9 rows (the -40 dBFS minimum scale); a
    frame with its peak under -54 dBFS gives the line; an echo tail decaying from -20 to -60 dBFS
-   draws on every frame until it is under -54 dBFS.
+   draws on every frame until it is under -54 dBFS. A constant frame draws a flat line off the horizon:
+   at -30 dBFS on row 10 (its value is its peak and its scale), at -50 dBFS on row 25 (the -40 dBFS
+   minimum scale). No input reaches the scope as a constant today, because the PCM1808's high-pass,
+   the Input gate and Lo-fi's mid-tread rounding all leave none.
 4. `core_scope`, ring: wrap-around returns the newest samples in order; a host two-thread stress where the writer
    fills each block with its block number and the reader asserts every frame is consecutive numbers.
 5. `core_block_tail` or `core_chain_run`: the ring advances one block per audio block through a layout
