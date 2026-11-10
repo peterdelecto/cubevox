@@ -237,7 +237,8 @@ DrumSynthV3 are references to read, and nothing in `firmware/` is copied from th
   DMA transfer errors are counted in `audio.cpp` and reported at most once a second. `SAI1_IRQn` delivers `OVRUDR`,
   `AFSDET`, `LFSDET` and `WCKCFG`. A stream-stopping error or 8 overruns in a row mutes; `audioPoll` restarts at
   most 3 times a minute. The next fault, or a restart that fails, takes the stall's path in `faultAudioWatch`,
-  with the cause in the entry's fault text. TX halves are zeroed once read.
+  with the cause in the entry's fault text under its code (`A1` budget spent, `A2` restart failed, `A3` stall,
+  `core/audio_fault_cause.h`); the next boot's splash shows the same code. TX halves are zeroed once read.
 - `board/dfu.cpp`: `enterDfu()` is the only way into update mode, where the bootloader serves the `CUBEVOX` drive.
   It writes a summary of this run into the boot block (version, uptime, reset cause, last fault kind), queues a
   diagnostic log entry and starts the planned reset (`board/planned_reset.cpp`). `loop()` keeps running until a
