@@ -2,6 +2,8 @@
 
 #include <array>
 
+#include "engine/common.h"
+
 // The Formant card's panel range and its tuning. Apraxia drives the same engine with its MIX pinned at 1.
 
 namespace cv {
@@ -23,6 +25,13 @@ constexpr int kFormantShiftSteps = 2 * kFormantVoiceMaxShiftSt + 1;
 constexpr float kFormantPowerSec = 0.04f;
 constexpr float kFormantLevelGainMax = 2.0f;
 constexpr float kFormantPowerFloor = 1e-20f;  // below this a power is silence
+
+// A switch-on's rise from the input to the mix, the S curve 3x^2 - 2x^3 over this many samples, 12 ms. A
+// card whose tracker replays its ring at the switch-on has its period 10.7 ms in, after the slot's 8 ms
+// fade, so the card's own rise brings it in. The 20 ms one-pole the card uses for its other moves put full
+// level 55 ms after the toggle; 12 ms puts it 24 ms after and holds a 220 Hz sine's toggle to x1.01 of
+// steady-state curvature, where 8 ms read x1.026.
+constexpr int kFormantRiseSamples = 11 * kBlock;
 
 // The shifted voice's trim, which the engine clamps to this many dB either way.
 constexpr float kFormantMaxTrimDb = 24.0f;

@@ -24,9 +24,9 @@
 // grid.
 //
 // A voice resets on its enable edge only once its crossfade has settled at zero, so a quick off and on
-// keeps the running voice instead of cutting to fresh grains. The tracker's frame is warm only while the
-// engine runs. A stopped engine calls rest() each block, and the next call after it starts clean, so the
-// first voiced frame comes about 32 ms in where a running engine gives it in 8 ms. At a note that starts
+// keeps the running voice instead of cutting to fresh grains. A stopped engine in the layout calls idle()
+// each block, which keeps writing the ring and idles the tracker, so at a switch-on the tracker replays the
+// ring's history and has a period in 11 to 16 ms, where a cold one takes about 32 ms. At a note that starts
 // after a rest, the period the voice reads moves to the new note from the tracker's onset estimate, ahead
 // of its first voiced frame (pitch.h). The correction still moves only on voiced frames.
 
@@ -68,26 +68,21 @@ class AutotuneFx {
  public:
   AutotuneFx() { reset(); }
 
-  // Leaves the ring zero and the tracker cold. A card that rested since it last ran (see rest) has
-  // cleared most of the ring already, and this clears what is left.
+  // Leaves the ring zero and the tracker cold, as at power-on and when a layout swap places the card.
   void reset() {
     ring_.clear();
     tracker_.reset();
-    voice_.reset();
-    fade_ = 0.0f;
-    gains_ = Gains{};
-    feed_ = GroupFeed{};
-    was_ = false;
-    fresh_ = true;
-    rested_ = false;
+    settle();
+    idle_ = false;
   }
 
-  // A call for each block the card sits stopped (the chain does not run it). It zeroes the next
-  // InputRing::kRestClearFloats floats of the ring, so the reset that starts the card again finds the ring
-  // clear and the first block after a switch-on carries none of the clear.
-  void rest() {
-    ring_.rest();
-    rested_ = true;
+  // A call for each block the card sits stopped in the layout. It writes the block into the ring and idles
+  // the tracker, so a switch-on finds the history and the tracker replays it (pitch.h) instead of starting
+  // cold. The first call after the engine ran settles the crossfade and the voice at off.
+  void idle(const float* in, int n) {
+    if (!idle_) settle();
+    for (int c = 0; c < n; c += kBlock) ring_.write(in + c, n - c < kBlock ? n - c : kBlock);
+    tracker_.idle(n);
   }
 
   // Runs n samples of any call length, in chunks of at most kBlock. in and out may be the same buffer.
@@ -95,7 +90,7 @@ class AutotuneFx {
   // voice that starts takes its newest mark from it, so the two lay their grains on one grid from the start.
   void process(const float* in, float* out, int n, const AutotuneParams& p, const TrackerNeeds& need = TrackerNeeds{},
                const GridMarks& grid = GridMarks{}) {
-    if (rested_) reset();
+    idle_ = false;
     for (int c = 0; c < n; c += kBlock) chunk(in + c, out + c, n - c < kBlock ? n - c : kBlock, p, need, grid);
   }
 
@@ -127,6 +122,18 @@ class AutotuneFx {
   uint32_t ringClearedForTest() const { return ring_.clearedForTest(); }
 
  private:
+  // The crossfade and the voice at off, the next chunk taking its target outright. The ring and the tracker
+  // stay.
+  void settle() {
+    voice_.reset();
+    fade_ = 0.0f;
+    gains_ = Gains{};
+    feed_ = GroupFeed{};
+    was_ = false;
+    fresh_ = true;
+    idle_ = true;
+  }
+
   // The crossfade's gains (equal-power): the corrected voice's share and the dry input's.
   struct Gains {
     float corrected = 0.0f;
@@ -235,7 +242,7 @@ class AutotuneFx {
   smooth::BlockCoef coef_;  // the 20 ms one-pole's step over the last chunk length
   bool was_ = false;     // Autotune was on last chunk
   bool fresh_ = true;    // the next chunk takes its target outright
-  bool rested_ = false;  // the engine sat stopped since it last ran
+  bool idle_ = false;    // the engine sat stopped since it last ran, its crossfade settled at off
 };
 
 }  // namespace cv

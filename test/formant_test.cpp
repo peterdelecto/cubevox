@@ -5,7 +5,7 @@
 // the toggle holds steady-state curvature, the MIX level, the trim, any call length, and no
 // allocation. The voice's silence skip returns the plain voice's samples, SHIFT starts at the knob
 // when the card comes up, a Formant that starts beside a running Autotune lines up, the tracker's range
-// flags put the card aside, and a NaN does not stay in the level gain. A pitch step reaches the output
+// flags put the card aside and it comes back on fresh grains, and a NaN does not stay in the level gain. A pitch step reaches the output
 // behind Autotune with Autotune's own, and Autotune's toggle under the card holds the largest step and the
 // pitch of a 440 Hz sine. SHIFT and MIX steps are knob_step_test's, the default level is level_test's. No
 // window, no audio device.
@@ -18,6 +18,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <limits>
+#include <memory>
 #include <vector>
 
 #include "alloc_guard.h"
@@ -816,6 +817,44 @@ bool testRangeFlags() {
     ok &= report(name, edgeFade == 0.0f && edgeDiffers == 0 && back_on,
                  "card aside through the note and the silence after it: fade peak %.3f (0), %.0f samples differ from the input (0); back on for the vowel: %.0f (1)",
                  static_cast<double>(edgeFade), static_cast<double>(edgeDiffers), back_on ? 1.0 : 0.0);
+  }
+
+  // The card on for a 110 Hz vowel steps aside for 0.4 s of a note past the range, then comes back. For the
+  // 60 ms after its fade leaves 0 its voice reads no further back than its lag, two periods and a block, so
+  // no grain from before the note plays.
+  constexpr double kBackHz = 110.0;
+  for (double hz : {70.0, 1500.0}) {
+    Signal in = vowel(kBackHz, kRate);
+    const Signal edge = sawtooth(hz, kRate * 2 / 5);
+    in.insert(in.end(), edge.begin(), edge.end());
+    const Signal back = vowel(kBackHz, kRate);
+    in.insert(in.end(), back.begin(), back.end());
+    auto fx = std::make_unique<cv::FormantFx>();
+    cv::FormantParams fp;
+    fp.on = true;
+    fp.shiftSt = -5;
+    fp.mix = 1.0f;
+    Signal out(cv::kBlock);
+    bool wasAside = false;
+    int returned = -1;
+    int worst = 0;
+    float allowed = 0.0f;
+    const int returnFrom = kRate * 7 / 5;
+    for (int i = 0; i + cv::kBlock <= static_cast<int>(in.size()); i += cv::kBlock) {
+      const float before = fx->fade();
+      fx->process(&in[static_cast<size_t>(i)], out.data(), cv::kBlock, fp);
+      if (i >= kRate && i < returnFrom) wasAside = wasAside || fx->fade() == 0.0f;
+      if (i >= returnFrom && returned < 0 && before == 0.0f && fx->fade() > 0.0f) returned = i;
+      if (returned >= 0 && i < returned + kRate * 6 / 100) {
+        allowed = fx->lagForTest() + 2.0f * static_cast<float>(kRate / kBackHz) + cv::kBlock;
+        worst = std::max(worst, fx->voiceReachForTest());
+      }
+    }
+    char name[48];
+    std::snprintf(name, sizeof name, "range return, %.0f Hz", hz);
+    ok &= report(name, wasAside && returned >= 0 && static_cast<float>(worst) <= allowed,
+                 "card aside: %.0f (1), back at %.0f ms; for 60 ms its voice reads %.0f samples back at most (%.0f)",
+                 wasAside ? 1.0 : 0.0, returned / (kRate / 1000.0), static_cast<double>(worst), static_cast<double>(allowed));
   }
   return ok;
 }
