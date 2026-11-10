@@ -158,8 +158,8 @@ void Box::tick(const PanelInput& in, uint32_t nowMs) {
   readControls(in, nowMs);
   runMute(in, nowMs);
 
-  const UiInput menuIn{in.detents, in.click, in.hold};
-  if (menuIn.detents != 0 || menuIn.click || menuIn.hold) dim_.noteActivity(nowMs);
+  const UiInput menuIn{in.detents, in.click, in.hold, in.press};
+  if (menuIn.detents != 0 || menuIn.click || menuIn.hold || menuIn.press) dim_.noteActivity(nowMs);
   const bool settingsChanged = applyAction(menu_.update(menuIn, nowMs));
   const bool changed = knobs_.takeChanged() || toggleChanged_;
   toggleChanged_ = false;

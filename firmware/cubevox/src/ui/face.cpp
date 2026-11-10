@@ -72,7 +72,7 @@ void Face::tick(uint32_t nowMs, const UiContext& ctx, const level::InputEnergy& 
   meterSegments_ = meterSegments(inputMeter_.update(input, dtMs));
   const GuiFrame frame = gui_.tick(nowMs, ctx.topSwitchOn, menu.open());
   if (frame.screen != Screen::Voice) {
-    scope_.scale = 0.0f;
+    scope_ = ScopeFrame{};
   } else if (ring.read(samples_.data())) {
     scope_ = scopeFrame(samples_.data(), scope_.scale);
   }

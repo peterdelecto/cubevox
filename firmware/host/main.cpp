@@ -628,6 +628,7 @@ int runLive(const char* argv0) {
       input.detents = 0;
       input.click = false;
       input.hold = false;
+      input.press = false;
       ++passes;
     }
     if (nowMs - passMs >= kPassMs) passMs = nowMs;  // the app stalled; drop the backlog

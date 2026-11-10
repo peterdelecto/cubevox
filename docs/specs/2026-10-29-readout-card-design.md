@@ -33,13 +33,13 @@ a reminder at the moment of use, not a reference to look up.
 | Upper name | 5x7 | x 13, top 12 |
 | Lower knob | 9 x 9 | x 1, rows 21 to 29 |
 | Lower name | 5x7 | x 13, top 22 |
-| Value | 16X24 | top 34, in the fixed field of the OLED GUI spec |
+| Value | 16X24 | top 34, laid out by the OLED GUI spec's Value field |
 
 1. Every piece of text keeps 1 px clear of edges, the strip, the pictures and other text.
 2. The strip is a heading by shape. Both reverb names fit in 5x7 inside it (SPRING REVERB is
    77 px, ending at x 90).
 3. No parameter name is truncated. Each name row is 114 px wide and the longest name is 53 px.
-4. The value row, its fixed field, the rolling digits and the key names are unchanged from the
+4. The value row, its field, the rolling digits and the key names are unchanged from the
    OLED GUI spec. The 9X12 parameter name of the old readout is gone.
 
 ## Knob picture
