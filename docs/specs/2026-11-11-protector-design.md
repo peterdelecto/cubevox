@@ -196,7 +196,8 @@ Built 2026-11-11 in `cubevox-enclosure` as component `Protector`, 26 timeline it
 sketches (`layout`, `rear`, `side pads`, `front pads`, `underside`), one plane (`centre`), all
 sketches fully constrained. STL at `hardware/exports/protector.stl`, in the model's frame (the
 plate is 2 degrees off level; the slicer lays it on the plate). 119.9 cm³, 158 g at 1.32 g/cm³.
-The three proof components are deleted. The UX audit of Adam's walk was not run.
+The three proof components are deleted. The UX audit of Adam's walk was run after the build,
+2026-11-11; its findings are in "UX audit" below and are not fixed yet.
 
 As built, where the build settles something the text above left open:
 
@@ -216,3 +217,17 @@ As built, where the build settles something the text above left open:
    the dish wall's top at the pad leads; nothing with the boot or the board. The knobs are not
    in the model, so the pockets were placed from the pot shaft positions and not checked
    against knob bodies.
+
+## UX audit of Adam's walk (2026-11-11, after the build)
+
+Forces are estimates from the data sheet's 450 MPa and a plain beam model of the finger.
+
+| # | Step | Finding | Size |
+|---|---|---|---|
+| 1 | 5, box into the cup | The box cannot go in. The boot's flat underside starts 1.4 mm from the cup wall (0.4 mm air plus its 1.0 mm chamfer). The pad's flat top at the rim reaches 1.9 mm. The boot lands flat on the four pad tops, 0.5 mm short of the lead, and nothing pushes the fingers out. | stops the walk |
+| 2 | 2, box out of the cup | The pull is far too hard. The boot is 3.0 mm wider per side than the pads (the text above says 2.5 mm). A finger bent 3.0 mm presses with about 30 N, so four press with about 120 N, and the 45 degree ramp with friction turns that into a pull of roughly 150 to 350 N. | stops the walk |
+| 3 | 2 and 5, every use | The finger root is strained about 5 % at 3.0 mm, across the layers, where the data sheet gives no strength. The roots may crack with use. | may break |
+| 4 | 3, cup onto the knobs | The pockets have no lead-in and 0.5 mm of room round a 15 mm knob. The cup has 3.6 mm of play front to back on the lid, so the knob tops usually land beside the pockets and the cup has to be jiggled until it drops 1.2 mm. One knob that sits 0.5 mm off keeps it from seating. | annoys |
+| 5 | 3, cup onto the lid | Works. The lid's top chamfer and the pad leads centre the cup from up to 1.75 mm off, and the walls reach the lid before the plate reaches the knobs. | fine |
+| 6 | 3, back to front | Works. The front wall stops on the jacks. In use the same holds: the jacks stand 2.2 mm past the boot, so the box does not go into the cup the wrong way round. | fine |
+| 7 | 4, in the bag | Hold about 15 N, as specced. The open rear and the load on the knob tops are the owner's accepted trade. | accepted |
