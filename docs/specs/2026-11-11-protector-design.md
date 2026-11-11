@@ -74,10 +74,14 @@ boot's flat bottom face.
    front pads. Two notches open at the rim, measured in x across the box and in height above
    the plate's inner face:
    1. 1/4" jack: x 7.6 to 29.6, floor at 17 mm.
-   2. Combo jack, switch and barrel: x 102 to 176. Under the combo jack (x 102 to 134.5) it
-      goes down to a lip 1.5 mm tall; under the switch and barrel its floor is at 17 mm.
-   Inside corners are rounded 4 mm, outside corners 3 mm. A full-height wall 72 mm long stands
-   between the notches.
+   2. Combo jack, switch and barrel: x 102 to 174.6, its floor following each opening in the
+      dish 2.0 mm clear (owner 2026-11-11: the wall comes closer to the DC jack and switch).
+      Under the combo jack (x 102 to 134.5) it goes down to a lip 1.5 mm tall. Under the
+      switch (x 134.5 to 159) the floor is at 24.5 mm; the dish's switch opening starts at
+      26.5 mm. Under the barrel jack (x 159 to 174.6) the floor is at 20.1 mm; the dish's
+      opening starts at 22.1 mm and ends at x 172.6. A barrel plug up to 15 mm across fits.
+   Inside corners are rounded 4 mm, outside corners 3 mm, and the 4.4 mm step between the
+   switch and barrel floors 2 mm. A full-height wall 72 mm long stands between the notches.
 5. Side pads. Two on each side wall, mirrored left to right, centred 40 mm and 116 mm from the
    cup's inner front face. Each is 25 mm long and stands 3.4 mm inward: 2.4 mm of gap to the
    lid and dish walls plus 1.0 mm of squeeze, taken up by its finger (item 13). Each runs from 23.0 mm above the plate's inner
@@ -142,8 +146,9 @@ boot's flat bottom face.
 | `fingerSlot` / `fingerRoot` | 1.0 mm / 4.0 mm | slot width; slot end above the plate inner face |
 | `pocketDia` / `pocketDepth` / `pocketLead` | 16.0 mm / 1.2 mm / 0.8 mm | knob pockets inside the plate and their lead-in |
 | `protRearClear` | 0.9 mm | air between the rear wall and the boot |
-| `rearJackFloor` | 17 mm | notch floor at the 1/4" jack, switch and barrel |
-| `rearCorner` / `rearEdge` | 4 mm / 3 mm | inside and outside corner radii of the rear notches |
+| `rearJackFloor` | 17 mm | notch floor at the 1/4" jack |
+| `rearSwitchFloor` / `rearBarrelFloor` | 24.5 mm / 20.1 mm | notch floors under the switch and the barrel jack |
+| `rearCorner` / `rearEdge` / `rearStep` | 4 mm / 3 mm / 2 mm | inside, outside and step corner radii of the rear notches |
 | `padRidge` / `padRidgePitch` | 0.4 mm / 0.8 mm | ridges on the pad lands |
 | `padFront` | 1.3 mm | front pad stand-off |
 | `padLead` | `padSide` | kept for reference; the lead is the pad's whole depth |
