@@ -55,7 +55,8 @@ boot's flat bottom face.
 | Toggle lever tip | z 25.2 | Fusion |
 | Slots | x 8.5 + 24 k, k 0 to 7 | Fusion, pot shafts |
 | Lowest rear part | combo jack body, 5.3 mm above the boot's underside; jacks span x 12.1 to 171.6 | Fusion |
-| Material | very stiff TPU, 68D; rigid, bends by hand | owner 2026-11-05, 2026-11-11 |
+| Material | Siraya Tech TPU-GF (Fibreheart TPU-GF, 15 % glass fibre), the owner's 68D; rigid, bends by hand | owner 2026-11-05, 2026-11-11 |
+| Material figures | bending modulus 450 MPa (ISO 178), Young's modulus 445 MPa along the layers, Shore 67D, 1.32 g/cm³; no figure across the layers | Siraya Tech data sheet |
 | Printer bed | 254 x 254 mm | owner |
 
 ## Geometry
@@ -109,10 +110,11 @@ boot's flat bottom face.
 2. Travel. The side pads press on the lid's side walls over the 5.6 mm land, each finger bent
    1.0 mm. The knob tops in their pockets set the depth and the place. Nothing clicks: the
    seam groove is 0.25 mm deep, too shallow to catch.
-3. Force, an estimate. With a stiffness of 300 MPa assumed for the TPU (not measured), one
-   finger bent 1.0 mm presses with about 5 N, so the four give about 19 N on the lid and
-   about 10 N of hold against pulling the cup off, seven times the cup's weight. The first
-   print shows the real figure; `padSide` is the one number that tunes it.
+3. Force, an estimate. With the data sheet's bending modulus of 450 MPa, one finger bent
+   1.0 mm presses with about 7 N, so the four give about 28 N on the lid and about 15 N of
+   hold against pulling the cup off, about nine times the cup's weight (about 160 g). The
+   fingers bend across the layers, where the data sheet gives no figure, so the printed
+   fingers may be softer. `padSide` is the one number that tunes the hold.
 
 ## Parameters in Fusion
 
@@ -139,7 +141,7 @@ boot's flat bottom face.
 
 ## Print
 
-1. Very stiff TPU, 68D, 0.4 mm nozzle, 0.2 mm layers.
+1. Siraya Tech TPU-GF, 0.4 mm nozzle, 0.2 mm layers.
 2. Plate down on a textured sheet, walls up. The textured face is the travel top.
 3. No supports. Every pad underside is a 45 degree ramp. The relief is 2 layers deep on the bed.
 4. Plate, walls and pads are explicit solids. No infill volume.
