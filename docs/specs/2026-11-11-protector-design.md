@@ -57,7 +57,7 @@ face, which is the face the boot's underside lies on.
 | Lid face | z 13.77 | Fusion |
 | Knob | 15 mm across, top 20 mm over the lid face (z 33.77) | owner 2026-11-05 and 2026-11-10 |
 | Toggle lever tip | z 25.2 | Fusion |
-| Pot shafts | x 8.5 + 24 k, k 0 to 7, y -107.8 and -133.8; gain (176.5, -30.8); MENU (117.9, -40.8) | Fusion |
+| Shaft axes (the 6 mm cylinder of each pot and of MENU) | pots x 8.5 + 24 k, k 0 to 7, y -108.5 and -134.5; gain (176.5, -31.5); MENU (117.94, -40.75) | Fusion, 2026-11-11. Earlier figures (y -107.8, -133.8, -30.8) were a detail at the shaft tip, 0.7 mm off the axis |
 | Rear openings in the dish and lid, x and height above the boot's underside | 1/4" jack x 13.5 to 23.7; combo jack x 105.1 to 131.5 from 4.6 mm; switch x 141.1 to 157.3 from 26.5 mm; barrel jack x 160.7 to 172.6 from 22.1 mm; USB-C x 52.5 to 65.5 from 35.2 mm | Fusion, rear faces |
 | Jacks past the boot's rear wall | 1/4" jack 2.2 mm, combo jack 1.1 mm | Fusion |
 | Material | Siraya Tech TPU-GF (Fibreheart TPU-GF, 15 % glass fibre), the owner's 68D; rigid, bends by hand | owner 2026-11-05, 2026-11-11 |
@@ -174,8 +174,8 @@ face, which is the face the boot's underside lies on.
    1.8 mm³ with the dish and 2.1 mm³ with the lid, all at the two ribs, 0.25 mm deep. Travel:
    the two rib crests touch the dish's top edge and the lid's bottom edge with no measurable
    overlap; nothing with the boot. Neither position touches any of the 122 bodies on the
-   board. The knobs are not in the model, so the pockets are placed from the pot shaft
-   positions and not checked against knob bodies.
+   board. The knobs are not in the model. The 18 pockets are placed on the 18 shaft axes;
+   measured in the travel cup, the largest pocket-to-shaft offset is 0.0 mm.
 6. Travel placement, measured: plate inner face z 32.27, pocket floors z 33.77 (the knob
    tops), rim z -3.33.
 7. STL at `hardware/exports/protector.stl`, in the model's frame (the plate is 2 degrees off
