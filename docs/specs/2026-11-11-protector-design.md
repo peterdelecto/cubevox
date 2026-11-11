@@ -190,4 +190,29 @@ boot's flat bottom face.
 ## Status
 
 Spec written 2026-11-11 from the owner's words, the Fusion model and proofs P1 and P2; fingers,
-knob pockets and ridged pads added the same day after proof P3 was set aside. Not built. A UX audit of Adam's walk is owed before the build.
+knob pockets and ridged pads added the same day after proof P3 was set aside.
+
+Built 2026-11-11 in `cubevox-enclosure` as component `Protector`, 26 timeline items, five
+sketches (`layout`, `rear`, `side pads`, `front pads`, `underside`), one plane (`centre`), all
+sketches fully constrained. STL at `hardware/exports/protector.stl`, in the model's frame (the
+plate is 2 degrees off level; the slicer lays it on the plate). 119.9 cm³, 158 g at 1.32 g/cm³.
+The three proof components are deleted. The UX audit of Adam's walk was not run.
+
+As built, where the build settles something the text above left open:
+
+1. Rear. The sweep is seen from the rear, not from the side. Each side wall wraps its rear
+   corner at full height for the corner only; from the corner's end the rear wall drops 7.0 mm
+   straight and then sweeps on the 25 mm radius down to the lip. The `rear` sketch is on the
+   rear wall's outer face, not on the centre plane.
+2. Front pads. The lead at the rim is 1.3 mm (`padFront`), because the pad stands only 1.3 mm.
+   Land 7.9 mm tall, nine grooves.
+3. Ridges. They are cut as grooves 0.4 mm wide and 0.4 mm deep into the land, so the ridge
+   tops stay at the pad's stand-off and the squeeze stays 1.0 mm. Six grooves on a side pad.
+4. Underside relief. Its sketch is on the plate's underside face.
+5. Inside fillet. It runs along the lip as well, so the lip's inner face is the fillet.
+6. Checks, by intersecting the bodies. In use: 368 mm³ with the dish and 57 mm³ with the lid,
+   all at the four side pads, 1.0 mm deep; 0.08 mm³ film with the boot; nothing with any part
+   on the board. Travel: 411 mm³ with the lid at the four side pads, 1.0 mm deep; 6 mm³ with
+   the dish wall's top at the pad leads; nothing with the boot or the board. The knobs are not
+   in the model, so the pockets were placed from the pot shaft positions and not checked
+   against knob bodies.
