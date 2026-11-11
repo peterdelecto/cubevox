@@ -159,13 +159,13 @@ face, which is the face the boot's underside lies on.
 
 ## As built in Fusion
 
-1. Component `Protector` in `cubevox-enclosure`. `Protector:1` is the cup in use.
-   `Protector:3` is the same cup placed for travel and held to the Lid by the rigid as-built
-   joint `travel`.
-2. Timeline, 19 items, all healthy: `layout`, `plate`, `walls`, `knob pockets`,
+1. Component `Protector` in `cubevox-enclosure`, placed once: `Protector:1`, the cup in use
+   under the boot. A second placement of the same cup, turned over on the lid for travel,
+   was used for the travel checks below and then deleted with its joint (owner 2026-11-11:
+   one Protector in the document).
+2. Timeline, 17 items, all healthy: `layout`, `plate`, `walls`, `knob pockets`,
    `pocket leads`, `rear`, `rear notches`, `rear notch corners`, `centre`, `snap`, `snap rib`,
-   `snap crest`, `snap rib mirrored`, `plate edge`, `inside fillet`, `rim round`, then the
-   travel placement and its joint.
+   `snap crest`, `snap rib mirrored`, `plate edge`, `inside fillet`, `rim round`.
 3. Three sketches, all fully constrained: `layout` on the boot's underside face (the boot's
    walls projected, the cup's outline, the 18 pockets), `rear` on the rear wall's outer face
    (the notches), `snap` on a side wall's inner face (one rib's base).
@@ -176,7 +176,7 @@ face, which is the face the boot's underside lies on.
    overlap; nothing with the boot. Neither position touches any of the 122 bodies on the
    board. The knobs are not in the model. The 18 pockets are placed on the 18 shaft axes;
    measured in the travel cup, the largest pocket-to-shaft offset is 0.0 mm.
-6. Travel placement, measured: plate inner face z 32.27, pocket floors z 33.77 (the knob
+6. Travel placement, measured before it was deleted: plate inner face z 32.27, pocket floors z 33.77 (the knob
    tops), rim z -3.33.
 7. STL at `hardware/exports/protector.stl`, in the model's frame (the plate is 2 degrees off
    level; the slicer lays it on the plate).
