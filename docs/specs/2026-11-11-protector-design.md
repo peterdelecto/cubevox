@@ -98,11 +98,11 @@ boot's flat bottom face.
    2.17 mm tall.
 9. Rim. 0.5 mm round, inside and outside, carried down the swept rear ends.
 10. Inside corner. 1.5 mm fillet where the walls meet the plate.
-11. Underside. A relief 0.4 mm deep under the plate, leaving a band 10 mm wide round the edge.
-    In use the cup stands on the band. For travel the relief is a framed panel on the top.
-12. Outer size. 200.8 x 161.4 x 36.5 mm. Fits the 254 mm bed flat. 126.2 cm³, 167 g.
+11. Underside. Flat. A relief here was removed (owner 2026-11-11): this face lies on the bed,
+    so a recess in it has nothing under it and cannot print cleanly.
+12. Outer size. 200.8 x 161.4 x 36.5 mm. Fits the 254 mm bed flat. 136.9 cm³, 181 g.
 13. Fingers. Each side pad sits on a finger cut from the wall by two slots, 1.0 mm wide, one
-    each side of the pad, open at the rim and running down to 4.0 mm above the plate's inner
+    each side of the pad, open at the rim, with a full round end 4.0 mm above the plate's inner
     face. The finger is 27 mm wide, 29.5 mm long and the wall's 2.0 mm thick. It bends 3.0 mm
     to let the boot pass (strain about 2.5 %) and 1.0 mm when it presses on the lid. The walls
     themselves do not bow. The front pads stay on the solid wall; the box slides back 0.9 mm
@@ -139,7 +139,6 @@ boot's flat bottom face.
 | `protClear` | 0.4 mm | air between the wall and the boot |
 | `protDepth` | 33.5 mm | plate inner face to rim |
 | `protLip` | 1.5 mm | rear lip height |
-| `protRearSweep` | 25 mm | radius of the side walls' rear ends |
 | `padLen` | 25 mm | pad length along the wall |
 | `padStart` | 23.0 mm | pad start above the plate inner face |
 | `padSide` | 3.4 mm | side pad stand-off; tunes the squeeze |
@@ -151,18 +150,16 @@ boot's flat bottom face.
 | `rearCorner` / `rearEdge` / `rearStep` | 4 mm / 3 mm / 2 mm | inside, outside and step corner radii of the rear notches |
 | `padRidge` / `padRidgePitch` | 0.4 mm / 0.8 mm | ridges on the pad lands |
 | `padFront` | 1.3 mm | front pad stand-off |
-| `padLead` | `padSide` | kept for reference; the lead is the pad's whole depth |
-| `protLip` / `protRearSweep` | 1.5 mm / 25 mm | lip under the combo jack; `protRearSweep` is no longer used |
+| `protLip` | 1.5 mm | lip under the combo jack |
 | `protChamferW` / `protChamferH` | 1.25 mm / 2.17 mm | plate edge chamfer, the lid's |
 | `protRim` | 0.5 mm | rim round |
 | `protFillet` | 1.5 mm | inside fillet, wall to plate |
-| `protRelief` / `protBand` | 0.4 mm / 10 mm | underside relief depth and the band left round it |
 
 ## Print
 
 1. Siraya Tech TPU-GF, 0.4 mm nozzle, 0.2 mm layers.
 2. Plate down on a textured sheet, walls up. The textured face is the travel top.
-3. No supports. Every pad underside is a 45 degree ramp. The relief is 2 layers deep on the bed.
+3. No supports. Every pad underside is a 45 degree ramp. The face on the bed is flat.
 4. Plate, walls and pads are explicit solids. No infill volume.
 5. Fit is built for the first print: 0.4 mm air at the boot covers swell; the squeeze is at the
    pads, where the wall gives. No feature is under 0.4 mm.
@@ -199,7 +196,7 @@ boot's flat bottom face.
 7. No rear pads. They would stand 3.1 mm inward on the stiff rear corners, where nothing can
    bend to let the boot pass. The knob pockets set the cup's place for travel instead; it sits
    against the lid's front wall, 1.2 mm forward of centre.
-8. Open: a flush two-colour inlay in the underside relief, in the lid's style. Owner's taste.
+8. Open: a flush two-colour inlay in the underside face, in the lid's style. Owner's taste.
 9. Other approaches were weighed on 2026-11-11 before the build. A cover fitted to the lid
    that the box stands on in use (proof P3) cured the knob load and the open rear, and the
    owner set it aside: the protector is stashed nested, with the box in it. A second loose
@@ -215,11 +212,11 @@ knob pockets and ridged pads added the same day after proof P3 was set aside.
 
 Built 2026-11-11 in `cubevox-enclosure` as component `Protector`, and rebuilt the same day
 after the UX audit and the owner's choices (softer fingers, rear wall formed round the jacks).
-27 timeline items, five sketches (`layout`, `rear`, `side pads`, `front pads`, `underside`),
+27 timeline items, four sketches (`layout`, `rear`, `side pads`, `front pads`),
 one plane (`centre`), all sketches fully constrained, all features healthy. `Protector:1` is
 the cup in use; `Protector:2` is the same cup for travel, held to the Lid by the joint
 `travel`. STL at `hardware/exports/protector.stl`, in the model's frame (the plate is
-2 degrees off level; the slicer lays it on the plate). 126.2 cm³, 167 g at 1.32 g/cm³. The
+2 degrees off level; the slicer lays it on the plate). 136.9 cm³, 181 g at 1.32 g/cm³. The
 three proof components are deleted.
 
 As built:
@@ -256,3 +253,11 @@ Fixed in the rebuild: finding 1 (the lead spans the pad's whole depth), finding 
 down to 4 mm above the plate; push and pull about 60 N, hold for travel about 3.5 N, the
 owner's choice), finding 3 (root strain about 2.5 %), finding 4 (0.8 mm lead-in on each
 pocket). Finding 7 changes: the hold is about 3.5 N and the rear is walled.
+
+## Design pass (2026-11-11, after the push)
+
+Done at the owner's word: the underside relief is removed; the finger slots end in a full round
+(`slot ends`); the slot mouths at the rim are rounded 0.5 mm, and the round runs down the
+slots' outer edges (`slot mouths`); the unused parameters `protRearSweep`, `padLead`,
+`protRelief` and `protBand` are deleted; `rim round` sits before the travel placement in the
+timeline. Overlaps after the pass are the same as in "As built" item 5.
