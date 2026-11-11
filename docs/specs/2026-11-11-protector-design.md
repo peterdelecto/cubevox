@@ -222,8 +222,8 @@ three proof components are deleted.
 As built:
 
 1. Sketch planes. `layout` is on the boot's underside face, `rear` on the rear wall's outer
-   face, `side pads` and `front pads` on those walls' inner faces, `underside` on the plate's
-   underside face. `centre` is the plane midway between the side walls, used for the mirror.
+   face, `side pads` and `front pads` on those walls' inner faces. `centre` is the plane midway
+   between the side walls, used for the mirror.
 2. Front pads. The lead at the rim is 1.3 mm (`padFront`), the pad's whole depth. Nine grooves.
 3. Ridges. They are cut as grooves 0.4 mm wide and 0.4 mm deep into the land, so the ridge
    tops stay at the pad's stand-off and the squeeze stays 1.0 mm. Four grooves on a side pad.
