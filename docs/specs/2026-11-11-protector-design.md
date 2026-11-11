@@ -15,13 +15,13 @@ boot's flat bottom face.
 
 1. In use. The box stands in the cup on the desk. He sees a low tray round the boot whose rim
    stops 11.5 mm above the boot's top edge. The lid and the top of the dish stand clear above
-   it. The rear has no wall, so every jack, the power switch and the USB-C are open. He plays
-   the knobs and toggles as before.
+   it. The rear wall is cut away round the jacks and the power switch, and the USB-C is above
+   the rim, so all of them are open. He plays the knobs and toggles as before.
 2. Gig over. He unplugs the leads and lifts the box. The cup comes up with it, because the pads
    inside the cup sit above the boot's top edge. He holds the cup's walls and pulls the box up;
    the four side fingers bend out, the boot passes their pads and the box is free.
-   Goes wrong: he pulls one end only. The box tilts out front first or rear first; the open
-   rear lets it. Nothing binds.
+   Goes wrong: he pulls one end only. The box tilts out front first or rear first; the jacks
+   leave through their notches, which are open at the rim. Nothing binds.
 3. He turns the cup over, side to side, so the open end is still at the back where the jacks
    are, and lowers it over the knobs. The pads meet the lid's top chamfer, ride onto the lid's
    side walls and squeeze them. He pushes until the knob tops seat in the 18 pockets inside the
@@ -32,8 +32,8 @@ boot's flat bottom face.
    it round.
    Goes wrong: left to right. The cup is the same either way.
 4. In the bag. The knobs and toggles are under the 3 mm plate, the lid is covered to the seam,
-   and the dish shows as a band between the rim and the boot. The rear is open behind the knobs,
-   a gap 20 mm tall between the lid face and the plate. The hold is the squeeze of the pads on
+   and the dish shows as a band between the rim and the boot. The rear wall closes the space
+   behind the knobs except at its two notches. The hold is the squeeze of the pads on
    the lid's side walls; there is no click.
    Goes wrong: something heavy lands on the bag. The plate presses on 18 knob tops at once.
 5. Next gig. He grips the cup's walls and pulls it up off the lid, turns it over, sets it on
@@ -69,9 +69,15 @@ boot's flat bottom face.
 3. Depth. 33.5 mm inside, 36.5 mm outside, rim level. In use the rim is 11.5 mm above the
    boot's top edge and 9.4 mm (front) to 14.9 mm (rear) under the lid face. For travel the rim
    is at z -0.93, 1.2 mm past the seam between the lid and the dish, on the dish wall.
-4. Rear. No wall. Each side wall wraps its rear corner and then sweeps down in one curve, radius
-   25 mm, from full height to a lip 1.5 mm tall. The lip runs along the plate's rear edge,
-   2.0 mm thick, inner face 0.4 mm behind the boot. It sits 3.8 mm under the combo jack.
+4. Rear (owner 2026-11-11: formed round the space the jacks need, no sharp corners). A full
+   wall, 2.0 mm thick, inner face 0.9 mm behind the boot so the box can slide back past the
+   front pads. Two notches open at the rim, measured in x across the box and in height above
+   the plate's inner face:
+   1. 1/4" jack: x 7.6 to 29.6, floor at 17 mm.
+   2. Combo jack, switch and barrel: x 102 to 176. Under the combo jack (x 102 to 134.5) it
+      goes down to a lip 1.5 mm tall; under the switch and barrel its floor is at 17 mm.
+   Inside corners are rounded 4 mm, outside corners 3 mm. A full-height wall 72 mm long stands
+   between the notches.
 5. Side pads. Two on each side wall, mirrored left to right, centred 40 mm and 116 mm from the
    cup's inner front face. Each is 25 mm long and stands 3.4 mm inward: 2.4 mm of gap to the
    lid and dish walls plus 1.0 mm of squeeze, taken up by its finger (item 13). Each runs from 23.0 mm above the plate's inner
@@ -80,23 +86,25 @@ boot's flat bottom face.
    (x 44.5 and 140.5). Each is 25 mm long and stands 1.3 mm inward, the smallest gap to the dish's
    front wall in use. Same height range as the side pads.
 7. Pad ends. The end nearer the plate is a 45 degree ramp, so the pad prints with no support
-   and the boot rides over it when the box is lifted out. The end at the rim is a 1.5 mm lead
-   for the boot going in and the lid's chamfer going in. The two ends of each pad along the
-   wall are 45 degree ramps as well. Full-height land: 5.6 mm tall on the side pads.
+   and the boot rides over it when the box is lifted out. The end at the rim is a 45 degree
+   lead across the pad's whole depth, so the boot's bottom edge meets a slope and never a flat
+   top. The two ends of each pad along the wall are 45 degree ramps as well. Full-height land:
+   3.7 mm tall on the side pads, 7.9 mm on the front pads.
 8. Plate edge. The outer edge of the plate carries the lid's own chamfer, 1.25 mm wide and
    2.17 mm tall.
 9. Rim. 0.5 mm round, inside and outside, carried down the swept rear ends.
 10. Inside corner. 1.5 mm fillet where the walls meet the plate.
 11. Underside. A relief 0.4 mm deep under the plate, leaving a band 10 mm wide round the edge.
     In use the cup stands on the band. For travel the relief is a framed panel on the top.
-12. Outer size. 200.8 x 160.9 x 36.5 mm. Fits the 254 mm bed flat.
+12. Outer size. 200.8 x 161.4 x 36.5 mm. Fits the 254 mm bed flat. 126.2 cm³, 167 g.
 13. Fingers. Each side pad sits on a finger cut from the wall by two slots, 1.0 mm wide, one
-    each side of the pad, open at the rim and running down to 13.0 mm above the plate's inner
-    face. The finger is 27 mm wide, 20.5 mm long and the wall's 2.0 mm thick. It bends 2.5 mm
-    to let the boot pass (strain about 3 %) and 1.0 mm when it presses on the lid. The walls
+    each side of the pad, open at the rim and running down to 4.0 mm above the plate's inner
+    face. The finger is 27 mm wide, 29.5 mm long and the wall's 2.0 mm thick. It bends 3.0 mm
+    to let the boot pass (strain about 2.5 %) and 1.0 mm when it presses on the lid. The walls
     themselves do not bow. The front pads stay on the solid wall; the box slides back 0.9 mm
     to pass them.
-14. Knob pockets. 18 round pockets inside the plate, 16.0 mm across and 1.2 mm deep, one over
+14. Knob pockets. 18 round pockets inside the plate, 16.0 mm across and 1.2 mm deep, each with
+    a 0.8 mm lead-in chamfer at its mouth, one over
     each knob and over MENU, placed for the cup turned over. For travel the knob tops seat in
     them and set the cup's place front to back and side to side: the front pads just touch the
     lid's front wall. In use the boot's underside lies flat over them.
@@ -110,11 +118,13 @@ boot's flat bottom face.
 2. Travel. The side pads press on the lid's side walls over the 5.6 mm land, each finger bent
    1.0 mm. The knob tops in their pockets set the depth and the place. Nothing clicks: the
    seam groove is 0.25 mm deep, too shallow to catch.
-3. Force, an estimate. With the data sheet's bending modulus of 450 MPa, one finger bent
-   1.0 mm presses with about 7 N, so the four give about 28 N on the lid and about 15 N of
-   hold against pulling the cup off, about nine times the cup's weight (about 160 g). The
-   fingers bend across the layers, where the data sheet gives no figure, so the printed
-   fingers may be softer. `padSide` is the one number that tunes the hold.
+3. Force, an estimate (owner chose the softer fingers, 2026-11-11). With the data sheet's
+   bending modulus of 450 MPa, one finger bent 1.0 mm presses with about 2.2 N, so the four
+   give about 9 N on the lid and about 3.5 N of hold against pulling the cup off, twice the
+   cup's weight. Pushing the box in or pulling it out bends each finger 3.0 mm and takes about
+   60 N. The fingers bend across the layers, where the data sheet gives no figure, so the
+   printed fingers may be softer. `padSide` tunes the hold; a stronger hold always costs a
+   harder pull, because the boot is 2.0 mm wider per side than the lid.
 
 ## Parameters in Fusion
 
@@ -129,11 +139,15 @@ boot's flat bottom face.
 | `padLen` | 25 mm | pad length along the wall |
 | `padStart` | 23.0 mm | pad start above the plate inner face |
 | `padSide` | 3.4 mm | side pad stand-off; tunes the squeeze |
-| `fingerSlot` / `fingerRoot` | 1.0 mm / 13.0 mm | slot width; slot end above the plate inner face |
-| `pocketDia` / `pocketDepth` | 16.0 mm / 1.2 mm | knob pockets inside the plate |
+| `fingerSlot` / `fingerRoot` | 1.0 mm / 4.0 mm | slot width; slot end above the plate inner face |
+| `pocketDia` / `pocketDepth` / `pocketLead` | 16.0 mm / 1.2 mm / 0.8 mm | knob pockets inside the plate and their lead-in |
+| `protRearClear` | 0.9 mm | air between the rear wall and the boot |
+| `rearJackFloor` | 17 mm | notch floor at the 1/4" jack, switch and barrel |
+| `rearCorner` / `rearEdge` | 4 mm / 3 mm | inside and outside corner radii of the rear notches |
 | `padRidge` / `padRidgePitch` | 0.4 mm / 0.8 mm | ridges on the pad lands |
 | `padFront` | 1.3 mm | front pad stand-off |
-| `padLead` | 1.5 mm | lead at the rim end of a pad |
+| `padLead` | `padSide` | kept for reference; the lead is the pad's whole depth |
+| `protLip` / `protRearSweep` | 1.5 mm / 25 mm | lip under the combo jack; `protRearSweep` is no longer used |
 | `protChamferW` / `protChamferH` | 1.25 mm / 2.17 mm | plate edge chamfer, the lid's |
 | `protRim` | 0.5 mm | rim round |
 | `protFillet` | 1.5 mm | inside fillet, wall to plate |
@@ -169,7 +183,9 @@ boot's flat bottom face.
 1. No change to the boot, lid or dish (owner 2026-11-11). Windows in the boot cannot be reached:
    a cup this shallow ends above the boot when it is over the knobs.
 2. Plate flat on the desk in use; its slope for travel does not matter (owner 2026-11-11).
-3. Rear open, so nothing covers the jacks or switches in use (owner 2026-11-11).
+3. Nothing covers the jacks or switches in use (owner 2026-11-11). First built with the whole
+   rear open; the owner then asked for a rear wall formed round the space the jacks need, with
+   no sharp corners (2026-11-11, geometry item 4).
 4. Height. The owner chose a low cup (2026-11-11: "35 seems fine"), then the refinements, which
    add 1.5 mm so the rim reaches the seam (item 10 puts it 1.2 mm past).
 5. The plate rests on the knobs for travel (owner 2026-11-11). No stop on the box.
@@ -192,31 +208,30 @@ boot's flat bottom face.
 Spec written 2026-11-11 from the owner's words, the Fusion model and proofs P1 and P2; fingers,
 knob pockets and ridged pads added the same day after proof P3 was set aside.
 
-Built 2026-11-11 in `cubevox-enclosure` as component `Protector`, 26 timeline items, five
-sketches (`layout`, `rear`, `side pads`, `front pads`, `underside`), one plane (`centre`), all
-sketches fully constrained. STL at `hardware/exports/protector.stl`, in the model's frame (the
-plate is 2 degrees off level; the slicer lays it on the plate). 119.9 cm³, 158 g at 1.32 g/cm³.
-The three proof components are deleted. The UX audit of Adam's walk was run after the build,
-2026-11-11; its findings are in "UX audit" below and are not fixed yet.
+Built 2026-11-11 in `cubevox-enclosure` as component `Protector`, and rebuilt the same day
+after the UX audit and the owner's choices (softer fingers, rear wall formed round the jacks).
+27 timeline items, five sketches (`layout`, `rear`, `side pads`, `front pads`, `underside`),
+one plane (`centre`), all sketches fully constrained, all features healthy. `Protector:1` is
+the cup in use; `Protector:2` is the same cup for travel, held to the Lid by the joint
+`travel`. STL at `hardware/exports/protector.stl`, in the model's frame (the plate is
+2 degrees off level; the slicer lays it on the plate). 126.2 cm³, 167 g at 1.32 g/cm³. The
+three proof components are deleted.
 
-As built, where the build settles something the text above left open:
+As built:
 
-1. Rear. The sweep is seen from the rear, not from the side. Each side wall wraps its rear
-   corner at full height for the corner only; from the corner's end the rear wall drops 7.0 mm
-   straight and then sweeps on the 25 mm radius down to the lip. The `rear` sketch is on the
-   rear wall's outer face, not on the centre plane.
-2. Front pads. The lead at the rim is 1.3 mm (`padFront`), because the pad stands only 1.3 mm.
-   Land 7.9 mm tall, nine grooves.
+1. Sketch planes. `layout` is on the boot's underside face, `rear` on the rear wall's outer
+   face, `side pads` and `front pads` on those walls' inner faces, `underside` on the plate's
+   underside face. `centre` is the plane midway between the side walls, used for the mirror.
+2. Front pads. The lead at the rim is 1.3 mm (`padFront`), the pad's whole depth. Nine grooves.
 3. Ridges. They are cut as grooves 0.4 mm wide and 0.4 mm deep into the land, so the ridge
-   tops stay at the pad's stand-off and the squeeze stays 1.0 mm. Six grooves on a side pad.
-4. Underside relief. Its sketch is on the plate's underside face.
-5. Inside fillet. It runs along the lip as well, so the lip's inner face is the fillet.
-6. Checks, by intersecting the bodies. In use: 368 mm³ with the dish and 57 mm³ with the lid,
-   all at the four side pads, 1.0 mm deep; 0.08 mm³ film with the boot; nothing with any part
-   on the board. Travel: 411 mm³ with the lid at the four side pads, 1.0 mm deep; 6 mm³ with
-   the dish wall's top at the pad leads; nothing with the boot or the board. The knobs are not
-   in the model, so the pockets were placed from the pot shaft positions and not checked
-   against knob bodies.
+   tops stay at the pad's stand-off and the squeeze stays 1.0 mm. Four grooves on a side pad.
+4. Inside fillet. It runs along the lip under the combo jack as well.
+5. Checks, by intersecting the bodies. In use: 306 mm³ with the dish and 1 mm³ with the lid,
+   all at the four side pads, 1.0 mm deep; 0.06 mm³ film with the boot; nothing with any of
+   the 122 bodies on the board. Travel: 315 mm³ with the lid at the four side pads, 1.0 mm
+   deep; nothing with the dish, the boot or the board. The knobs are not in the model, so the
+   pockets were placed from the pot shaft positions and not checked against knob bodies.
+6. Renders looked at: `build/protector-proofs/C-5`, `C-6`, `C-7`, `C-8`.
 
 ## UX audit of Adam's walk (2026-11-11, after the build)
 
@@ -231,3 +246,8 @@ Forces are estimates from the data sheet's 450 MPa and a plain beam model of the
 | 5 | 3, cup onto the lid | Works. The lid's top chamfer and the pad leads centre the cup from up to 1.75 mm off, and the walls reach the lid before the plate reaches the knobs. | fine |
 | 6 | 3, back to front | Works. The front wall stops on the jacks. In use the same holds: the jacks stand 2.2 mm past the boot, so the box does not go into the cup the wrong way round. | fine |
 | 7 | 4, in the bag | Hold about 15 N, as specced. The open rear and the load on the knob tops are the owner's accepted trade. | accepted |
+
+Fixed in the rebuild: finding 1 (the lead spans the pad's whole depth), finding 2 (slots run
+down to 4 mm above the plate; push and pull about 60 N, hold for travel about 3.5 N, the
+owner's choice), finding 3 (root strain about 2.5 %), finding 4 (0.8 mm lead-in on each
+pocket). Finding 7 changes: the hold is about 3.5 N and the rear is walled.
