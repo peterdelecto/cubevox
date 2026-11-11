@@ -261,3 +261,20 @@ Done at the owner's word: the underside relief is removed; the finger slots end 
 slots' outer edges (`slot mouths`); the unused parameters `protRearSweep`, `padLead`,
 `protRelief` and `protBand` are deleted; `rim round` sits before the travel placement in the
 timeline. Overlaps after the pass are the same as in "As built" item 5.
+
+## Plain cup (owner chose B, 2026-11-11) and the seam
+
+The model now holds the plain cup: the four side pads, their fingers and slots, the two front
+pads and the `centre` plane are deleted. Every section above that describes pads, fingers,
+ridges or a squeeze hold is out of date and waits on the seam decision below. As the model
+stands: 12 timeline items, two sketches (`layout`, `rear`), no construction plane, all healthy;
+the rear wall is 0.4 mm behind the boot again (`protRearClear` = `protClear`); 134.4 cm³,
+177 g. Checks by intersecting the bodies: 0.08 mm³ film with the boot in use, nothing else in
+either position, nothing with the 122 bodies on the board. Nothing holds the cup on for travel;
+the 18 knob pockets stop it sliding.
+
+The seam (owner 2026-11-11: the cup can grab it). Decision 6 and "What holds it" item 2 above
+say the seam is too shallow to catch. That was wrong. Measured on the side wall: the lid's
+bottom edge and the dish's top edge are each rounded about 0.5 mm, so the seam is a rounded
+groove 1.12 mm tall (z -0.36 to 0.76) and 0.25 mm deep, centred at z 0.2. A rounded rib on
+the cup can snap into it. For travel that rib sits 1.1 mm inside the rim.
