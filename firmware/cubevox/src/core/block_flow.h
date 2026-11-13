@@ -46,9 +46,12 @@ class BlockFlow {
 
   // Starts a block: moves the layout fade, holding the output at zero while `outputHeld`, and takes the
   // late flag. When start.fade.swap is set the caller adopts the newest snapshot (adopt) before run().
-  Start begin(bool outputHeld, bool layoutPending) {
+  // While `awaitingSnapshot` (no snapshot has been published yet) the block is silent: it runs no
+  // card, so nothing processed with the default settings is left in a delay line or a reverb tail.
+  Start begin(bool outputHeld, bool layoutPending, bool awaitingSnapshot = false) {
     fade_.hold(outputHeld);
     Start s{fade_.next(layoutPending), false};
+    if (awaitingSnapshot) s.fade.silent = true;
     s.dry = late_.takeDry(s.fade.silent);
     return s;
   }

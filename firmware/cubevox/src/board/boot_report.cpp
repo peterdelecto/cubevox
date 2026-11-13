@@ -15,6 +15,7 @@
 #include "board/print_hex.h"
 #include "board/record_service.h"
 #include "board/serial_link.h"
+#include "board/start_timing.h"
 #include "board/sysclock.h"
 #include "core/version.h"
 
@@ -92,6 +93,7 @@ void bootReport(bool oledFound) {
   reportCpu(out);
   reportOled(out, oledFound);
   audioReport(out);
+  startTimingReport(out);
   powerSenseReport(out);
   controlsReport(out);
 }

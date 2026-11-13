@@ -7,15 +7,18 @@
 #include <new>
 
 #include "board/bench_drill.h"
+#include "board/boot_block_access.h"
 #include "board/block_mem.h"
 #include "board/clocks.h"
 #include "board/mute.h"
 #include "board/pins.h"
 #include "board/serial_link.h"
+#include "board/start_timing.h"
 #include "core/audio_recovery.h"
 #include "core/block_flow.h"
 #include "core/chain_run.h"
 #include "core/layout_fade.h"
+#include "core/mid_song_mark.h"
 #include "core/load_window.h"
 #include "core/registry.h"
 #include "engine/common.h"
@@ -273,7 +276,7 @@ void processHalf(int half) {
 
   syncSnapshot();
   // The mute sequence holds the output at zero until the relay is closed.
-  const BlockFlow::Start start = gFlow.begin(muteOutputHeld(), gLayoutPending);
+  const BlockFlow::Start start = gFlow.begin(muteOutputHeld(), gLayoutPending, gSeenSeq == 0);
   if (start.fade.swap) swapSnapshot();
 
   std::array<float, cv::kBlock> a;
@@ -516,6 +519,7 @@ void SWPMI1_IRQHandler(void) {
     __enable_irq();
     gNextHalf ^= 1u;
     recordBlock(cycles, readTooSoon);
+    startTimingNoteBlock();
   }
 }
 
@@ -645,6 +649,26 @@ bool restartStream() {
   return initPeripherals() && startStream();
 }
 
+#if CUBEVOX_BENCH
+// The fail_audio_start op leaves this word in the boot block's application area, after the mid-song
+// mark, so it outlives the reset it is meant to be read after. The bootloader clears the area at a
+// power-on.
+constexpr uint32_t kBenchFailStartWord = 0xFA11AD10u;
+constexpr size_t kBenchFailStartOffset = sizeof(MidSongMark);
+
+// True once after the op set the word; the word clears as it is read.
+bool takeBenchFailStart() {
+  CvBootBlock& block = bootBlock();
+  if (!cvBootBlockInitialised(&block)) return false;
+  uint32_t word = 0;
+  memcpy(&word, block.appReserved + kBenchFailStartOffset, sizeof word);
+  if (word != kBenchFailStartWord) return false;
+  word = 0;
+  memcpy(block.appReserved + kBenchFailStartOffset, &word, sizeof word);
+  return true;
+}
+#endif
+
 // The fault behind a restart, for the report line.
 void printFaultCause(Print& out) {
   if (gOverrunTripped) {
@@ -677,6 +701,12 @@ AudioEvent restartAfterFault() {
 }  // namespace
 
 bool audioInit() {
+#if CUBEVOX_BENCH
+  if (takeBenchFailStart()) {
+    gError = "audio start refused (bench fail_audio_start)";
+    return false;
+  }
+#endif
   if (!checkMemoryAndClock()) return false;
   resetAudioState();
   if (!initPeripherals()) return false;
@@ -802,6 +832,14 @@ void audioStreamFaultForBench() {
   NVIC_EnableIRQ(DMA1_Stream1_IRQn);
   NVIC_EnableIRQ(DMA1_Stream0_IRQn);
   NVIC_EnableIRQ(SAI1_IRQn);
+}
+
+bool audioBenchFailNextStart() {
+  CvBootBlock& block = bootBlock();
+  if (!cvBootBlockInitialised(&block)) return false;
+  const uint32_t marker = kBenchFailStartWord;
+  memcpy(block.appReserved + kBenchFailStartOffset, &marker, sizeof marker);
+  return true;
 }
 
 bool audioBenchToggleFailRestart() {

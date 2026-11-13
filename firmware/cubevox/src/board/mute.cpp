@@ -5,6 +5,7 @@
 #include <atomic>
 
 #include "board/pins.h"
+#include "board/start_timing.h"
 #include "core/debounce.h"
 #include "core/mute_sequence.h"
 #include "core/timing.h"
@@ -41,6 +42,7 @@ void drive(MuteOutputs next) {
   setPin(pins::kXsmt, next.xsmtHigh);
   setPin(pins::kMuteN, next.muteNHigh);
   __set_PRIMASK(primask);
+  if (next.muteNHigh) startTimingNoteRelay(millis());
 }
 
 }  // namespace
@@ -57,6 +59,8 @@ void muteInit() {
   gTrips.store(0);
   gOutputHeld = true;
 }
+
+void muteWarmStart() { gSequence.warmStart(); }
 
 void muteClocksRunning() { gSequence.clocksRunning(); }
 

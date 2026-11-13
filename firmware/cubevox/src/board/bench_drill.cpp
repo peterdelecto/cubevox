@@ -87,6 +87,13 @@ void toggleFailRestart() {
                                                     : "[bench] stream restarts run as usual");
 }
 
+// Returns an error text when no bootloader wrote the block the word lives in.
+const char* failNextAudioStart() {
+  if (!audioBenchFailNextStart()) return "boot block not written";
+  serialOut().println("[bench] the next audioInit() fails, once, across the next reset");
+  return nullptr;
+}
+
 }  // namespace
 
 const BenchOverrides& benchOverrides() { return gBench; }
@@ -135,6 +142,7 @@ BenchResult benchDrillRun(BenchOp op, const BenchArgs& args) {
     case BenchOp::StopAudio: stopAudio(); break;
     case BenchOp::StreamFault: raiseStreamFault(); break;
     case BenchOp::FailRestart: toggleFailRestart(); break;
+    case BenchOp::FailAudioStart: r.error = failNextAudioStart(); break;
     case BenchOp::Fault: faultForceBusFault(); break;
     case BenchOp::Spin: faultSpinForWatchdog(); break;
     case BenchOp::RecordSave: recordSaveNow(); break;

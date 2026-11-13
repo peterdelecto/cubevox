@@ -134,6 +134,10 @@ void audioStopForBench();
 // then restarts the stream, or resets the box once the restart budget is spent.
 void audioStreamFaultForBench();
 
+// Makes the next audioInit() fail once, across a reset: the word that says so sits in the boot
+// block's application area. Returns false when no bootloader wrote the block.
+bool audioBenchFailNextStart();
+
 // Flips whether the next stream restart fails, as one whose DMA start is refused. Returns the new
 // state. A failed restart clears it.
 bool audioBenchToggleFailRestart();

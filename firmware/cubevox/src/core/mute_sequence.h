@@ -2,7 +2,8 @@
 // output relay (MUTE_N). Mute order is XSMT low, wait, MUTE_N low. Release order is XSMT high with
 // the output held at digital zero, wait, MUTE_N high, wait for the relay, then the output fades up.
 // The DAC therefore unmutes into an open relay and the contacts close on silence. The first release
-// after power-on also waits until kRelayCloseAfterPowerOnMs after reset() before MUTE_N rises.
+// after a cold power-on also waits until kRelayCloseAfterPowerOnMs after reset() before MUTE_N rises;
+// a warm start skips that wait.
 // The chain keeps running while muted. Timing constants live in core/timing.h.
 
 #pragma once
@@ -23,6 +24,11 @@ class MuteSequence {
   // Starts fully muted with no latch, hold or running clocks, and counts the power-on wait from
   // `nowMs`. `switchReleased` is the raw MUTE_SW level (high = not muted).
   void reset(bool switchReleased, uint32_t nowMs);
+
+  // A warm start (core/restart_rule): the output capacitor never lost its charge, so the release does
+  // not wait kRelayCloseAfterPowerOnMs. MUTE_N rises once XSMT has led by kXsmtLeadMs and nothing
+  // else holds the mute. Call right after reset().
+  void warmStart() { powerOnDone_ = true; }
 
   // The SAI clocks run. XSMT may rise from here, into the open relay.
   void clocksRunning() { clocksRunning_ = true; }

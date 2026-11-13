@@ -144,7 +144,9 @@ std::array<int, kPotCount> stepCounts(const Layout& layout) {
 
 }  // namespace
 
-void controlsInit() {
+void controlsInit(bool warmStart) {
+  // A warm reset never dropped 3V3A, so the mux scan has no rail to wait for.
+  gMuxReady = warmStart;
   for (uint32_t pin : kMuxSelectPins) {
     digitalWrite(pin, LOW);
     pinMode(pin, OUTPUT);

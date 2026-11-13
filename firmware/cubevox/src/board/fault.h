@@ -42,6 +42,11 @@ bool faultRecordPresent();
 // boot with the error; a power-on or any other reset reads None. Valid after faultInit().
 AudioFaultCause faultLastAudioCause();
 
+// The code the splash and DIAG.TXT show for this start (core/audio_fault_cause restartCode): the
+// sealed audio cause A1 to A4, C1 after a crash, W1 after a watchdog reset, or None. Valid after
+// faultInit().
+AudioFaultCause faultRestartCode();
+
 // Clears the sealed cause, for a planned reset that ends in update mode instead.
 void faultForgetAudioCause();
 

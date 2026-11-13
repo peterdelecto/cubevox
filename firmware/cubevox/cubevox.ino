@@ -16,12 +16,14 @@
 #include "board/fault.h"
 #include "board/input.h"
 #include "board/input_jack.h"
+#include "board/mid_song_mark.h"
 #include "board/mute.h"
 #include "board/pins.h"
 #include "board/planned_reset.h"
 #include "board/power_sense.h"
 #include "board/record_service.h"
 #include "board/serial_link.h"
+#include "board/start_timing.h"
 #include "board/usb_link.h"
 #include "core/compose.h"
 #include "core/gate_floor.h"
@@ -30,6 +32,7 @@
 #include "core/load_led.h"
 #include "core/loop_policy.h"
 #include "core/protocol.h"
+#include "core/restart_rule.h"
 #include "core/settings.h"
 #include "core/timing.h"
 #include "core/version.h"
@@ -82,6 +85,10 @@ void flushDenormalsToZero() {
 
 void reportBoot() { bootReport(sh1106Present()); }
 
+// True once the first snapshot has gone to the audio interrupt. Until then the blocks run the default
+// snapshot, so the relay stays open.
+bool gSnapshotPublished = false;
+
 // The snapshot publishSnapshot builds. It is over a kilobyte, so it lives here and not on the stack the
 // interrupts share.
 ChainSnapshot gCompose;
@@ -90,6 +97,8 @@ ChainSnapshot gCompose;
 void publishSnapshot() {
   composeSnapshotInto(gCompose, gLayout, controlsReading(), gSettings, benchOverrides());
   audioPublish(gCompose);
+  gSnapshotPublished = true;
+  startTimingNoteSnapshot(millis());
 }
 
 // The encoder's turns and clicks for the menu. While a planned reset waits on the flash the menu
@@ -208,8 +217,9 @@ void onRequest(const char* line, uint32_t nowMs) {
 // The relay switches only while the output is fully muted; the mute is held until it settles.
 void runJackSwitch(uint32_t nowMs) {
   gJack.update(nowMs, benchJack(gSettings.inputJack), muteFullyMuted());
-  // Unseeded knobs read 0, so stay muted; the panel test can hold the mute too.
-  muteHold(gJack.holdMute() || !controlsSeeded() || benchMuteHeld());
+  // Unseeded knobs read 0 and the first snapshot is not in, so stay muted; the panel test can hold the
+  // mute too.
+  muteHold(gJack.holdMute() || !controlsSeeded() || !gSnapshotPublished || benchMuteHeld());
   inputJackApply(gJack.relay());
 }
 
@@ -217,7 +227,7 @@ void runJackSwitch(uint32_t nowMs) {
 // dissolves in from what they left once either ends. It ticks at 25 frames a second and only
 // after the panel has taken the last frame. Without a panel the pages stay dirty, so the face waits.
 void drawFace(const UiContext& ctx, uint32_t nowMs) {
-  switch (gSplash.draw(nowMs, kFirmwareVersion, gCanvas, mutePowerOnWait(), faultLastAudioCause())) {
+  switch (gSplash.draw(nowMs, kFirmwareVersion, gCanvas, mutePowerOnWait(), faultRestartCode())) {
     case SplashStep::Up: return;
     case SplashStep::Ended: gFace.invalidate(); break;
     case SplashStep::Off: break;
@@ -260,40 +270,60 @@ void driveLoadLed(uint32_t nowMs) {
 }  // namespace
 
 // The bootloader starts the watchdog at 16 s (CV_WATCHDOG_BOOT_MS) right before the jump, and
-// faultWatchdogStart() sets the box's own 2 s at the end. The refresh after recordBoot splits the
-// time between into two stretches, each well inside 16 s:
+// faultWatchdogStart() sets the box's own 2 s at the end. The refreshes after recordBoot and after
+// audioInit split the time between into three stretches, each well inside 16 s:
 //   1. Up to the end of the ECC recovery, at most 10.3 s: the clock setup's waits (0.2 s), the
 //      power sense ADC (tens of ms), two erases at the driver's 5 s bound and eight program words
 //      at 5 ms each.
-//   2. From there to faultWatchdogStart(), well under 1 s: the panel's start (five tries 20 ms
+//   2. The audio start, well under 1 s: the HAL's bounded PLL3, SAI and DMA waits (tens of ms).
+//   3. From there to faultWatchdogStart(), well under 1 s: the panel's start (five tries 20 ms
 //      apart, each a bus recovery of about 0.3 ms and one polled wait that gives up within about
-//      15 ms, so 0.2 s at the most) and the HAL's bounded ADC, PLL3, SAI and DMA waits (tens of ms).
+//      15 ms, so 0.2 s at the most) and the HAL's bounded ADC wait (tens of ms).
+//
+// Audio starts before the panel, USB and the menu on every start, so a panel that hangs never delays
+// the first block. A warm start (core/restart_rule) skips the 6 s power-on wait and the mux scan's
+// wait for 3V3A.
 void setup() {
+  // First, so nothing that can fault or block runs ahead of it: it reads the boot block and four
+  // words of flash and touches no pin. The static constructors and the core's clock setup run before
+  // setup() and are not part of this application's start.
+  midSongMarkClearFailedStarts();
+  startTimingBegin(millis());
   flushDenormalsToZero();  // before the audio interrupt can run
   muteInit();  // MUTE_N and XSMT low before anything slow
   powerSenseInit();  // needs the mute pins; a failure prints in the boot report
-  inputJackInit();  // PAD_EN low = MIC
+  inputJackInit();  // PAD_EN low = MIC; a reset leaves the pin an input, so every start drives it
   faultInit();  // before recordBoot: the ECC recovery reads the fault record this loads
+  const bool warm = isWarmStart(faultResetFlags(), powerSenseHasReading(), powerSenseTripped());
+  startTimingSetWarm(warm);
+  if (warm) muteWarmStart();
   recordBoot(gLayout, gSettings, millis());  // waits on the ECC recovery's erases, if any
   faultWatchdogKick();  // ends stretch 1 above
   gJack = JackSwitch(gSettings.inputJack);  // output is still muted, so no dip
   inputJackApply(gSettings.inputJack);
+
+  gAudioRunning = audioInit();
+  if (gAudioRunning) muteClocksRunning();
+  faultWatchdogKick();  // ends stretch 2 above
+
   analogWriteResolution(kLedPwmBits);
   analogWriteFrequency(kLedPwmHz);
   driveLoadLed(millis());  // PWM at duty 0: dark until the first load figure
   usbLinkInit();  // USB attaches from loop() once VBUS is seen
 
-  controlsInit();
+  controlsInit(warm);
   gDisplay = &sh1106Display();  // starts the panel; one that does not answer is retried once a second
   gDisplay->setContrast(brightnessLevel(gSettings.brightness).contrast);  // goes out before the splash's first page
   inputInit();
 
-  gAudioRunning = audioInit();
-  if (gAudioRunning) muteClocksRunning();
   faultWatchdogStart();  // every init is behind us; from here loop() must keep running
   bootHealthInit();  // after the watchdog: a start only counts as healthy with both running
   diagInit();  // after recordBoot (ECC recovery) and bootHealthInit (failed starts, bootloader reason)
-  gSplash.start(millis());
+  if (warm && faultRestartCode() != AudioFaultCause::None) {
+    gSplash.startAfterWarmError(millis());  // 6 s, ended by a touch, so Adam reads the error code
+  } else {
+    gSplash.start(millis());
+  }
   gDim.start(millis());
 }
 
@@ -316,7 +346,10 @@ void loop() {
   mutePoll(nowMs, gSettings.topSwitch);
 
   const UiInput input = menuInput(nowMs);
-  if (input.detents != 0 || input.click || input.hold || input.press) gDim.noteActivity(nowMs);
+  if (input.detents != 0 || input.click || input.hold || input.press) {
+    gDim.noteActivity(nowMs);
+    gSplash.noteTouch();
+  }
   const bool settingsChanged = applyAction(gMenu.update(input, nowMs, gLayout), nowMs);
   saveSettings(settingsChanged, nowMs);
   recordPoll(nowMs);
@@ -333,11 +366,13 @@ void loop() {
   LastMoved touch;
   if (controlsTakeTouch(touch)) {
     gDim.noteActivity(nowMs);
+    gSplash.noteTouch();
     gFace.knobMoved(gLayout, ctx.panel, touch, nowMs);
   }
   ToggleFlip flip;
   if (controlsTakeToggle(flip)) {
     gDim.noteActivity(nowMs);
+    gSplash.noteTouch();
     gFace.toggleFlipped(gLayout, flip, nowMs);
   }
   drawFace(ctx, nowMs);

@@ -45,7 +45,7 @@ void paint(const char* version, AudioFaultCause cause, Canvas& canvas) {
 }  // namespace
 
 SplashStep Splash::draw(uint32_t nowMs, const char* version, Canvas& canvas, bool hold, AudioFaultCause cause) {
-  const bool up = started_ && (splashUp(started_, startMs_, nowMs) || hold);
+  const bool up = started_ && !touched_ && (splashUp(started_, startMs_, nowMs, durationMs_) || hold);
   if (handoff_.update(up)) return SplashStep::Ended;
   if (!up) return SplashStep::Off;
   if (!painted_) {
