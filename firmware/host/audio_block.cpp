@@ -64,14 +64,16 @@ void AudioBlock::publish(const ChainSnapshot& snapshot) {
 }
 
 // Picks up a newly published snapshot. The same layout is adopted at once, and a toggle that moved
-// crossfades from the slot's fade level; a different layout waits for the fade's zero point. The
-// first publish has nothing to fade from and is adopted whole, every slot settled.
+// crossfades from the slot's fade level. A different layout that cannot change what is heard (cards
+// swapped in slots that are off) is adopted at once too; any other waits for the fade's zero point.
+// The first publish has nothing to fade from and is adopted whole, every slot settled.
 void AudioBlock::syncSnapshot() {
   const uint32_t seq = published_.load(std::memory_order_acquire);
   if (seq == seenSeq_) return;
   const ChainSnapshot& pub = snapshots_[seq & 1];
   const bool first = seenSeq_ == 0;
-  layoutPending_ = !first && pub.layout != held_.layout;
+  const bool differs = !first && pub.layout != held_.layout;
+  layoutPending_ = differs && !flow_.adoptAtOnce(held_, pub);
   seenSeq_ = seq;
   if (!layoutPending_) held_ = pub;
   if (first) flow_.settleSlots(held_.slotOn);

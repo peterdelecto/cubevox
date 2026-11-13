@@ -297,7 +297,7 @@ DrumSynthV3 are references to read, and nothing in `firmware/` is copied from th
   the op runs: `{"id":N,"ok":true}` or an error such as `record store busy`. Only `fault` and `spin`, which never
   return, reply first. Diagnostic text (`[audio]`, `[record]`, `[panel]`) stays on log lines. One table
   (`core/bench_ops`) holds each op's name and class.
-  1. Query ops (every build): `report` (boot report), `stats`, `record_status`.
+  1. Query ops (every build): `report` (boot report), `stats`, `record_status`. Service op (every build, class `Service`): `diag_clear` erases the diag log so a box can leave with no entries; it replies `diag log busy` and changes nothing while the log is busy.
   2. Bench ops (bench image only; the parser refuses them in a release image with `op not in this build: <op>`, and
      the release image does not contain the code): `slot_off`, `slots_on`, `slot_on`, `all_on`, `slots_live`,
      `pin_knobs`, `set_knob`, `knobs_live`, `chasm`, `clip`, `reset_peaks`, `stop_audio`, `fault`, `spin`,

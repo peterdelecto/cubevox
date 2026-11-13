@@ -1,6 +1,6 @@
 // The flow of one audio block after its input is loaded, pure so the host test covers it and the board
 // and the host run the same code. It owns the layout fade, the slot crossfades, the output gain ramp,
-// the engine clears that wait for a silent block, the BYPASS phase, the late-block flag and the scope's
+// the engine clears waiting for a silent block or a chain block, the BYPASS phase, the late-block flag and the scope's
 // ring. The board and the host keep the engines, the snapshots, the block buffers and the output sink.
 
 #pragma once
@@ -23,6 +23,12 @@
 constexpr int kResetsPerSilentBlock = 1;
 static_assert(kResetsPerSilentBlock * (1 + kFadeHoldBlocks) >= kEngineCount,
               "the silent blocks must be enough to clear every engine");
+
+// Engine clears per chain block, for the engines a layout change taken at once leaves waiting. The clear
+// lands on top of a full chain pass. The largest engine is Mob's (65,792 B on the host), and the board's
+// memset clears 51 kB in 10k to 26k cycles (engine/CLAUDE.md), so one clear costs at most about 34k
+// cycles, 5.3 % of the 640,000-cycle block, beside the costliest layout's 44 % worst block.
+constexpr int kResetsPerChainBlock = 1;
 
 // Samples over which a late block's start, and the first chain block after it, blend in from the last
 // sample sent.
@@ -73,6 +79,18 @@ class BlockFlow {
   // zero and nothing needs a crossfade.
   void adopt(const ChainSnapshot& from, const ChainSnapshot& to);
 
+  // For a published snapshot `to` whose layout differs from the running `from`. When the change cannot
+  // alter what is heard (changeHeard: every slot that changes card sits off and settled in both, and no
+  // live slot plays from an engine that changes or clears), queues the clears of the changed slots' engines
+  // and returns true, and the caller runs `to` from the next block with no fade. Chain blocks then clear
+  // kResetsPerChainBlock engines each, and a slot that plays from a waiting engine stays at the dry input
+  // until it clears. Otherwise returns false and the caller waits for the fade's zero point.
+  bool adoptAtOnce(const ChainSnapshot& from, const ChainSnapshot& to);
+
+  // For the host tests: the engines still waiting for a clear, and slot `s`'s fade level.
+  uint32_t enginesWaiting() const { return resetMask_; }
+  int slotLevel(int s) const { return slots_.level(s); }
+
   // The scope's ring, which holds the chain output of the newest blocks. The main loop reads it.
   ScopeRing& scope() { return scope_; }
   const ScopeRing& scope() const { return scope_; }
@@ -80,7 +98,7 @@ class BlockFlow {
   // Runs one block of cv::kBlock samples. `a` holds the input and takes the output, `b` is scratch,
   // `held` is the snapshot the block runs, and sink(i, v) takes each output sample. The silent
   // blocks of a layout change clear the waiting engines, a late block passes the dry input, and
-  // every other block runs the chain. BYPASS mixes the dry input in over a chain block. A NaN or an
+  // every other block runs the chain, after clearing a waiting engine when one is left. BYPASS mixes the dry input in over a chain block. A NaN or an
   // infinity out of a slot cuts the output, clears every engine in the blocks that follow and
   // resets CLEANUP EQ. Every block writes one block into the scope's ring, the chain output ahead of
   // CLEANUP EQ's back half when the chain ran and zeros when it did not.
@@ -105,6 +123,7 @@ class BlockFlow {
       scope_.writeSilence();
     } else {
       report.chainRan = true;
+      clearWhileRunning(engines, held.layout);
       auto tap = [this](const float* block) { scope_.write(block); };
       if (!runChain(engines, slots_, a, b, n, held, cycleClock, report.cycles, tap)) {
         report.discarded = true;
@@ -125,6 +144,10 @@ class BlockFlow {
 
   // Clears up to `count` of the waiting engines, lowest first.
   void resetWaiting(ChainEngines& engines, int count);
+
+  // Ahead of a chain block: clears kResetsPerChainBlock waiting engines, then holds at the dry input every
+  // slot of `layout` that still plays from a waiting one.
+  void clearWhileRunning(ChainEngines& engines, const Layout& layout);
 
   // Eases the block's start from the last sample sent, over kLateBlendSamples, when the block is a
   // dry one or the first after it. Records the block's last sample.

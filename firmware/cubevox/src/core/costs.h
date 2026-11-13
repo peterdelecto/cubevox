@@ -127,7 +127,7 @@ constexpr Cost kBloom{2, 4, true};     // 11.7k to 12.0k / 22.9k to 23.4k, stres
 
 // The Deepthroat card (code id growl), Distortion's alternate in slot 6, reads Autotune's tracker like Mob,
 // and pays a tracker of its own with no Autotune ahead. Its row is the card's slot measured on the box.
-constexpr Cost kGrowl{5, 8, true};  // 24.5k / 46.4k, stress run 2026-11-10 (v2.01.85, throat layout: mean 3.8 %, worst 7.26 %, lowest of two runs, which the old worst of 7 failed); the 2026-11-05 run (v2.01.51-bench) read 25.7k / 42.7k
+constexpr Cost kGrowl{5, 9, true};  // stress run 2026-11-13 (v2.01.94, costliest layout): mean 3.8 %, worst 8.45 % in one run of three and 7.5 % in the others
 
 // What every block spends whatever the layout: CLEANUP EQ's front half ahead of the slots, and the
 // tail after them. stress.py gates the CLEANUP EQ bucket, at STRONG (both halves), against kCleanupEq. The

@@ -425,7 +425,16 @@ lines of 21 characters; the extension `uf2` never appears on screen because the 
    application clears `faultAddress`, so the bootloader reads the log again. A sector that will not
    erase stays unread for that start, and the log stays closed when it is the log's. The boot
    entry still records the address the bootloader left.
-4. Adam's support step is one sentence, told to him: open the `CUBEVOX` drive, send `DIAG.TXT`.
+4. The diag log can be cleared, so a box leaves for Adam with no entries (owner 2026-11-13). The
+   op `diag_clear` of the serial protocol erases the sector through the same path a full log takes,
+   from `diagPoll()`, one flash operation per `loop()` pass, never in the audio interrupt, and it
+   waits for a layout record erase like any log write. It is a service op, so the release image
+   runs it and every other bench op stays out. The reply is `{"id":N,"ok":true}` once the erase is
+   queued, or the error `diag log busy` with nothing changed while an entry is queued or being
+   written, a record erase holds the flash, or the log is closed. The sequence keeps counting in the
+   running box, and a power cycle with no entry written after the clear starts it again at 1.
+   `DIAG.TXT` reads `flash log: empty` until the box next writes an entry.
+5. Adam's support step is one sentence, told to him: open the `CUBEVOX` drive, send `DIAG.TXT`.
 
 ## Application changes
 | File | Change |

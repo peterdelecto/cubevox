@@ -42,8 +42,13 @@ class EntryLog {
   // erased first and the log starts again at slot 0.
   void poll();
 
-  // True while an entry is queued or being written.
-  bool busy() const { return hasPending_ || phase_ != Phase::Idle; }
+  // Queues an erase of the whole sector, through the path a full sector takes. Returns false and
+  // changes nothing when the log is closed, busy, or the gate holds the flash. The sequence keeps
+  // counting, so the next entry continues the numbering.
+  bool clear();
+
+  // True while an entry or a clear is queued or being written.
+  bool busy() const { return hasPending_ || clearPending_ || phase_ != Phase::Idle; }
 
   // Valid entries in the sector, and the highest sequence among them or written since (0 when none).
   uint32_t count() const { return count_; }
@@ -63,6 +68,7 @@ class EntryLog {
   bool entryValid(const uint8_t* entry) const;
   void scan();
   void startWrite();
+  void startClear();
   void stamp();
   void pollErase();
   void pollProgram();
@@ -81,6 +87,8 @@ class EntryLog {
   uint32_t count_ = 0;
   uint32_t lastSequence_ = 0;
 
+  bool clearPending_ = false;  // clear() accepted, erase not started
+  bool clearing_ = false;      // the erase in flight is a clear, so no entry follows it
   bool hasPending_ = false;
   EntryBytes pendingEntry_ = {};
   EntryBytes writingEntry_ = {};

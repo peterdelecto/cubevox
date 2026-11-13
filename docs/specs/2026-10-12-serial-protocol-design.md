@@ -58,6 +58,7 @@ carries no drill it doesn't need. This realises item 5 of `2026-10-08-effect-reg
 | Class | Ops | Builds |
 |---|---|---|
 | Query | `report`, `stats`, `record_status` | all |
+| Service | `diag_clear` (erases the diag log; reply `diag log busy` while an entry or a record erase is in flight; owner 2026-11-13, `2026-10-24-field-update-design.md` Diagnostics item 4) | all |
 | Bench | `slot_off`, `slots_on`, `pin_knobs`, `chasm`, `clip`, `reset_peaks`, `stop_audio`, `fault`, `spin`, `record_save`, `record_erase`, `panel_test`, `panel_summary`, `panel_dump`, `panel_jack`, `panel_mute`, `panel_oled`, `slot_on`, `all_on`, `slots_live`, `set_knob`, `knobs_live`, `bypass`, `polish_comp`, `vox_eq`, `stream_fault`, `fail_restart` | `CUBEVOX_BENCH` only |
 
 Panel levers (owner 2026-11-01, "you can control the toggles. we need autonomous stress testing";
@@ -98,16 +99,39 @@ load maps unknown ids to `empty`.
    Clearing a large engine (reverb, pitch) inside the interrupt costs block time. The bench check
    measures the worst block through a swap. If it goes late, the clears are spread over the
    silent blocks before the fade-in.
-3. The ramp is a pure core sequencer (`core/layout_fade`): per block it gives the gain and whether
+3. A layout change that cannot alter what is heard skips the fade (owner 2026-11-13: a card picked
+   from the menu for a slot whose bypass toggle is off dipped the output for over 100 ms). The
+   interrupt adopts it at once when both hold:
+   1. Every slot whose card changes is off in the held snapshot and in the new one (`slotOn`, the
+      toggles of `slotToggles()` with the overload holds on top) and its slot crossfade sits at off.
+   2. Every slot that is on or still fading plays from the same engines in both layouts, and none of
+      them clears (`enginesReadBy`, `changeHeard` in `core/layout_fade`). A card plays from its own
+      engine, Autotune's when it reads Autotune's tracker (Formant or Apraxia with only Empty slots
+      between, Mob or Deepthroat anywhere behind) and the Input gate's when it is Chatter.
+
+   The changed slots' engines, old card and new, then clear one per chain block (`kResetsPerChainBlock`),
+   lowest engine first, on top of a full chain pass. The largest is Mob's, 65,792 B, about 34k cycles
+   at the board memset's rate (51 kB in 10k to 26k), 5.3 % of a 640,000-cycle block beside the
+   costliest layout's 44 % worst block. A slot that plays from a waiting engine stays at the dry input
+   with its engine stopped, even with its toggle up, and fades in by the slot crossfade once the engine
+   is clear. The board's swap watch (`audioSwapStats`) starts at such a change too, so the bench reads
+   the worst block through its clears. Every other layout change fades as in item 2.
+
+   Every card the menu's SLOT rows swap into an off slot of the default layout is taken at once.
+   The cases that keep the fade come only from a `set_layout` that changes an off slot ahead of an on
+   reader: Autotune placed or removed ahead of an on Formant, Apraxia, Mob or Deepthroat; the Input
+   gate placed or removed with Chatter on; a card placed in, or taken from, a slot between Autotune
+   and an on Formant or Apraxia, which starts or ends their shared grain cut.
+4. The ramp is a pure core sequencer (`core/layout_fade`): per block it gives the gain and whether
    to swap. Host-tested.
-4. Controls re-seed knob steps for the new cards (already in place). No menu row opens the chain
+5. Controls re-seed knob steps for the new cards (already in place). No menu row opens the chain
    view (`2026-10-24-polish-design.md`).
 
 ## Modules
 | Tier | Module | Owns |
 |---|---|---|
 | core | `protocol` | line framing state, request parse, reply formatting into a writer interface |
-| core | `layout_fade` | fade-out, swap, fade-in per block |
+| core | `layout_fade` | fade-out, swap, fade-in per block; `changeHeard`, which picks the change taken at once |
 | board | `serial_link` | reads CDC bytes, cuts JSON lines and ignores every other byte (counted as stray), writes replies |
 | sketch | | dispatches commands to layout, record, audio stats, mute and DFU |
 
@@ -116,7 +140,10 @@ load maps unknown ids to `empty`.
    unknown commands give error replies; `hello` output parses as JSON (checked by a small reader
    in the test) and lists every card; fade gain is monotonic, reaches zero before the swap and
    returns to one. A fuzz loop feeds random bytes and truncated JSON through the parser under the
-   sanitizers.
+   sanitizers. `core_swap_at_once` holds Apply item 3: every menu card swapped into an off slot plays
+   the same samples as no swap with no fade, the cases that keep the fade do fade, a toggle raised
+   after the swap waits for the clear and then crossfades in, no stale engine state is heard, and no
+   block clears more than one engine.
 2. `tools/protocol_check.py`: talks to the box over the port; runs hello, get, set valid, set
    invalid (unknown id, two reverbs, duplicate), status, and checks the layout survives a reset.
    Run on the test board (chip checks only); audio stays at 0 late through every apply.

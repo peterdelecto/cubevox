@@ -1,5 +1,6 @@
 // Fade sequencer for a live layout change: the output ramps to zero, the audio block swaps in the new
 // snapshot, and the output ramps back. Pure, called once per audio block (spec 2026-10-12 serial protocol).
+// A change that cannot alter what is heard (changeHeard) skips the fade; BlockFlow::adoptAtOnce takes it.
 
 #pragma once
 
@@ -66,3 +67,15 @@ class LayoutFade {
 
 // Bit per Engine for every engine that serves a card in a slot whose card differs between the layouts.
 uint32_t enginesToReset(const Layout& from, const Layout& to);
+
+// Bit per Engine for every engine whose state the card in slot `s` plays from: its own engine, Autotune's
+// when the card reads Autotune's tracker (the Formant engine with only Empty slots between it and Autotune,
+// Mob or Deepthroat with Autotune anywhere ahead), and the Input gate's when Chatter keys on its detector.
+// An Empty slot reads none.
+uint32_t enginesReadBy(const Layout& layout, int s);
+
+// True when moving the running layout from `from` to `to` can change what is heard. Bit s of `liveMask`
+// says slot s is on in either snapshot or still fading. `clearing` holds the engines that clear for the
+// change, with any still waiting from an earlier one. The change is heard when a live slot changes card,
+// reads other engines in `to` than in `from`, or reads an engine that clears.
+bool changeHeard(const Layout& from, const Layout& to, uint8_t liveMask, uint32_t clearing);

@@ -181,6 +181,7 @@ add_executable(firmware_test
                test/firmware/core_boot_health.cpp
                test/firmware/core_load_rule.cpp
                test/firmware/core_block_tail.cpp
+               test/firmware/core_swap_at_once.cpp
                test/firmware/core_canvas.cpp
                test/firmware/core_chain_run.cpp
                test/firmware/core_crc32.cpp

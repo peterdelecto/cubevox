@@ -95,7 +95,7 @@ def check_hello(link, rep):
     rep.check("hello: build is release or bench, with an op list",
               hello.get("build") in ("release", "bench") and isinstance(ops, list)
               and {"report", "stats", "record_status"} <= set(ops), str((hello.get("build"), ops)))
-    want = bench_ops.ALL_OPS if hello.get("build") == "bench" else bench_ops.QUERY_OPS
+    want = bench_ops.ALL_OPS if hello.get("build") == "bench" else bench_ops.RELEASE_OPS
     rep.check(f"hello: {hello.get('build')} lists exactly its ops",
               isinstance(ops, list) and len(ops) == len(set(ops)) and set(ops) == want, str(ops))
     cards = hello.get("cards", [])

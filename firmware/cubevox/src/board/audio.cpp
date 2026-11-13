@@ -221,17 +221,22 @@ void noteGatePeak() {
 }
 
 // Picks up a newly published snapshot. The same layout is adopted at once, and a toggle that moved
-// crossfades from the slot's fade level; a different layout waits for the fade's zero point. The
-// first publish after boot has nothing to fade from and is adopted whole, every slot settled.
+// crossfades from the slot's fade level. A different layout that cannot change what is heard (cards
+// swapped in slots that are off) is adopted at once too and starts the swap watch; any other waits for
+// the fade's zero point. The first publish after boot has nothing to fade from and is adopted whole,
+// every slot settled.
 void syncSnapshot() {
   const uint32_t seq = gPublished.load(std::memory_order_acquire);
   if (seq == gSeenSeq) return;
   const ChainSnapshot& pub = gSnapshots[seq & 1];
   const bool first = gSeenSeq == 0;
-  gLayoutPending = !first && pub.layout != gHeld.layout;
+  const bool differs = !first && pub.layout != gHeld.layout;
+  const bool atOnce = differs && gFlow.adoptAtOnce(gHeld, pub);
+  gLayoutPending = differs && !atOnce;
   gSeenSeq = seq;
   if (!gLayoutPending) gHeld = pub;
   if (first) gFlow.settleSlots(gHeld.slotOn);
+  if (atOnce) gSwapStarted = true;
 }
 
 // At the zero point of the fade: adopts the newest snapshot (BlockFlow::adopt).

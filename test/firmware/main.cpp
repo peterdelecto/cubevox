@@ -19,6 +19,7 @@ int main() {
   checkFade();
   checkChainRun();
   checkBlockTail();
+  checkSwapAtOnce();
   checkFuzz();
   checkInputLogic();
   checkMenu();
