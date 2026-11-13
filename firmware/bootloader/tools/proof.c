@@ -38,13 +38,16 @@ typedef struct {
 } Proof;
 
 // One proof per state of the spec's OLED table. 04 is the menu screen with a host connected, 10
-// the stopped update with the host still connected (a copy that stopped or failed its check).
+// the stopped update with the host still connected (a copy that stopped or failed its check). 11
+// and 12 are the updater's screens, 13 the bootloader's first wait after the updater wrote it.
 static const Proof kProofs[] = {
     {"wait-menu", CvScreenWaitMenu, false},      {"wait-no-image", CvScreenWaitNoImage, false},
     {"wait-boot-failed", CvScreenWaitBootFailed, false}, {"host-connected", CvScreenWaitMenu, true},
     {"writing", CvScreenWriting, false},         {"wrong-file", CvScreenWrongFile, false},
     {"done", CvScreenDone, false},               {"cable-out", CvScreenCableOut, false},
     {"clock-failed", CvScreenClockFailed, false}, {"no-image-connected", CvScreenWaitNoImage, true},
+    {"boot-updating", CvScreenBootUpdating, false}, {"boot-damaged", CvScreenBootDamaged, false},
+    {"boot-updated", CvScreenBootUpdated, false},
 };
 
 // The release the menu proofs show as installed.
@@ -170,6 +173,12 @@ static const Wording kWording[] = {
      {"The update stopped.", "Drop the firmware on", "the CUBEVOX drive.", "Computer connected."}},
     {"boot-failed-connected", CvScreenWaitBootFailed, true,
      {"Startup failed.", "Drop the firmware on", "the CUBEVOX drive.", "Computer connected."}},
+    {"boot-updating", CvScreenBootUpdating, false, {"Updating the", "bootloader.", "Keep the power on.", ""}},
+    {"boot-damaged", CvScreenBootDamaged, false, {"The bootloader file", "is damaged.", "", ""}},
+    {"boot-updated", CvScreenBootUpdated, false,
+     {"Bootloader updated.", "Drop the firmware on", "the CUBEVOX drive.", ""}},
+    {"boot-updated-connected", CvScreenBootUpdated, true,
+     {"Bootloader updated.", "Drop the firmware on", "the CUBEVOX drive.", "Computer connected."}},
 };
 
 // Reports a broken rule and returns 1, so the checks combine with |.

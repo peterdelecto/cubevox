@@ -1,5 +1,5 @@
 // The update-mode screens of docs/specs/2026-10-24-field-update-design.md (section OLED in update
-// mode), drawn into a frame buffer with no HAL, so tools/proof.c renders the same bytes the panel
+// mode) and the updater's two of docs/specs/2026-11-13-bootloader-update-design.md, drawn into a frame buffer with no HAL, so tools/proof.c renders the same bytes the panel
 // shows. Owner rules: every line is a full sentence in the 5x7 font, a screen holds four lines on
 // rows 0, 2, 4 and 6 of the panel's eight 8 px rows, and the file extension never appears because
 // the font blurs it.
@@ -36,7 +36,13 @@ typedef enum {
   // The cable came out after a computer had connected, and update mode cannot time out.
   CvScreenCableOut,
   // The crystal or PLL1 did not start; USB runs from the internal oscillator.
-  CvScreenClockFailed
+  CvScreenClockFailed,
+  // The updater's two screens (docs/specs/2026-11-13-bootloader-update-design.md). The bootloader
+  // never shows them.
+  CvScreenBootUpdating,
+  CvScreenBootDamaged,
+  // Waiting, no valid image, after the updater wrote this bootloader (cvBootUpdatedMarked).
+  CvScreenBootUpdated
 } CvScreen;
 
 // The text of a screen as it is drawn, one string per line, "" for a blank line.

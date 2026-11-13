@@ -54,6 +54,10 @@ static const ScreenText kScreens[] = {
     [CvScreenClockFailed] = {{"The clock failed.", "Send the DIAG.TXT", "file on the CUBEVOX",
                               "drive for a repair."},
                              NULL},
+    [CvScreenBootUpdating] = {{"Updating the", "bootloader.", "Keep the power on.", NULL}, NULL},
+    [CvScreenBootDamaged] = {{"The bootloader file", "is damaged.", NULL, NULL}, NULL},
+    [CvScreenBootUpdated] = {{"Bootloader updated.", "Drop the firmware on", "the CUBEVOX drive.", NULL},
+                             kConnected},
 };
 
 // Appends at most `limit` characters of `text`.
