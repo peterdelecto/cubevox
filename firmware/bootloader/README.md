@@ -2,7 +2,8 @@
 
 TinyUF2 (Adafruit, MIT, on TinyUSB) for the STM32H7 port, with a cubevox board. It lives in bank 1
 sector 0 (0x08000000, 128 KB) and starts the application at 0x08020000. In update mode the box is a
-drive named `CUBEVOX`; dragging the release `.uf2` onto it updates the firmware. Design:
+drive named `CUBEVOX`; dragging the release `.uf2` onto it updates the firmware, and dragging the
+bootloader file `cubevox-bootloader-v<version>.uf2` updates the bootloader itself. Design:
 `docs/specs/2026-10-24-field-update-design.md`. Shared contract: `firmware/cubevox/src/board/boot_block.h`.
 Run-or-update policy: `boards/cubevox/boot_decide.c` (pure C, covered by `ctest`).
 
@@ -21,7 +22,8 @@ in `build.sh`. The compiler version is `XPACK_VERSION` in `firmware/build.sh`, w
 
 ## Build
 ```
-./build.sh                # cubevox board: $OUT/cubevox-bootloader.{bin,elf}, OUT=/tmp/cubevox-boot-cubevox by default
+./build.sh                # cubevox board: $OUT/cubevox-bootloader.{bin,elf} and the bootloader file
+                          # $OUT/cubevox-bootloader-v<version>.uf2, OUT=/tmp/cubevox-boot-cubevox by default
 ./build.sh --outdir       # the output dir
 ./build.sh --proofs       # host build of screens.c: build/proofs/boot/NN-<state>.png and diag-sample.txt at the repo root
 ./build.sh --selftest     # host checks, listed below
@@ -45,8 +47,13 @@ in `build.sh`. The compiler version is `XPACK_VERSION` in `firmware/build.sh`, w
 7. `--selftest` holds `image_check.c` against `tools/stamp_image.py` (a later header version
    included), the screens against the approved wording and rows (`tools/proof.c --check`), the drive
    texts of seven sample boxes (`tools/drivetext.c`), flash.sh's option byte edit
-   (`tools/option_bytes.py selftest`), and runs upstream's `ports/test_ghostfat` selftest on the
-   patched tree for boards 4k, 4k_favicon, 32k and 512b_favicon. The policy in `boot_decide.c`,
+   (`tools/option_bytes.py selftest`), the updater's payload check (`tools/updatercheck.c`) on the
+   built bootloader and on payloads with a wrong length, a wrong CRC, a flipped byte and a size over
+   the sector, and runs upstream's `ports/test_ghostfat` selftest on the
+   patched tree for boards 4k, 4k_favicon, 32k and 512b_favicon. It builds the bootloader and the
+   bootloader file into `$OUT` first when they are missing there.
+8. After the bootloader the script builds the bootloader file (section The bootloader file), checks
+   it with `stamp_image.py check` and `updatercheck image`, and prints its size and SHA-256. The policy in `boot_decide.c`,
    the decision, the fault record, the option byte rule, the UF2 filters and the screen choice, is
    covered by `ctest` (`test/firmware/boot_decide.cpp`).
 
@@ -216,12 +223,72 @@ slots. A slot is blank when every byte is 0xFF, valid when its magic and its tra
 4. `./build.sh --proofs` writes `build/proofs/boot/diag-sample.txt`, the sample box with three valid
    entries, one torn entry and blank slots. `./build.sh --selftest` checks it and six variants.
 
-## Flash (shop only)
+## The bootloader file
+Design: `docs/specs/2026-11-13-bootloader-update-design.md`.
+
+| Item | Value |
+|---|---|
+| File | `$OUT/cubevox-bootloader-v<version>.uf2`, family `cubevox`, base 0x08020000 |
+| Header version text | `boot-<version>`, from `CV_BOOT_VERSION` |
+| Program | the updater, `updater/`, linked at 0x08020000 by `updater/updater.ld` |
+| Carried bootloader | `payload.S`: magic `CVBL`, length, CRC-32, then the `.bin`, last in the image |
+
+Every bootloader since v0.04 takes the file as an application: the header and CRC hold, the stack
+lies in DTCM and the reset handler in the application region. The bootloader jumps to it with the
+core on HSI, the caches off and IWDG1 at 16 s. The updater then:
+1. masks interrupts for the whole run, copies its RAM code and vectors into AXI SRAM, and shows
+   `Updating the bootloader.` / `Keep the power on.`;
+2. checks the carried bootloader (`updater_check.c`: magic, length against sector 0 and the bytes
+   carried, CRC, a DTCM stack and a reset handler inside the bytes), copies it into AXI SRAM with
+   0xFF to the end of the sector, and checks the copy. A failure shows
+   `The bootloader file is damaged.` for 4 s;
+3. checks the core is on HSI, the flash programming delay is not 0, the banks are not swapped, BOR
+   level 3 is set and `FLASH_CR1` unlocks, then the power: VDD above the PVD's 2.85 V and eight
+   readings of 5VA on ADC1 at or above `kPowerClearMv` (4.85 V);
+4. copies sector 0 into AXI SRAM, then clears its write protection with the bootloader's own option
+   byte change, the sector 0 bit set instead of cleared;
+5. from AXI SRAM (`updater_ram.c`), erases sector 0, writes the bytes flash word by flash word and
+   compares the whole sector with the copy, again until it compares. Three passes in a row that
+   leave the old bootloader whole end the run with it kept;
+6. erases bank 1 sector 1, the first of the application region, and resets.
+
+A refusal at steps 2 to 4 skips step 5. Every run leaves one line in the boot block's `appSummary`,
+which `DIAG.TXT` shows as `app summary:` at the next update mode: `bootloader v0.09 written`,
+`bootloader file damaged: crc wrong`, `bootloader kept: 5VA 4612 mV` and the like. The new
+bootloader protects sector 0 again at its first start, finds no application and offers the drive.
+Bank 2 is never unlocked, erased or written. Every wait kicks IWDG1 and is bounded, except the loop
+of step 5. `build.sh` fails when `updater_ram.o` needs any symbol but `_estack` from elsewhere, or
+the linked RAM code holds a flash address past sector 0.
+
+Only after sector 0 compares does the updater also set the bootloader-updated mark: words 0 and 1
+of the boot block's `bootReserved` hold `CV_BOOT_UPDATED_MARK` (the bytes U P B L) and its
+complement (`boot_decide.h`). The new bootloader reads it at the start of update mode, and while no
+image is installed shows `Bootloader updated.` / `Drop the firmware on` / `the CUBEVOX drive.` in
+place of `The update stopped.`, with `Computer connected.` on the last line while a host is
+connected. The mark changes no decision: the box waits in update mode and `INFO_UF2.TXT` reads
+`Installed: none` as without it. `cvBootMarkUpdated` clears it when a firmware install completes,
+and a power-on clears the whole block.
+
+## Flash
+The drive path, the default, takes a box that runs a bootloader:
+1. `./flash.sh` checks the bootloader file and the built firmware (`../build.sh`), sends
+   `enter_dfu` over the serial port when the box runs the firmware, and waits for `/Volumes/CUBEVOX`.
+2. It copies the bootloader file and ejects. The box restarts into the updater, which takes about
+   3 s; the power must stay on for the 2 s of step 5 above.
+3. It waits up to 60 s for the drive to return and requires `INFO_UF2.TXT` to read
+   `cubevox bootloader v<version>` and `Installed: none` and `DIAG.TXT` to read
+   `app summary: bootloader v<version> written`, printing that line and `option bytes:`. Then it
+   runs `../flash.sh` for the firmware and exits with its code. When a check fails it still runs
+   `../flash.sh`, because the updater erased the firmware, then prints the error and exits 1.
+
+`./flash.sh FILE.uf2` takes another bootloader file. A box that cannot start, or one whose power was
+cut during step 5, goes the ROM path, shop only:
 1. Enclosure open, 9 V on. Hold BOOT0 down for the whole run, tap NRST.
-2. `./flash.sh` waits for 0483:df11. It reads the option bytes through the ROM DFU's option byte
-   area (`tools/option_bytes.py`); when a bootloader has write protected sector 0, it clears that one
-   bit, because the ROM DFU skips a protected sector without an error. The chip restarts after an
-   option byte write and BOOT0 brings it back into the ROM DFU.
+2. `./flash.sh --rom` (or `./flash.sh --rom FILE.bin`) waits for 0483:df11. It reads the option
+   bytes through the ROM DFU's option byte area (`tools/option_bytes.py`); when a bootloader has
+   write protected sector 0, it clears that one bit, because the ROM DFU skips a protected sector
+   without an error. The chip restarts after an option byte write and BOOT0 brings it back into the
+   ROM DFU.
 3. It writes `cubevox-bootloader.bin` at 0x08000000, reads the sector back, compares it with the file,
    and starts the bootloader. A file over `CV_FLASH_SECTOR_SIZE` (131072 bytes) is refused; a
    read-back that differs is an [ERROR]. `./flash.sh --help` prints the usage.
@@ -249,6 +316,9 @@ slots. A slot is blank when every byte is 0xFF, valid when its magic and its tra
    the protection through the ROM DFU.
 10. A missing crystal: the clock screen, the drive on HSI48 with CRS, DIAG.TXT's clock line.
 11. The 16 s watchdog before the jump and the application's 2 s after `setup()`.
+12. The bootloader file: the updater's screens, its option byte change, the erase and write of
+    sector 0 from AXI SRAM, the erase of its own sector, the restart into the new bootloader, and
+    the ADC and PVD readings it takes on HSI.
 
 ## Licences
 cubevox is MIT. The bootloader binary contains TinyUF2 and TinyUSB under these notices:

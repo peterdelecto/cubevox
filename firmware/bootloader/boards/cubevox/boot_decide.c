@@ -131,7 +131,18 @@ void cvBootMarkUpdated(struct CvBootBlock* block) {
   if (!inBank2(block->faultAddress)) block->faultAddress = 0u;
   clearSummary(block);
   clearBootFault(block);
+  cvBootUpdatedWordsPut(block, 0u, 0u);
   cvBootBlockSeal(block);
+}
+
+static uint32_t reservedWord(const struct CvBootBlock* block, uint32_t index) {
+  uint32_t word;
+  memcpy(&word, &block->bootReserved[4u * index], sizeof word);
+  return word;
+}
+
+bool cvBootUpdatedMarked(const struct CvBootBlock* block) {
+  return reservedWord(block, 0u) == CV_BOOT_UPDATED_MARK && reservedWord(block, 1u) == ~CV_BOOT_UPDATED_MARK;
 }
 
 // ---- Option bytes -------------------------------------------------------------------------
@@ -221,12 +232,17 @@ bool cvDirNamesWrongFile(const uint8_t* sector, char name[13]) {
   return false;
 }
 
+// With no image, a bootloader the updater just wrote says so instead of "The update stopped.".
+static CvScreen noImageScreen(const CvScreenInputs* in) {
+  return in->bootUpdated && !in->imageValid ? CvScreenBootUpdated : CvScreenWaitNoImage;
+}
+
 static CvScreen waitingScreen(const CvScreenInputs* in) {
   switch (in->reason) {
     case CvReasonAppRequest:
-    case CvReasonBootFault: return in->imageValid ? CvScreenWaitMenu : CvScreenWaitNoImage;
+    case CvReasonBootFault: return in->imageValid ? CvScreenWaitMenu : noImageScreen(in);
     case CvReasonBootFailed: return CvScreenWaitBootFailed;
-    default: return CvScreenWaitNoImage;
+    default: return noImageScreen(in);
   }
 }
 
@@ -389,7 +405,7 @@ CvScreen cvSessionScreen(const CvUpdateSession* s, bool imageValid, bool timeout
   if (s->updateWritten) return CvScreenDone;
   const CvScreenInputs in = {s->reason,          imageValid,        s->writeBegun,
                              s->sessionAccepted, s->sessionRefused, s->sessionFailed || s->sessionStalled,
-                             s->cableOut,        timeoutArmed};
+                             s->cableOut,        timeoutArmed,      s->bootUpdated};
   return cvUpdateScreen(&in);
 }
 

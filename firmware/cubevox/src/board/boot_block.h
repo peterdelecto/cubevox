@@ -266,7 +266,8 @@ struct CvBootBlock {
   // Block version 3. CV_BOOT_BLOCK_SEAL while a bootloader owns the block, so data the ST ROM loader
   // or any other RAM user leaves here reads as no block.
   uint32_t blockSeal;
-  // Zero when written.
+  // Zero when written. Bytes 0..7 hold the bootloader-updated mark (boot_decide.h), which checks
+  // itself and so needs no block version.
   uint8_t bootReserved[36];
 
   // Written by the application. 0 until an application adds a field to appReserved.

@@ -1,6 +1,6 @@
 # Host builds of the bootloader's HAL-free code: the OLED screen proofs (proof), the image check
-# (imagecheck) and the drive's text files (drivetext). build.sh --proofs and build.sh --selftest
-# drive them.
+# (imagecheck), the drive's text files (drivetext) and the updater's payload check (updatercheck).
+# build.sh --proofs, --selftest and the board build drive them.
 
 cmake_minimum_required(VERSION 3.16)
 project(cubevox_bootloader_tools C CXX)
@@ -12,12 +12,15 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(BOARD_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../boards/cubevox)
+set(UPDATER_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../updater)
 set(REPO_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../..)
 include_directories(${BOARD_DIR} ${REPO_DIR}/firmware/cubevox/src/board ${REPO_DIR}/tools/font-editor/fonts)
 add_compile_options(-Wall -Wextra -Werror)
 
 add_executable(proof proof.c ${BOARD_DIR}/screens.c ${BOARD_DIR}/fonts.cpp ${BOARD_DIR}/image_check.c)
 add_executable(imagecheck imagecheck.c ${BOARD_DIR}/image_check.c)
+add_executable(updatercheck updatercheck.c ${UPDATER_DIR}/updater_check.c ${BOARD_DIR}/image_check.c)
+target_include_directories(updatercheck PRIVATE ${UPDATER_DIR})
 
 # The version a real build takes from git is a placeholder here.
 add_executable(drivetext drivetext.c ${BOARD_DIR}/diag.c ${BOARD_DIR}/image_check.c)
