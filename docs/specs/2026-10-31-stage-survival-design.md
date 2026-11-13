@@ -5,8 +5,11 @@ Target: the H7 firmware on the v4 board, 48 kHz, 64-sample blocks, float32. Revi
 against the code at v2.01.90; the build started that day, in the order load rule and NaN guard,
 warm restart, safe start, drills.
 
-Settled: a card the box turns off stays off until Adam flips its toggle off and on. The box never
-turns a card back on by itself. Board changes are out of scope.
+Settled (owner 2026-11-13, replacing the 2026-10-31 rule that a card stayed off until its toggle
+was flipped): a card the box turns off comes back by itself, so Adam never has to act in the middle
+of a song, and the screen says `OVERLOAD`. The heaviest layout the menu builds costs 70 % in its
+worst block against the 95 % limit, so the load rule is a net for a catastrophic fault that should
+never be seen. Board changes are out of scope.
 
 ## How to read this
 One entry per failure. Each gives how it arises, what Adam hears today, what he hears after this
@@ -37,17 +40,24 @@ where a slot is switched (`compose.cpp`, beside the bench's forced-off mask), so
 does not change. The Input gate card is never held, wherever the layout puts it. CLEANUP EQ, the
 soft ceiling and the BYPASS mix are not cards and keep running. Steps are at least 50 ms apart, and
 the window starts empty after each step. The bottom is every card held: his dry voice through the
-Input gate and CLEANUP EQ. A held card stays held for the rest of the power cycle. Adam brings it
-back by flipping its toggle off and on (the rule watches the toggle levels in the panel reading),
-and if the load is still over, the rule holds it again with one tick. A layout apply or a card swap
-clears the holds, because that path restarts the chain anyway. Text row 0 of the voice screen names
-the held cards in slot order, `HOLD REVERB OCTAVE`, each by the word the menu's SLOT rows show for
-it; when the names pass 21 columns the row reads `HOLD 4 CARDS` with the count. The row moves with
-the screen's burn-in walk. Proof by number.
+Input gate and CLEANUP EQ.
 
-What Adam does. He hears one tick and a card drop out, and the screen's top row names it. His
-voice never stops. To get the card back he flips its toggle down and up. If it drops out again, the
-layout is too heavy for what he is doing and the row says so again.
+The card comes back by itself. Each held card has its own wait, counted from the moment it was
+held: 2 s the first time. When the wait is up and the window holds no late block, the rule lets
+the card go and it fades back in. If the same card is held again, its wait doubles: 4 s, 8 s, 16 s.
+A card held a fifth time stays off for the rest of the power cycle, so a card that keeps failing
+ends up out of the chain instead of coming and going all song. A flip of the card's toggle off and
+on lets it go at once and starts its count again at 2 s (the rule watches the toggle levels in the
+panel reading). A layout apply or a card swap clears every hold and every count, because that path
+restarts the chain anyway.
+
+Text row 0 of the voice screen says what happened while any card is held, and is blank otherwise:
+`OVERLOAD: REVERB OFF`, naming the held cards in slot order, each by the word the menu's SLOT rows
+show for it. When the names pass 21 columns the row reads `OVERLOAD: 4 CARDS OFF` with the count.
+The row moves with the screen's burn-in walk. Proof by number.
+
+What Adam does. Nothing. He hears one tick and a card drop out, his voice never stops, and the top
+row says `OVERLOAD` and names the card. A few seconds later the card is back and the row is blank.
 Bound. His voice at every moment, one tick per step, never a buzz, the mute relay never drops
 for load.
 Drill. `burn 200000` (about 103 %), `burn 400000` (about 134 %), a ramp 0 to 400 000 over 10 s.
@@ -61,8 +71,9 @@ the guard's own test (one sum of squares, which also catches a finite output pas
 that loud is broken too). At the first slot that fails, the chain stops for that block, so no later
 card takes in the bad block; the block is silent and only that card's engine is cleared. The load
 rule holds that card at once, with no window, because an engine that produces NaN is broken, not
-busy. The other cards keep their state. The check costs eight sums of 64 samples per block, and the
-stress run measures it.
+busy. The other cards keep their state. The card comes back by the same waits as in F2, with its
+engine cleared, and the row reads `OVERLOAD` for it as well. The check costs eight sums of 64
+samples per block, and the stress run measures it.
 Bound. One silent block, then his voice through the other cards.
 Drill. `nan <slot>`.
 
@@ -219,13 +230,15 @@ as the A1 to A3 texts do, so the entry layout and the bootloader do not change.
 
 ## 3. Host tests
 1. `core/load_rule.h`, pure: window counts, the two-late trip, step order by `worst`, 50 ms
-   spacing, the later slot on a tie, the Input gate never held, a flip off and on releases a hold,
-   a layout apply clears holds, a NaN slot is held at once.
+   spacing, the later slot on a tie, the Input gate never held, a NaN slot is held at once; a held
+   card comes back after its wait when the window holds no late block, the wait doubles from 2 s
+   to 16 s, the fifth hold stays, a flip off and on lets the card go at once and resets its count,
+   a layout apply clears holds and counts.
 2. `core/restart_rule.h`, pure: warm against cold from the reset flags and 5VA.
 3. `core/safe_start_rule.h`, pure: `bootFails` ≥ 1 holds all; the DTCM word keeps its card held
    through a flip; a layout apply clears it.
 4. `core_chain_run`: a NaN block names its slot.
-5. `test/firmware/ui_*`: the HOLD row, proof by number.
+5. `test/firmware/ui_*`: the `OVERLOAD` row, proof by number.
 6. `core_protocol`: the three new status fields.
 
 ## 4. Fault drills, on the bench, every release
@@ -241,10 +254,10 @@ run skips them.
 | Failure | Drill | Expected | Measured |
 |---|---|---|---|
 | F1 | `burn 700000` once | one dry block, one tick | ticks |
-| F2 | `burn 200000` | one step inside 120 ms, Reverb held, voice continuous; Reverb stays held after `burn 0` until its toggle is flipped off and on | time to step, ticks |
+| F2 | `burn 200000` | one step inside 120 ms, Reverb held, voice continuous, the row reads `OVERLOAD: REVERB OFF`; after `burn 0` Reverb is back 2 s after it was held and the row is blank; with the burn left on, its waits run 2, 4, 8, 16 s and the fifth hold stays | time to step, time to return, ticks |
 | F2 | `burn 400000` | steps to the bottom at 50 ms spacing, voice continuous, no mute | steps, time to bottom |
 | F2 | ramp 0 to 400 000 over 10 s | one step at a time, no mute, no buzz | steps, late count |
-| F3 | `nan <slot>` | that card held at once, other tails intact | silent blocks |
+| F3 | `nan <slot>` | that card held at once, other tails intact, the card back after 2 s | silent blocks |
 | F4 | `stall` | mute inside 100 ms, reset, back with the same layout | gap |
 | F5 | `hang` | sound for 2 s, watchdog, back | gap after the watchdog |
 | F6 | `crash` | mute, reset, back; DIAG.TXT entry | gap |
