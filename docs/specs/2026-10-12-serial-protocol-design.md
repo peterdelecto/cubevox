@@ -58,6 +58,7 @@ carries no drill it doesn't need. This realises item 5 of `2026-10-08-effect-reg
 | Class | Ops | Builds |
 |---|---|---|
 | Query | `report`, `stats`, `record_status` | all |
+| Service | `diag_clear` (erases the diag log; reply `diag log busy` while an entry or a record erase is in flight; owner 2026-11-13, `2026-10-24-field-update-design.md` Diagnostics item 4) | all |
 | Bench | `slot_off`, `slots_on`, `pin_knobs`, `chasm`, `clip`, `reset_peaks`, `stop_audio`, `fault`, `spin`, `record_save`, `record_erase`, `panel_test`, `panel_summary`, `panel_dump`, `panel_jack`, `panel_mute`, `panel_oled`, `slot_on`, `all_on`, `slots_live`, `set_knob`, `knobs_live`, `bypass`, `polish_comp`, `vox_eq`, `stream_fault`, `fail_restart` | `CUBEVOX_BENCH` only |
 
 Panel levers (owner 2026-11-01, "you can control the toggles. we need autonomous stress testing";

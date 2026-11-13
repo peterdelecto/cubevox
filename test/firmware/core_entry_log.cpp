@@ -167,6 +167,35 @@ void checkEraseWhenFull() {
   check(entries.count() == 1 && entries.lastSequence() == 100 + kSlots, "entry log: the counts restart with the erase");
 }
 
+void checkClear() {
+  FakeFlash f;
+  fillSector(f, 100);
+  EntryLog entries = makeLog(f);
+  entries.begin();
+  check(entries.clear() && entries.busy() && f.ops == 0, "entry log: clear is accepted and starts nothing yet");
+  check(!entries.clear(), "entry log: a second clear while one is queued is refused");
+  const int worst = runToIdle(entries, f);
+  check(f.erases[kLogSector] == 1 && worst == 1 && slotBlank(f, 0) && slotBlank(f, kSlots - 1),
+        "entry log: clear erases the sector, one operation per poll, and writes nothing");
+  check(entries.count() == 0 && entries.lastSequence() == 100 + kSlots - 1 && !entries.busy(),
+        "entry log: after a clear the log is empty and the sequence is kept");
+  queueEntry(entries, makeEntry(0x60));
+  runToIdle(entries, f);
+  check(slotValid(f, 0) && slotAt(f, 0).sequence == 100 + kSlots && slotBlank(f, 1) && f.erases[kLogSector] == 1,
+        "entry log: the next entry lands in slot 0 and continues the numbering");
+  queueEntry(entries, makeEntry(0x61));
+  check(!entries.clear(), "entry log: a clear is refused while an entry is queued");
+  runToIdle(entries, f);
+  gGateOpen = false;
+  EntryLog gated = makeLog(f, gate);
+  gated.begin();
+  check(!gated.clear() && !gated.busy(), "entry log: a clear is refused while the gate holds the flash");
+  gGateOpen = true;
+  EntryLog closed(f, kLogSector, 100, 4);
+  closed.begin();
+  check(!closed.clear(), "entry log: a closed log refuses a clear");
+}
+
 void checkPendingReplacement() {
   FakeFlash f;
   EntryLog entries = makeLog(f);
@@ -265,6 +294,7 @@ void checkEntryLog() {
   checkTornEntry();
   checkCrcMismatch();
   checkEraseWhenFull();
+  checkClear();
   checkPendingReplacement();
   checkErrors();
   checkDirtySector();

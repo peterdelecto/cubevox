@@ -33,7 +33,7 @@ LOAD_RULE_H = os.path.join(SRC, "core", "load_rule.h")
 BENCH_OPS_H = os.path.join(SRC, "core", "bench_ops.h")
 BOOT_DECIDE_H = os.path.join(ROOT, "firmware", "bootloader", "boards", "cubevox", "boot_decide.h")
 ENGINE_COMMON_H = os.path.join(ROOT, "engine", "common.h")
-ROW = re.compile(r'\{BenchOp::\w+,\s*"(\w+)",\s*OpClass::(Query|Bench)\}')
+ROW = re.compile(r'\{BenchOp::\w+,\s*"(\w+)",\s*OpClass::(Query|Service|Bench)\}')
 
 
 def constant(path, name):
@@ -50,6 +50,7 @@ def op_table_failures():
         rows = ROW.findall(f.read())
     names = {n for n, _ in rows}
     queries = {n for n, c in rows if c == "Query"}
+    services = {n for n, c in rows if c == "Service"}
     failed = []
     if len(rows) != len(names) or not rows:
         failed.append(f"table parse: {len(rows)} rows, {len(names)} unique names")
@@ -58,6 +59,8 @@ def op_table_failures():
                       f"only in bench_ops.py {sorted(bench_ops.ALL_OPS - names)}")
     if queries != bench_ops.QUERY_OPS:
         failed.append(f"query ops differ: C++ {sorted(queries)}, bench_ops.py {sorted(bench_ops.QUERY_OPS)}")
+    if services != bench_ops.SERVICE_OPS:
+        failed.append(f"service ops differ: C++ {sorted(services)}, bench_ops.py {sorted(bench_ops.SERVICE_OPS)}")
     return failed, len(rows)
 
 
