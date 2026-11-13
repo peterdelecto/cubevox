@@ -149,11 +149,19 @@ After. No special mode (owner 2026-11-13: a stage box comes back in the state th
 expects; it does not show a fault-finding screen or ask him to work out what failed). Every restart
 is the warm restart of F4: the same layout, the same settings, and the panel as it stands, read
 again from the toggles and pots. The software keeps no memory of a toggle or a knob, so what the
-panel shows is what the box plays. A crash that repeats restarts the box again each time. The
-bootloader's three-strikes rule stays as it is, because it is what recovers a box from a bad
-update: three starts in a row that do not run audio for 5 s end in update mode.
-Bound. Gap ≤ 1.5 s at each restart.
-Drill. `crash` twice, 10 s apart: the same layout and panel after each.
+panel shows is what the box plays. A crash that repeats restarts the box again each time, and a
+restart in the middle of a song never ends in update mode (owner 2026-11-13: a box that fails to
+start before a gig is a different case from a box that restarts mid-song). The bootloader's
+three-strikes rule, three starts in a row that do not run audio for 5 s end in update mode, is
+for a box that cannot start after power-on or after an update. So once the box has run audio for
+5 s since power-on, the application sets a mark in the boot block's application area, which the
+bootloader zeroes at every power-on. On a warm start with the mark set, `setup()` zeroes the
+failed-start counter at once, before audio starts, so mid-song restarts never add up to three.
+The bootloader does not change.
+Bound. Gap ≤ 1.5 s at each restart, however many in a row.
+Drill. `crash` five times, 2 s apart, after the box has run 10 s: the same layout and panel after
+each, never update mode. With the box freshly powered and the image made to fail at once, the
+third start is update mode, as today.
 
 ### F8. Brownout or power loss
 How. The 9 V supply sags or is pulled.
@@ -256,7 +264,7 @@ run skips them.
 | F4 | `stall` | mute inside 100 ms, reset, back with the same layout | gap |
 | F5 | `hang` | sound for 2 s, watchdog, back | gap after the watchdog |
 | F6 | `crash` | mute, reset, back; DIAG.TXT entry | gap |
-| F7 | `crash` twice, 10 s apart | the same layout and panel after each | gap, twice |
+| F7 | `crash` five times, 2 s apart, after 10 s of running | the same layout and panel after each, never update mode | gap, five times |
 | F8 | 9 V to 7 V, then cut | mute before garbage; return on the power-on path | gap on return |
 | F9 | 20 saves during `burn 300000`; `crash` during a save | no late block beyond the rule's steps; the record loads or the default layout does | late count |
 | F10 | host plug and unplug under load | no late block | late count |
