@@ -18,6 +18,7 @@
 #include "core/chain_run.h"
 #include "core/compose.h"
 #include "core/late_block.h"
+#include "core/late_window.h"
 #include "core/layout.h"
 #include "core/level.h"
 #include "core/output_stage.h"
@@ -440,6 +441,36 @@ void checkDiscardCuts() {
   check(cut.report.discarded && next.fade.silent && next.fade.to == 0.0f, "runaway: the block after a discard is silent");
 }
 
+// The late window takes a block only when the report says the chain ran, as audio.cpp feeds it. A
+// layout swap's silent blocks and the dry block after a late one report no chain run, so neither counts.
+void checkWindowTakesChainBlocks() {
+  const ChainSnapshot snap = snapshotOf(emptyLayout(), false, false);
+  Rig rig;
+  BlockFlow flow;
+  LateWindow window;
+  int silent = 0;
+  int dry = 0;
+  int fed = 0;
+  bool swapped = false;
+  for (int b = 0; b < 220; ++b) {
+    if (b == 150) flow.markLate();
+    const BlockFlow::Start start = flow.begin(false, b >= 5 && !swapped);
+    swapped = swapped || start.fade.swap;
+    Block a = tone(b, 0.5f);
+    Block scratch{};
+    const BlockFlow::Report report =
+        flow.run(rig.engines, snap, start, a.data(), scratch.data(), false, StillClock(), [](int, float) {});
+    silent += start.fade.silent ? 1 : 0;
+    dry += start.dry ? 1 : 0;
+    if (report.chainRan) {
+      window.add(true, 700000, report.cycles.slot);
+      ++fed;
+    }
+  }
+  check(silent > 0 && dry == 1 && fed == 220 - silent - dry && window.lateCount() == kLateWindowBlocks,
+        "late window: swap blocks and the dry block are not fed to it, every chain block is");
+}
+
 // The newest block the scope's ring holds.
 Block newestBlock(const ScopeRing& ring) {
   std::array<float, kScopeReadSamples> all;
@@ -601,6 +632,7 @@ void checkBlockTail() {
   checkSilenceUntilFirstSnapshot();
   checkRunawayRecovers();
   checkDiscardCuts();
+  checkWindowTakesChainBlocks();
   checkScopeRingAdvances();
   checkScopeAheadOfTrim();
   checkSwapClearsReengaged();

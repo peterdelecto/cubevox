@@ -179,6 +179,7 @@ add_executable(firmware_test
                test/firmware/support.cpp
                test/firmware/boot_decide.cpp
                test/firmware/core_boot_health.cpp
+               test/firmware/core_load_rule.cpp
                test/firmware/core_block_tail.cpp
                test/firmware/core_canvas.cpp
                test/firmware/core_chain_run.cpp

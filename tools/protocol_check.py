@@ -122,7 +122,8 @@ def check_get(link, rep, hello):
 
 
 def status_ok(st):
-    keys = ("cpu_mean", "cpu_worst", "late", "muted", "seq", "rec_errors", "serial_dropped", "stray_bytes")
+    keys = ("cpu_mean", "cpu_worst", "late", "muted", "seq", "rec_errors", "serial_dropped", "stray_bytes",
+            "held", "steps")
     return ok_reply(st) and all(k in st for k in keys)
 
 

@@ -43,7 +43,8 @@ Layouts, by name: default, crowd (Crowd in Unison's slot), chasm (the reverb slo
 crowd-chasm, octave-alone (the default with Autotune's slot empty), formant (Formant in Octave's slot),
 formant-alone (Formant with Autotune's slot empty), chatter (Chatter in Gate's slot), lofi (Lo-fi in Gate's
 slot), apraxia (Apraxia in Octave's slot), throat (Deepthroat in Distortion's slot) and heaviest (Input gate, Formant, Unison and
-Crowd, Gate, Distortion, Chatter and the default reverb, with the reverb on Chasm). The saved layout and CLEANUP EQ setting are read first and put back at the end,
+Crowd, Gate, Distortion, Chatter and the default reverb, with the reverb on Chasm) and costliest (the
+default with Apraxia, Mob, Deepthroat and Lo-fi swapped in, the dearest card of each SLOT row). The saved layout and CLEANUP EQ setting are read first and put back at the end,
 together with slots_live,
 knobs_live, clip off and the reverb engine, even when the run fails.
 
@@ -101,7 +102,7 @@ REPLY_WAIT_S = 5.0
 PORT_WAIT_S = 30.0
 TAIL_LINES = 20
 LAYOUT_NAMES = ("default", "crowd", "chasm", "crowd-chasm", "octave-alone", "formant", "formant-alone",
-                "chatter", "lofi", "apraxia", "throat", "heaviest")
+                "chatter", "lofi", "apraxia", "throat", "heaviest", "costliest")
 PORT_ERRORS = (cubevox_port.PortError, cubevox_port.PortGone)
 
 # Card id to the costs.h row that bounds it.
@@ -212,7 +213,10 @@ def layout_table():
     apraxia = ["formant_follow" if c == "octave" else c for c in base]
     throat = ["growl" if c == "distortion" else c for c in base]
     heaviest = ["input_gate", "formant", "unison", "crowd", "gate", "distortion", "bloom", reverbs[0]]
-    return {"default": (base, False), "crowd": (crowd, False), "chasm": (base, True), "crowd-chasm": (crowd, True),
+    # The costliest worst block the menu's SLOT rows can build: every swappable slot on its dearest card.
+    swaps = {"octave": "formant_follow", "unison": "crowd", "distortion": "growl", "gate": "lofi"}
+    costliest = [swaps.get(c, c) for c in base]
+    return {"costliest": (costliest, False),"default": (base, False), "crowd": (crowd, False), "chasm": (base, True), "crowd-chasm": (crowd, True),
             "octave-alone": (octave_alone, False), "formant": (formant, False), "formant-alone": (formant_alone, False),
             "chatter": (chatter, False), "lofi": (lofi, False), "apraxia": (apraxia, False), "throat": (throat, False),
             "heaviest": (heaviest, True)}

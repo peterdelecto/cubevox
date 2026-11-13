@@ -44,13 +44,15 @@ enum class UiAction : uint8_t {
 // Read-only state the screens draw. `layout` names the cards, `panel` holds the knob readings and
 // `settings` the menu values. `topSwitchOn` says the top switch sits in its engaged position,
 // whether it mutes or bypasses. `loadPercent` is the audio load the voice screen shows while the
-// DEBUG setting is on.
+// DEBUG setting is on. `heldMask` is the load rule's held slots, bit s for slot s, which the voice
+// screen's OVERLOAD row names.
 struct UiContext {
   const Layout& layout;
   const PanelReading& panel;
   const Settings& settings;
   bool topSwitchOn;
   int loadPercent = 0;
+  uint8_t heldMask = 0;
 };
 
 // The text of one screen: kDisplayRows rows of up to kDisplayCols characters, each NUL-terminated.

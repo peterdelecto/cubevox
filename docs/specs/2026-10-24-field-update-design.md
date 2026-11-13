@@ -27,8 +27,13 @@ copies the same `.uf2` file to the same drive. The firmware structure rules of
    show a "disk not ejected properly" notice (bootloader v0.06, owner 2026-11-01).
 5. If the copy is interrupted, the box comes back in update mode on its own, says why, and he drags
    again. If the box ever fails to start three times in a row it also comes back in update mode.
-   Holding MENU while switching the power on forces update mode. No action from outside the box
-   can leave it without a way back.
+   No action from outside the box can leave it without a way back. The bootloader enters update
+   mode in four cases only: a pending update request from the application (MENU > Update firmware
+   or `enter_dfu`), an image that fails its check, three failed starts, or a clock failure.
+   It reads no switch. Owner 2026-11-13: v0.09 removed MENU held at power-on, because the
+   bootloader read MENU at every reset, so a crash in the middle of a song with the singer's finger
+   on MENU ended on the silent update screen, and the menu's `Update firmware` item already
+   covers the path.
 
 ## Why a bootloader
 1. The ROM DFU needs dfu-util on the host and a BOOT0 press to recover from a bad image. BOOT0 is
@@ -186,13 +191,13 @@ A 32-byte header sits at application offset 0x400, after the 0x298-byte vector t
 2. `board_init2` adopts the block with the reset flags the clock step saved (power-on rule,
    section Shared boot block), then runs the option byte step (section Option bytes).
 3. `cvBootDecide()` (pure C, `firmware/bootloader/boards/cubevox/boot_decide.c`, shared with the
-   host tests) returns one of two actions from the block, the image check, the MENU switch and the
+   host tests) returns one of two actions from the block, the image check and the
    clock. `board_app_valid2` hands the action to TinyUF2. The first matching row wins.
 
 | Order | Condition | Action | `lastReason` |
 |---|---|---|---|
 | 1 | the crystal or PLL1 failed | update mode on HSI48 | `ClockFailed` |
-| 2 | MENU switch held at reset (PE13 low after 20 ms) | update mode | `MenuHeld` |
+| 2 | removed in v0.09 (was MENU held at reset); the number stays so the other rows keep theirs | — | — |
 | 3 | `request` = `0x53525643` after a read fault in the image | update mode, erase the faulting sector | `ImageUnreadable` (`ImageInvalid` when the fault named no sector) |
 | 4 | `request` = `0x53525643` otherwise | update mode | the stored reason, `BootFault` when none |
 | 5 | `request` = `0xF01669EF` | update mode | `AppRequest` |
@@ -234,7 +239,7 @@ A 32-byte header sits at application offset 0x400, after the 0x298-byte vector t
    window does not count, by design; a box that runs for minutes is a box Adam can still update
    from the menu, and a box that never reaches the menu is what the counter is for.
 10. Update mode leaves on its own after 60 s when no USB host has enumerated and the image is valid
-    and `lastReason` is `MenuHeld`, `AppRequest` or `BootFault`. That covers a confirm with no
+    and `lastReason` is `AppRequest` or `BootFault`. That covers a confirm with no
     computer attached. A cable pulled before anything was written starts the 60 s again. Once a
     host has enumerated, or a write has begun, or the image is invalid, there is no timeout.
 11. The mute relay K102 is open while the bootloader runs (MUTE_N idle low), so update mode is
@@ -316,6 +321,8 @@ A 32-byte header sits at application offset 0x400, after the 0x298-byte vector t
    after the last block, so `Installed:` follows the image check without a restart; the Mac shows
    the new text after it unmounts and mounts the drive. Bootloader v0.08 (drill 7 on board 1,
    2026-11-13: v0.07 rebuilt `INFO_UF2.TXT` only at a USB connect and kept the old version there).
+   `MenuHeld` stays in `enum CvBootReason` as a reserved value, so old `DIAG.TXT` entries still list;
+   no start writes it.
 
 ## OLED in update mode
 The bootloader drives the SH1106 over I2C2 (PB10/PB11) through `firmware/cubevox/src/board/sh1106.c`,
@@ -356,7 +363,7 @@ lines of 21 characters; the extension `uf2` never appears on screen because the 
 | Power loss mid-copy, no half-programmed word | CRC fails at next boot, update mode | `The update stopped.`, drive | `reason ImageInvalid` |
 | Power loss mid-copy, half-programmed word | read fault, sector erased, update mode | same | `reason ImageUnreadable, address` |
 | USB pulled mid-copy | host session ends, box waits | `The cable came out.`, drive returns when replugged | nothing; the next copy starts afresh |
-| USB pulled before a copy | the 60 s timeout starts again from the pull | the waiting screen, then normal | `reason AppRequest` or `MenuHeld` |
+| USB pulled before a copy | the 60 s timeout starts again from the pull | the waiting screen, then normal | `reason AppRequest` |
 | Wrong UF2 file dragged | every block refused, image intact | `That is not a cubevox firmware file.` | `blocks: 0 written, N refused, 0 failed, last family X` |
 | Non-UF2 file dragged (`.bin`, `.zip`) | nothing written, image intact | `That is not a cubevox firmware file.` | `wrong file: NAME.BIN` |
 | Flash write fails | not counted, the update cannot complete | `The update stopped.`; dropping the file again retries on erased sectors | `blocks: ... N failed, first failure at X` |
@@ -368,7 +375,7 @@ lines of 21 characters; the extension `uf2` never appears on screen because the 
 | New firmware crashes at start | 3 resets, update mode | `Startup failed.` | `reason BootFailed`, fault record |
 | New firmware hangs in `setup()` | the 16 s watchdog resets, 3 of those, update mode | `Startup failed.` | `reason BootFailed` |
 | New firmware works but sounds wrong | — | — | Adam drags the previous release file; every release stays downloadable |
-| Menu dead, app otherwise fine | hold MENU at power-on | `Drop the firmware on the CUBEVOX drive.` | `reason MenuHeld` |
+| Menu dead, app otherwise fine | `enter_dfu` from the Mac (`firmware/flash.sh`) | `Drop the firmware on the CUBEVOX drive.` | `reason AppRequest` |
 | Confirm with no computer | 60 s, back to the app | `Drop the firmware on the CUBEVOX drive.`, then normal | `reason AppRequest, timeout` |
 | 9 V dips or flickers | BOR resets at 2.7 V; a power-on clears the start count | normal start | nothing |
 | Power cut tears a layout save | the next start's scan faults and resets; the start after it copies the newest intact record to the other sector, then erases the faulted one | normal start on the last saved settings | a boot entry with the fault, `bus pc=... bfar=...` |
@@ -540,7 +547,7 @@ firmware/bootloader/
 | 7 | Copy a `.uf2` with one payload byte flipped | No reset; OLED `The update stopped.`; after a remount `INFO_UF2.TXT` `Installed: invalid` |
 | 8 | Bench op `f` (bus fault) three times inside 5 s of boot | Third reset lands in update mode, `DIAG.TXT` carries the fault record |
 | 9 | `set_layout`, update, `get_layout` | Same layout |
-| 10 | Operator holds MENU, cycles power | OLED `Drop the firmware on the CUBEVOX drive.`, `DIAG.TXT` reason `MenuHeld` |
+| 10 | Removed in v0.09 (was MENU held at power-on); the number stays so the others keep theirs | — |
 | 11 | `enter_dfu` with no USB data connection (power only) | Back to the application after 60 s |
 | 12 | Operator: MENU → Update firmware → click | Confirm screen shows the installed version, click enters update mode |
 | 13 | Release image copy, `hello` | `build == "release"`, version equals the file name, `serial` equals the UID |

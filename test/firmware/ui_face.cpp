@@ -141,7 +141,9 @@ struct FaceRig {
   bool switchOn = false;
   int loadPercent = 0;
 
-  UiContext ctx() const { return UiContext{layout, panel, settings, switchOn, loadPercent}; }
+  uint8_t heldMask = 0;
+
+  UiContext ctx() const { return UiContext{layout, panel, settings, switchOn, loadPercent, heldMask}; }
 
   ScopeRing ring;
   uint32_t sampleAt = 0;  // the next sample of the output tone
@@ -710,6 +712,48 @@ void checkLoadFigureAbsent() {
   check(sameCanvas(menu.live, menuScreen), "face: the menu has no figure with DEBUG on");
 }
 
+// The OVERLOAD row shows on the voice screen from the next tick on, walks with the screen, leaves with
+// the hold, and shows on no other screen.
+void checkOverloadRow() {
+  FaceRig r;
+  r.ticks(3);
+  check(sameCanvas(r.live, lineScreen()), "face: nothing held, no OVERLOAD row");
+
+  r.heldMask = static_cast<uint8_t>(1u << 7);
+  r.tick();
+  Canvas want = lineScreen();
+  want.drawText(1, 1, font5x7(), "OVERLOAD: SPRING");
+  check(sameCanvas(r.live, want), "face: a held card shows as one 5x7 row at the top left");
+
+  r.heldMask = static_cast<uint8_t>((1u << 7) | (1u << 2));
+  r.tick();
+  want = lineScreen();
+  want.drawText(1, 1, font5x7(), "OVERLOAD: 2 CARDS");
+  check(sameCanvas(r.live, want), "face: two held cards read the count");
+
+  r.ticks(static_cast<int>(kWalkStepMs / kUiTickMs) + 10);
+  Canvas shifted = lineScreen(1, 0);
+  shifted.drawText(2, 1, font5x7(), "OVERLOAD: 2 CARDS");
+  check(sameCanvas(r.live, shifted), "face: the OVERLOAD row walks with the voice screen");
+
+  r.heldMask = 0;
+  r.tick();
+  check(sameCanvas(r.live, lineScreen(1, 0)), "face: a card released takes its row away");
+
+  FaceRig toggle;
+  toggle.heldMask = 1u << 7;
+  toggle.ticks(3);
+  toggle.flip(5, true);
+  toggle.ticks(4);
+  check(sameCanvas(toggle.live, toggleScreen(toggle.layout, 5, true)), "face: the toggle readout has no OVERLOAD row");
+
+  FaceRig muted;
+  muted.heldMask = 1u << 7;
+  muted.switchOn = true;
+  muted.ticks(5);
+  check(matchesGolden(muted.live, "muted-3"), "face: the MUTED screen has no OVERLOAD row");
+}
+
 // True when the panel's last column, which the trace leaves blank, holds no lit pixel.
 bool darkFrom127(const Canvas& c) {
   for (int y = 0; y < kCanvasHeight; ++y) {
@@ -905,6 +949,7 @@ void checkFace() {
   checkWalkOnPanel();
   checkLoadFigure();
   checkLoadFigureAbsent();
+  checkOverloadRow();
   checkVoiceLevels();
   checkEachOwnsItsSource();
   checkOutputHissIsSilence();

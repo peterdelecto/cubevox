@@ -184,7 +184,7 @@ DrumSynthV3 are references to read, and nothing in `firmware/` is copied from th
   whose header version differs from `VERSION.txt` and exits 1 unless the boot report that follows names the
   version it flashed.
 - `bringup.py`: first-article checks for a new board over USB, optional fault, ROM-DFU and update drills
-  (`--faults`, `--dfu`, `--flood`, `--update`, the last one being spec drills 1 to 13), operator questions, log to
+  (`--faults`, `--dfu`, `--flood`, `--update`, the last one being spec drills 1 to 13, 10 removed), operator questions, log to
   `hardware/bringup/`. `./bringup.py --board 1 --faults --update`. It checks its panel thresholds, block rate
   and SAI clock against the firmware through `tools/bench_ops_check.py`. `--dfu` stops at once when dfu-util is
   missing. Drill 1 fails a unit whose option bytes are not BOR level 3 with sector 0 protected. The final summary
@@ -278,7 +278,7 @@ DrumSynthV3 are references to read, and nothing in `firmware/` is copied from th
   is 1 to 31 printable ASCII characters. `status` reports CPU mean and worst since the previous `status` (its own
   window; the bench peaks are untouched), cumulative `late` and `dry_blocks` (the blocks that skipped the chain and
   passed the dry input after a late one), `muted`, the record `seq` and `rec_errors`,
-  `serial_dropped`, `stray_bytes`, `boot_fails`, `update_reason`, the audio counters `overruns`, `sai_errors`,
+  `serial_dropped`, `stray_bytes`, `boot_fails`, `update_reason`, the load rule's `held` and `steps`, the audio counters `overruns`, `sai_errors`,
   `restarts` and `nan_blocks`, and `power_trips`, `stalled` and `reply_overflows`. All output
   (replies, boot report, bench prints) goes through `serialOut()`, a bounded queue (`core/tx_queue`) that
   `serialLinkPoll` drains each pass with non-blocking writes sized by `Serial.availableForWrite()`; a line that does not fit is dropped whole and counted, and with no host connected

@@ -106,8 +106,8 @@ CvBootBlock bootBlock() {
   return b;
 }
 
-CvBootInputs inputs(bool menuHeld, CvImageStatus image, uint32_t clockStep = 0) {
-  return CvBootInputs{menuHeld, image, clockStep};
+CvBootInputs inputs(CvImageStatus image, uint32_t clockStep = 0) {
+  return CvBootInputs{image, clockStep};
 }
 
 bool decided(const CvBootDecision& d, CvBootAction action, CvBootReason reason, uint32_t erase = 0) {
@@ -123,8 +123,8 @@ CvBootDecision decide(CvBootBlock& b, const CvBootInputs& in, uint32_t resetFlag
   return d;
 }
 
-CvBootDecision decide(CvBootBlock& b, bool menuHeld, CvImageStatus image) {
-  return decide(b, inputs(menuHeld, image));
+CvBootDecision decide(CvBootBlock& b, CvImageStatus image) {
+  return decide(b, inputs(image));
 }
 
 CvFaultInfo faultAt(uint32_t eccAddress, bool imageReading, bool updateMode) {
@@ -140,24 +140,19 @@ void recordFault(CvBootBlock& b, uint32_t eccAddress, bool imageReading = false,
 // One block per row of the decision table, set up so that only that row applies.
 void checkBootRows() {
   CvBootBlock b = bootBlock();
-  check(decided(decide(b, true, CvImageValid), CvActionUpdateMode, CvReasonMenuHeld), "boot: row 1, MENU held");
-  check(b.lastReason == CvReasonMenuHeld && cvBootFailsGet(&b) == 0,
-        "boot: row 1 stores the reason and leaves the counter");
-
-  b = bootBlock();
   b.request = CV_REQUEST_UPDATE;
-  check(decided(decide(b, false, CvImageValid), CvActionUpdateMode, CvReasonAppRequest),
+  check(decided(decide(b, CvImageValid), CvActionUpdateMode, CvReasonAppRequest),
         "boot: row 2, request from the application");
   check(b.lastReason == CvReasonAppRequest, "boot: row 2 stores the reason");
 
   b = bootBlock();
-  check(decided(decide(b, false, CvImageInvalid), CvActionUpdateMode, CvReasonImageInvalid),
+  check(decided(decide(b, CvImageInvalid), CvActionUpdateMode, CvReasonImageInvalid),
         "boot: row 3, invalid image");
   check(b.lastReason == CvReasonImageInvalid, "boot: row 3 stores the reason");
 
   b = bootBlock();
   recordFault(b, kAppSector3);
-  const CvBootDecision unreadable = decide(b, false, CvImageValid);
+  const CvBootDecision unreadable = decide(b, CvImageValid);
   check(decided(unreadable, CvActionUpdateMode, CvReasonImageUnreadable, 0x08060000u) && unreadable.imageReadable,
         "boot: row 4, read fault yields its sector, and the image is read after the erase");
   check(b.lastReason == CvReasonImageUnreadable && b.faultAddress == kAppSector3,
@@ -165,13 +160,13 @@ void checkBootRows() {
 
   b = bootBlock();
   cvBootFailsSet(&b, CV_BOOT_FAIL_LIMIT);
-  check(decided(decide(b, false, CvImageValid), CvActionUpdateMode, CvReasonBootFailed),
+  check(decided(decide(b, CvImageValid), CvActionUpdateMode, CvReasonBootFailed),
         "boot: row 5, three failed starts");
   check(cvBootFailsGet(&b) == CV_BOOT_FAIL_LIMIT && b.lastReason == CvReasonBootFailed,
         "boot: row 5 stores the reason and leaves the counter");
 
   b = bootBlock();
-  check(decided(decide(b, false, CvImageValid), CvActionRunApp, CvReasonNone), "boot: row 6, run the application");
+  check(decided(decide(b, CvImageValid), CvActionRunApp, CvReasonNone), "boot: row 6, run the application");
   check(cvBootFailsGet(&b) == 1 && cvBootFailsValid(&b), "boot: row 6 counts the start and writes the check word");
 }
 
@@ -180,32 +175,24 @@ void checkBootPriority() {
   CvBootBlock b = bootBlock();
   b.request = CV_REQUEST_UPDATE;
   cvBootFailsSet(&b, CV_BOOT_FAIL_LIMIT);
-  check(decided(decide(b, true, CvImageInvalid), CvActionUpdateMode, CvReasonMenuHeld),
-        "boot: MENU held beats a request, an invalid image and a failed count");
-
   b.request = CV_REQUEST_UPDATE;
-  check(decided(decide(b, false, CvImageInvalid), CvActionUpdateMode, CvReasonAppRequest),
+  check(decided(decide(b, CvImageInvalid), CvActionUpdateMode, CvReasonAppRequest),
         "boot: a request beats an invalid image and a failed count");
-  check(decided(decide(b, false, CvImageInvalid), CvActionUpdateMode, CvReasonImageInvalid),
+  check(decided(decide(b, CvImageInvalid), CvActionUpdateMode, CvReasonImageInvalid),
         "boot: an invalid image beats a failed count");
-  check(decided(decide(b, false, CvImageValid), CvActionUpdateMode, CvReasonBootFailed),
+  check(decided(decide(b, CvImageValid), CvActionUpdateMode, CvReasonBootFailed),
         "boot: a failed count alone stays in update mode");
 
   b = bootBlock();
   recordFault(b, kAppSector3);
   cvBootFailsSet(&b, CV_BOOT_FAIL_LIMIT);
-  check(decided(decide(b, false, CvImageInvalid), CvActionUpdateMode, CvReasonImageUnreadable, 0x08060000u),
+  check(decided(decide(b, CvImageInvalid), CvActionUpdateMode, CvReasonImageUnreadable, 0x08060000u),
         "boot: a pending read fault beats an invalid image and a failed count");
-
-  b = bootBlock();
-  recordFault(b, kAppSector3);
-  check(decided(decide(b, true, CvImageValid), CvActionUpdateMode, CvReasonMenuHeld, 0x08060000u),
-        "boot: MENU held names the reason but a pending read fault still yields its sector");
 
   b = bootBlock();
   b.request = CV_REQUEST_UPDATE;
   recordFault(b, 0u);
-  check(decided(decide(b, false, CvImageValid), CvActionUpdateMode, CvReasonBootFault),
+  check(decided(decide(b, CvImageValid), CvActionUpdateMode, CvReasonBootFault),
         "boot: the bootloader's resume request names its own reason");
 }
 
@@ -214,24 +201,24 @@ void checkBootCounter() {
   b.bootFails = 7;
   b.bootFailsCheck = 0x12345678u;
   check(!cvBootFailsValid(&b) && cvBootFailsGet(&b) == 0, "boot: a counter whose check word disagrees reads as 0");
-  check(decided(decide(b, false, CvImageValid), CvActionRunApp, CvReasonNone) && cvBootFailsGet(&b) == 1 &&
+  check(decided(decide(b, CvImageValid), CvActionRunApp, CvReasonNone) && cvBootFailsGet(&b) == 1 &&
             cvBootFailsValid(&b),
         "boot: with a garbage check word the next start counts as the first");
 
   b = bootBlock();
   for (uint32_t n = 1; n <= CV_BOOT_FAIL_LIMIT; ++n) {
-    const CvBootDecision d = decide(b, false, CvImageValid);
+    const CvBootDecision d = decide(b, CvImageValid);
     check(d.action == CvActionRunApp && cvBootFailsGet(&b) == n, "boot: starts below the limit run and count");
   }
   for (int i = 0; i < 3; ++i) {
-    check(decided(decide(b, false, CvImageValid), CvActionUpdateMode, CvReasonBootFailed) &&
+    check(decided(decide(b, CvImageValid), CvActionUpdateMode, CvReasonBootFailed) &&
               cvBootFailsGet(&b) == CV_BOOT_FAIL_LIMIT,
           "boot: at the limit update mode stays and the counter stays put");
   }
 
   b = bootBlock();
   cvBootFailsSet(&b, 0xFFFFFFFFu);
-  check(decided(decide(b, false, CvImageValid), CvActionUpdateMode, CvReasonBootFailed) &&
+  check(decided(decide(b, CvImageValid), CvActionUpdateMode, CvReasonBootFailed) &&
             cvBootFailsGet(&b) == 0xFFFFFFFFu,
         "boot: a huge valid count stays in update mode without wrapping");
 }
@@ -270,7 +257,7 @@ void checkBootPowerOn() {
   std::strcpy(b.appSummary, "v2.00.10 up 5 s");
   b.appFieldsVersion = 3;
   b.optionBytes = CvOptionTimeout;
-  check(decided(decide(b, inputs(false, CvImageValid), kPowerOn), CvActionRunApp, CvReasonNone) &&
+  check(decided(decide(b, inputs(CvImageValid), kPowerOn), CvActionRunApp, CvReasonNone) &&
             cvBootFailsGet(&b) == 1,
         "boot: a power-on clears the counter and the request, and the start counts as the first");
   check(b.lastReason == CvReasonNone && b.appSummary[0] == '\0' && b.appFieldsVersion == 0 &&
@@ -279,27 +266,27 @@ void checkBootPowerOn() {
 
   b = bootBlock();
   for (int dip = 0; dip < 5; ++dip) {
-    check(decide(b, inputs(false, CvImageValid), kPowerOn).action == CvActionRunApp,
+    check(decide(b, inputs(CvImageValid), kPowerOn).action == CvActionRunApp,
           "boot: power dips inside the healthy window never reach Startup failed");
   }
 }
 
 void checkBootRestartsCount() {
   CvBootBlock b = bootBlock();
-  decide(b, inputs(false, CvImageValid), kPowerOn);
+  decide(b, inputs(CvImageValid), kPowerOn);
   for (uint32_t n = 2; n <= CV_BOOT_FAIL_LIMIT; ++n) {
-    check(decide(b, inputs(false, CvImageValid), kPowerOn | CV_RSR_SFTRSTF).action == CvActionRunApp &&
+    check(decide(b, inputs(CvImageValid), kPowerOn | CV_RSR_SFTRSTF).action == CvActionRunApp &&
               cvBootFailsGet(&b) == n,
           "boot: a crash before the application clears the flags still counts");
   }
-  check(decided(decide(b, inputs(false, CvImageValid), kPowerOn | CV_RSR_IWDG1RSTF), CvActionUpdateMode,
+  check(decided(decide(b, inputs(CvImageValid), kPowerOn | CV_RSR_IWDG1RSTF), CvActionUpdateMode,
                 CvReasonBootFailed),
         "boot: a hang the watchdog ends counts, so the third failure stays in update mode");
 
   b = bootBlock();
   cvBootAdopt(&b, kPowerOn);
   recordFault(b, kAppSector3, true, false);
-  check(decided(decide(b, inputs(false, CvImageInvalid), kPowerOn | CV_RSR_SFTRSTF), CvActionUpdateMode,
+  check(decided(decide(b, inputs(CvImageInvalid), kPowerOn | CV_RSR_SFTRSTF), CvActionUpdateMode,
                 CvReasonImageUnreadable, 0x08060000u),
         "boot: a read fault in the first start after power-on survives its own reset");
 }
@@ -311,7 +298,7 @@ void checkBootGarbage() {
   for (const uint8_t fill : fills) {
     CvBootBlock b;
     std::memset(&b, fill, sizeof b);
-    check(decided(decide(b, inputs(false, CvImageValid), kPowerOn), CvActionRunApp, CvReasonNone) &&
+    check(decided(decide(b, inputs(CvImageValid), kPowerOn), CvActionRunApp, CvReasonNone) &&
               cvBootFailsGet(&b) == 1,
           "boot: a garbage block at power-on gives a first start");
     bool clean = b.lastReason == CvReasonNone && b.faultAddress == 0 && b.bootFaultPc == 0 &&
@@ -325,7 +312,7 @@ void checkBootGarbage() {
   CvBootBlock b;
   std::memset(&b, 0xA5, sizeof b);
   b.blockVersion = 0;
-  check(decided(decide(b, false, CvImageValid), CvActionRunApp, CvReasonNone) && cvBootFailsGet(&b) == 1 &&
+  check(decided(decide(b, CvImageValid), CvActionRunApp, CvReasonNone) && cvBootFailsGet(&b) == 1 &&
             b.appSummary[0] == '\0',
         "boot: a block no bootloader initialised is cleared on any reset");
 }
@@ -342,7 +329,7 @@ void checkBootJunkAfterRomSession() {
       state = state * 1664525u + 1013904223u;
       bytes[i] = static_cast<uint8_t>(state >> 24);
     }
-    const CvBootDecision d = decide(b, inputs(false, CvImageValid), kSoftware);
+    const CvBootDecision d = decide(b, inputs(CvImageValid), kSoftware);
     check(decided(d, CvActionRunApp, CvReasonNone) && cvBootFailsGet(&b) == 1,
           "boot: a junk block after a system reset gives a first start");
     check(b.bootFaultPc == 0 && b.bootFaultCfsr == 0 && b.bootFaultHfsr == 0 && b.bootFaultBfar == 0,
@@ -362,7 +349,7 @@ void checkBootSeal() {
   // The bootloader's own fault, recorded before a system reset, reaches the application.
   CvBootBlock b = bootBlock();
   recordFault(b, 0u);
-  decide(b, inputs(false, CvImageValid), kSoftware);
+  decide(b, inputs(CvImageValid), kSoftware);
   check(b.bootFaultPc == 0x08001234u && b.bootFaultCfsr == 0x00008200u && cvBootBlockInitialised(&b),
         "boot: a real bootloader fault survives the reset and the application accepts the block");
 
@@ -371,7 +358,7 @@ void checkBootSeal() {
   cvBootFailsSet(&b, 2);
   b.request = CV_REQUEST_UPDATE;
   std::strcpy(b.appSummary, "v2.01.52 up 7 s");
-  check(decided(decide(b, false, CvImageValid), CvActionUpdateMode, CvReasonAppRequest) &&
+  check(decided(decide(b, CvImageValid), CvActionUpdateMode, CvReasonAppRequest) &&
             cvBootFailsGet(&b) == 2 && std::strcmp(b.appSummary, "v2.01.52 up 7 s") == 0,
         "boot: a sealed block keeps its counter, request and summary across a system reset");
 
@@ -395,7 +382,7 @@ void checkBootSeal() {
   b.blockVersion = 2;
   b.blockSeal = 0;
   cvBootFailsSet(&b, 1);
-  check(decided(decide(b, false, CvImageValid), CvActionRunApp, CvReasonNone) && cvBootFailsGet(&b) == 1 &&
+  check(decided(decide(b, CvImageValid), CvActionRunApp, CvReasonNone) && cvBootFailsGet(&b) == 1 &&
             cvBootBlockSealed(&b),
         "boot: a version 2 block is cleared by the new bootloader and comes out sealed");
 
@@ -409,16 +396,16 @@ void checkBootSeal() {
 // than version 2 gets none.
 void checkBootResetFlags() {
   CvBootBlock b = bootBlock();
-  decide(b, inputs(false, CvImageValid), kPowerOn);
+  decide(b, inputs(CvImageValid), kPowerOn);
   check(b.resetFlags == kPowerOn, "boot: a start stores the flags it read in the block");
-  decide(b, inputs(false, CvImageValid), kSoftware);
+  decide(b, inputs(CvImageValid), kSoftware);
   check(b.resetFlags == kSoftware, "boot: the next start replaces them with its own");
   check(cvBootBlockResetFlags(&b) == kSoftware,
         "boot: the application takes the flags from the block when the live register reads 0");
 
   CvBootBlock garbage;
   std::memset(&garbage, 0xA5, sizeof garbage);
-  decide(garbage, inputs(false, CvImageValid), kPowerOn);
+  decide(garbage, inputs(CvImageValid), kPowerOn);
   check(garbage.resetFlags == kPowerOn, "boot: a power-on clears the block and then stores the flags");
 
   CvFaultInfo early = faultAt(0u, false, false);
@@ -440,19 +427,19 @@ void checkBootResetFlags() {
 void checkBootStaleFields() {
   CvBootBlock b = bootBlock();
   b.lastReason = 0xDEADBEEFu;
-  decide(b, false, CvImageValid);
+  decide(b, CvImageValid);
   check(b.lastReason == CvReasonNone, "boot: an out-of-range reason is cleared, it indexes name tables");
 
   b = bootBlock();
   b.lastReason = 0xDEADBEEFu;
   b.request = CV_REQUEST_UPDATE;
-  check(decided(decide(b, false, CvImageValid), CvActionUpdateMode, CvReasonAppRequest),
+  check(decided(decide(b, CvImageValid), CvActionUpdateMode, CvReasonAppRequest),
         "boot: a request with a garbage reason is a plain request");
 
   b = bootBlock();
   std::strcpy(b.appSummary, "v2.00.10 up 5 s");
   b.request = CV_REQUEST_UPDATE;
-  decide(b, false, CvImageValid);
+  decide(b, CvImageValid);
   check(std::strcmp(b.appSummary, "v2.00.10 up 5 s") == 0, "boot: a decision keeps the application's summary");
 }
 
@@ -465,12 +452,12 @@ void checkBootVersions() {
   b.appFieldsVersion = 2;
   b.appReserved[0] = 0x5A;
   check(cvBootBlockInitialised(&b), "boot: a later block version counts as initialised");
-  decide(b, false, CvImageValid);
+  decide(b, CvImageValid);
   check(std::strcmp(b.appSummary, "v3.00.00 up 9 s") == 0 && b.appFieldsVersion == 2 && b.appReserved[0] == 0x5A,
         "boot: a later block version keeps the application's summary and fields");
 
   recordFault(b, 0u);
-  decide(b, false, CvImageValid);
+  decide(b, CvImageValid);
   cvBootMarkUpdated(&b);
   check(b.appFieldsVersion == 2 && b.appReserved[0] == 0x5A,
         "boot: faults and updates never touch the application's area");
@@ -503,7 +490,7 @@ void checkBootReadFault() {
     check(b.request == CV_REQUEST_RESUME && b.lastReason == CvReasonImageUnreadable && b.faultAddress == c.address,
           "boot: recording a read fault sets the resume request, the reason and the address");
     std::snprintf(message, sizeof message, "boot: read fault at %s", c.what);
-    const CvBootDecision d = decide(b, false, CvImageInvalid);
+    const CvBootDecision d = decide(b, CvImageInvalid);
     check(decided(d, CvActionUpdateMode, c.reason, c.erase) && d.imageReadable == (c.erase != 0), message);
     check(b.faultAddress == c.address, "boot: the fault address stays for DIAG.TXT");
   }
@@ -515,21 +502,21 @@ void checkBootReadFaultAfter() {
   recordFault(b, 0u, true, false);
   check(b.request == CV_REQUEST_RESUME && b.lastReason == CvReasonImageUnreadable && b.faultAddress == 0,
         "boot: any fault while the image is read is an unreadable image");
-  const CvBootDecision blind = decide(b, false, CvImageInvalid);
+  const CvBootDecision blind = decide(b, CvImageInvalid);
   check(decided(blind, CvActionUpdateMode, CvReasonImageInvalid) && !blind.imageReadable,
         "boot: an unreadable image with no sector to erase is not read again, so the fault cannot loop");
 
   b = bootBlock();
   recordFault(b, kAppSector3);
-  decide(b, false, CvImageInvalid);
-  check(decided(decide(b, false, CvImageInvalid), CvActionUpdateMode, CvReasonImageInvalid) && b.faultAddress == 0,
+  decide(b, CvImageInvalid);
+  check(decided(decide(b, CvImageInvalid), CvActionUpdateMode, CvReasonImageInvalid) && b.faultAddress == 0,
         "boot: the sector is yielded once, a later start sees a plain invalid image");
 
   b = bootBlock();
   b.lastReason = CvReasonImageUnreadable;
   b.request = CV_REQUEST_UPDATE;
   b.faultAddress = kAppSector3;
-  check(decided(decide(b, false, CvImageValid), CvActionUpdateMode, CvReasonAppRequest),
+  check(decided(decide(b, CvImageValid), CvActionUpdateMode, CvReasonAppRequest),
         "boot: the application's request never reads as a read fault, whatever reason is left over");
 }
 
@@ -537,7 +524,7 @@ void checkBootReadFaultAfter() {
 // update mode brings the box back to update mode with the same reason.
 void checkBootBank2Fault() {
   const uint32_t addresses[] = {0x08100000u, 0x08145678u, 0x081FFFE0u};
-  const CvBootReason reasons[] = {CvReasonMenuHeld, CvReasonAppRequest, CvReasonImageInvalid,
+  const CvBootReason reasons[] = {CvReasonAppRequest, CvReasonImageInvalid,
                                   CvReasonBootFailed};
   for (const uint32_t address : addresses) {
     for (const CvBootReason reason : reasons) {
@@ -546,7 +533,7 @@ void checkBootBank2Fault() {
       recordFault(b, address, false, true);
       check(b.request == CV_REQUEST_RESUME && b.lastReason == reason && b.faultAddress == address,
             "boot: a bank 2 fault in update mode asks to resume and keeps the reason and the address");
-      const CvBootDecision d = decide(b, false, CvImageInvalid);
+      const CvBootDecision d = decide(b, CvImageInvalid);
       check(decided(d, CvActionUpdateMode, reason) && d.imageReadable && b.faultAddress == address,
             "boot: after a bank 2 fault update mode resumes for the same reason, with no erase");
     }
@@ -554,9 +541,9 @@ void checkBootBank2Fault() {
     CvBootBlock b = bootBlock();
     recordFault(b, address, false, false);
     check(b.request == 0 && b.faultAddress == address, "boot: a bank 2 fault outside update mode asks for nothing");
-    check(decided(decide(b, false, CvImageValid), CvActionRunApp, CvReasonNone) && b.faultAddress == address,
+    check(decided(decide(b, CvImageValid), CvActionRunApp, CvReasonNone) && b.faultAddress == address,
           "boot: after a bank 2 fault a valid image runs and the address stays");
-    check(decided(decide(b, false, CvImageValid), CvActionRunApp, CvReasonNone) && b.faultAddress == address &&
+    check(decided(decide(b, CvImageValid), CvActionRunApp, CvReasonNone) && b.faultAddress == address &&
               cvBootFailsGet(&b) == 2,
           "boot: the address outlasts further starts until the application clears it");
   }
@@ -564,7 +551,7 @@ void checkBootBank2Fault() {
   CvBootBlock b = bootBlock();
   recordFault(b, 0x08145678u, false, true);
   recordFault(b, kAppSector3, false, true);
-  check(decided(decide(b, false, CvImageInvalid), CvActionUpdateMode, CvReasonImageUnreadable, 0x08060000u),
+  check(decided(decide(b, CvImageInvalid), CvActionUpdateMode, CvReasonImageUnreadable, 0x08060000u),
         "boot: an application fault after a bank 2 fault still yields its sector");
 }
 
@@ -576,12 +563,12 @@ void checkBootFaultRegisters() {
   check(b.request == CV_REQUEST_RESUME && b.lastReason == CvReasonBootFault && b.bootFaultPc == 0x08001234u &&
             b.bootFaultCfsr == 0x8200u && b.bootFaultHfsr == 0x40000000u && b.faultAddress == 0,
         "boot: a bootloader fault records its registers and asks for update mode");
-  const CvBootDecision d = decide(b, false, CvImageInvalid);
+  const CvBootDecision d = decide(b, CvImageInvalid);
   check(decided(d, CvActionUpdateMode, CvReasonBootFault) && d.imageReadable,
         "boot: a bootloader fault returns to update mode and the image is read after the decision");
   check(cvBootTimeoutAllowed(&b, CvImageValid, false, false), "boot: a bootloader fault times out on a valid image");
   check(!cvBootTimeoutAllowed(&b, CvImageInvalid, false, false), "boot: never on an invalid one");
-  check(decided(decide(b, false, CvImageValid), CvActionRunApp, CvReasonNone) && b.bootFaultPc == 0x08001234u,
+  check(decided(decide(b, CvImageValid), CvActionRunApp, CvReasonNone) && b.bootFaultPc == 0x08001234u,
         "boot: after the timeout the application runs and the registers stay for its report");
 
   cvBootMarkUpdated(&b);
@@ -594,7 +581,7 @@ void checkBootFaultRegisters() {
   early.blockAdopted = false;
   early.resetFlags = kPowerOn;
   cvBootRecordFault(&garbage, &early);
-  check(decided(decide(garbage, inputs(false, CvImageInvalid), kPowerOn | CV_RSR_SFTRSTF), CvActionUpdateMode,
+  check(decided(decide(garbage, inputs(CvImageInvalid), kPowerOn | CV_RSR_SFTRSTF), CvActionUpdateMode,
                 CvReasonImageUnreadable, 0x08060000u) &&
             garbage.appSummary[0] == '\0',
         "boot: a fault before the block was adopted adopts it first, so its record survives clean");
@@ -604,17 +591,17 @@ void checkBootFaultRegisters() {
 void checkBootFaultRepeats() {
   CvBootBlock b = bootBlock();
   recordFault(b, 0u, false, true);
-  decide(b, false, CvImageInvalid);
+  decide(b, CvImageInvalid);
   recordFault(b, 0u, false, true);
   check(b.request == 0 && b.lastReason == CvReasonBootFault,
         "boot: a second fault inside the update mode a first one started asks for nothing");
-  check(decided(decide(b, false, CvImageValid), CvActionRunApp, CvReasonNone),
+  check(decided(decide(b, CvImageValid), CvActionRunApp, CvReasonNone),
         "boot: so a bootloader fault that repeats in update mode cannot keep a valid image from running");
 
   b = bootBlock();
   int faultScreens = 0;
   for (int start = 0; start < 12 && b.lastReason != CvReasonBootFailed; ++start) {
-    const CvBootReason reason = decide(b, false, CvImageValid).reason;
+    const CvBootReason reason = decide(b, CvImageValid).reason;
     if (reason == CvReasonNone) {
       recordFault(b, 0u, false, false);  // a fault on the way to the application, every time
     } else if (reason == CvReasonBootFault) {
@@ -625,21 +612,53 @@ void checkBootFaultRepeats() {
         "boot: a fault before every jump ends in Startup failed through the start counter");
 }
 
+// The inputs are the image and the clock step, so no pin can change a decision. MenuHeld stays in
+// the enum for old logs and no start produces it.
+void checkBootNoMenuReason() {
+  static_assert(sizeof(CvBootInputs) == sizeof(CvImageStatus) + sizeof(uint32_t),
+                "CvBootInputs carries the image and the clock step only");
+  int menuReasons = 0;
+  for (const uint32_t request : {0u, CV_REQUEST_UPDATE, CV_REQUEST_RESUME}) {
+    for (const uint32_t last : {0u, 1u, 2u, 3u, 4u, 5u, 6u, 7u}) {
+      for (const uint32_t fails : {0u, CV_BOOT_FAIL_LIMIT}) {
+        for (const CvImageStatus image : {CvImageValid, CvImageInvalid}) {
+          for (const uint32_t clock : {0u, static_cast<uint32_t>(CvClockStepOscillator)}) {
+            CvBootBlock b = bootBlock();
+            b.request = request;
+            b.lastReason = last;
+            cvBootFailsSet(&b, fails);
+            if (decide(b, inputs(image, clock)).reason == CvReasonMenuHeld) ++menuReasons;
+          }
+        }
+      }
+    }
+  }
+  check(menuReasons == 0, "boot: no block, image or clock produces the MenuHeld reason");
+
+  CvBootBlock b = bootBlock();
+  b.request = CV_REQUEST_RESUME;
+  b.lastReason = CvReasonMenuHeld;
+  check(decided(decide(b, CvImageValid), CvActionUpdateMode, CvReasonBootFault),
+        "boot: a resume with the reserved MenuHeld reason reads as a bootloader fault");
+  check(decided(decide(b = bootBlock(), CvImageValid), CvActionRunApp, CvReasonNone),
+        "boot: a healthy start runs the application with nothing else to read");
+}
+
 void checkBootClock() {
   CvBootBlock b = bootBlock();
-  check(decided(decide(b, inputs(true, CvImageValid, CvClockStepOscillator)), CvActionUpdateMode,
+  check(decided(decide(b, inputs(CvImageValid, CvClockStepOscillator)), CvActionUpdateMode,
                 CvReasonClockFailed),
-        "boot: a failed clock beats MENU, because the application cannot run");
+        "boot: a failed clock beats everything else, because the application cannot run");
   check(!cvBootTimeoutAllowed(&b, CvImageValid, false, false), "boot: a failed clock never times out");
 
   b = bootBlock();
   recordFault(b, kAppSector3);
-  check(decided(decide(b, inputs(false, CvImageValid, CvClockStepClockTree)), CvActionUpdateMode,
+  check(decided(decide(b, inputs(CvImageValid, CvClockStepClockTree)), CvActionUpdateMode,
                 CvReasonClockFailed, 0x08060000u),
         "boot: a failed clock still erases the sector a read fault names");
 
   b = bootBlock();
-  check(decide(b, inputs(false, CvImageValid, 0)).action == CvActionRunApp, "boot: clock step 0 is a running clock");
+  check(decide(b, inputs(CvImageValid, 0)).action == CvActionRunApp, "boot: clock step 0 is a running clock");
 }
 
 void checkBootTimeout() {
@@ -652,15 +671,16 @@ void checkBootTimeout() {
       CvBootBlock b = bootBlock();
       b.lastReason = reason;
       const bool leavable =
-          reason == CvReasonMenuHeld || reason == CvReasonAppRequest || reason == CvReasonBootFault;
+          reason == CvReasonAppRequest || reason == CvReasonBootFault;
       const bool want = leavable && image == CvImageValid && !host && !written;
       if (cvBootTimeoutAllowed(&b, image, host, written) != want) ++wrong;
     }
   }
-  check(wrong == 0, "boot: the timeout needs MenuHeld, AppRequest or BootFault, a valid image, no host, no write");
+  check(wrong == 0, "boot: the timeout needs AppRequest or BootFault, a valid image, no host, no write");
 
   CvBootBlock b = bootBlock();
-  decide(b, true, CvImageValid);
+  b.request = CV_REQUEST_UPDATE;
+  decide(b, CvImageValid);
   check(cvBootTimeoutAllowed(&b, CvImageValid, false, false), "boot: a menu entry with no computer times out");
   check(!cvBootTimeoutAllowed(&b, CvImageValid, true, false), "boot: a host that enumerated ends the timeout");
   check(!cvBootTimeoutAllowed(&b, CvImageValid, false, true), "boot: a write that began ends the timeout");
@@ -680,18 +700,19 @@ void checkBootMarkUpdated() {
         "boot: an update clears the request, the reason and the fault address");
   check(b.appSummary[0] == '\0' && b.blockVersion == CV_BOOT_BLOCK_VERSION,
         "boot: an update clears the old application's summary");
-  check(decided(decide(b, false, CvImageValid), CvActionRunApp, CvReasonNone),
+  check(decided(decide(b, CvImageValid), CvActionRunApp, CvReasonNone),
         "boot: after an update the next start runs the application");
 
   // A torn log word DIAG.TXT faulted on, then an update in the same update mode.
   constexpr uint32_t kLogWord = CV_DIAG_LOG_ADDR + 0x1230u;
   b = bootBlock();
-  decide(b, true, CvImageValid);
+  b.request = CV_REQUEST_UPDATE;
+  decide(b, CvImageValid);
   recordFault(b, kLogWord, false, true);
-  decide(b, false, CvImageValid);
+  decide(b, CvImageValid);
   cvBootMarkUpdated(&b);
   check(b.faultAddress == kLogWord, "boot: an update keeps a bank 2 fault address for the new application");
-  decide(b, false, CvImageValid);
+  decide(b, CvImageValid);
   check(b.faultAddress == kLogWord, "boot: and the start into the new image still carries it");
 }
 
@@ -821,8 +842,9 @@ struct Bench {
   bool imageGood = true;
   bool marked = false;
 
-  explicit Bench(bool menuHeld = true) {
-    const CvBootDecision d = decide(block, menuHeld, CvImageValid);
+  Bench() {
+    block.request = CV_REQUEST_UPDATE;
+    const CvBootDecision d = decide(block, CvImageValid);
     cvSessionStart(&s, d.reason, true, now);
     cvSessionCable(&s, true, now);
   }
@@ -1068,7 +1090,7 @@ struct ScreenCase {
 
 // reason, imageValid, writeBegun, accepted, refused, failed, cableOut, timeoutArmed
 const ScreenCase kScreenCases[] = {
-      {{CvReasonMenuHeld, true, false, false, false, false, false, true}, CvScreenWaitMenu, "menu entry"},
+      {{CvReasonAppRequest, true, false, false, false, false, false, true}, CvScreenWaitMenu, "menu entry"},
       {{CvReasonAppRequest, false, false, false, false, false, false, false}, CvScreenWaitNoImage,
        "a request with no valid image"},
       {{CvReasonBootFault, true, false, false, false, false, false, true}, CvScreenWaitMenu,
@@ -1079,19 +1101,19 @@ const ScreenCase kScreenCases[] = {
        "an invalid image"},
       {{CvReasonClockFailed, true, false, false, false, false, false, false}, CvScreenClockFailed,
        "a failed clock"},
-      {{CvReasonMenuHeld, true, true, true, false, false, false, false}, CvScreenWriting, "blocks arriving"},
-      {{CvReasonMenuHeld, true, false, false, true, false, false, true}, CvScreenWrongFile, "refused blocks"},
-      {{CvReasonMenuHeld, true, true, true, true, true, false, false}, CvScreenWaitNoImage,
+      {{CvReasonAppRequest, true, true, true, false, false, false, false}, CvScreenWriting, "blocks arriving"},
+      {{CvReasonAppRequest, true, false, false, true, false, false, true}, CvScreenWrongFile, "refused blocks"},
+      {{CvReasonAppRequest, true, true, true, true, true, false, false}, CvScreenWaitNoImage,
        "a refusal after accepted blocks stops the update"},
-      {{CvReasonMenuHeld, true, true, true, false, true, false, false}, CvScreenWaitNoImage,
+      {{CvReasonAppRequest, true, true, true, false, true, false, false}, CvScreenWaitNoImage,
        "a failed write stops the update"},
-      {{CvReasonMenuHeld, true, true, false, false, false, true, false}, CvScreenCableOut,
+      {{CvReasonAppRequest, true, true, false, false, false, true, false}, CvScreenCableOut,
        "a cable pulled mid-copy"},
       {{CvReasonImageInvalid, false, false, false, false, false, true, false}, CvScreenCableOut,
        "a cable pulled with no image to return to"},
-      {{CvReasonMenuHeld, true, false, false, false, false, true, true}, CvScreenWaitMenu,
+      {{CvReasonAppRequest, true, false, false, false, false, true, true}, CvScreenWaitMenu,
        "a cable pulled before any write counts down again"},
-      {{CvReasonMenuHeld, true, true, false, false, false, false, false}, CvScreenWaitNoImage,
+      {{CvReasonAppRequest, true, true, false, false, false, false, false}, CvScreenWaitNoImage,
        "a copy cut short with the cable back"},
 };
 
@@ -1192,6 +1214,7 @@ void checkBootDecide() {
   checkImageHeaderVersion();
   checkBootRows();
   checkBootPriority();
+  checkBootNoMenuReason();
   checkBootCounter();
   checkBootPowerOnFlags();
   checkBootPowerOn();

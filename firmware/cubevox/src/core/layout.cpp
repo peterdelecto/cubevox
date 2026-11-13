@@ -52,6 +52,22 @@ const char* swapWord(const Layout& layout, SwapSlot which) {
   return swapCards(which).word[static_cast<size_t>(index)];
 }
 
+size_t cardWord(Card c, char* out, size_t size) {
+  if (size == 0) return 0;
+  const char* word = cardDesc(c).name;
+  for (int which = 0; which < static_cast<int>(SwapSlot::Count); ++which) {
+    const int index = swapIndex(static_cast<SwapSlot>(which), c);
+    if (index >= 0) word = swapCards(static_cast<SwapSlot>(which)).word[static_cast<size_t>(index)];
+  }
+  size_t n = 0;
+  for (; n + 1 < size && word[n] != '\0'; ++n) {
+    const char ch = word[n];
+    out[n] = (ch >= 'a' && ch <= 'z') ? static_cast<char>(ch - 'a' + 'A') : ch;
+  }
+  out[n] = '\0';
+  return n;
+}
+
 int reverbSlot(const Layout& layout) { return swapSlotOf(layout, SwapSlot::Reverb); }
 
 int unisonCrowdSlot(const Layout& layout) { return swapSlotOf(layout, SwapSlot::UnisonMob); }
@@ -76,6 +92,22 @@ LayoutCheck fail(LayoutError error, int slot, Card card, int percent) {
 }
 
 }  // namespace
+
+// Walks the slots behind Autotune's slot the way chain_run.cpp's autotuneContext does, keeping its
+// reader conditions: a Formant or Apraxia card with only Empty slots between, and Mob or Deepthroat
+// anywhere behind. A reader counts only while its slot is in `liveMask`.
+bool autotuneHasReader(const Layout& layout, int slot, uint8_t liveMask) {
+  bool onlyEmpty = true;
+  for (int t = slot + 1; t < kSlotCount; ++t) {
+    const Card c = layout.card[static_cast<size_t>(t)];
+    if (c == Card::Empty) continue;
+    const bool live = (liveMask >> t) & 1u;
+    const bool formant = c == Card::Formant || c == Card::FormantFollower;
+    if (live && ((formant && onlyEmpty) || engineOf(c) == Engine::Crowd || c == Card::Growl)) return true;
+    onlyEmpty = false;
+  }
+  return false;
+}
 
 LayoutCost layoutCost(const Layout& layout) {
   LayoutCost sum;

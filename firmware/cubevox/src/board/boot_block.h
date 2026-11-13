@@ -138,6 +138,8 @@ static inline uint32_t cvEccAddress(uint32_t bankBase, uint32_t eccFa) {
 // Why the bootloader last stayed in update mode.
 enum CvBootReason {
   CvReasonNone = 0,
+  // Reserved. Bootloader v0.08 and earlier wrote it for MENU held at a start; later ones never do.
+  // The value stays so old DIAG.TXT entries still list.
   CvReasonMenuHeld,
   CvReasonAppRequest,
   CvReasonImageInvalid,

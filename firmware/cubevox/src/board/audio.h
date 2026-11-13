@@ -13,6 +13,8 @@
 #include "core/chain_params.h"
 #include "core/compose.h"
 #include "core/level.h"
+#include "core/load_rule.h"
+#include "core/panel.h"
 #include "core/scope.h"
 
 // Cycle buckets: one per slot, then one for CLEANUP EQ (both of its halves).
@@ -49,7 +51,7 @@ enum class AudioEvent : uint8_t {
 AudioEvent audioPoll(uint32_t nowMs);
 
 // The "[boot] audio ..." line, or the "[ERROR] audio: ..." line when audioInit failed. Also reports
-// the SAI and DMA errors, overruns, restarts and NaN blocks counted since boot.
+// the SAI and DMA errors, overruns, restarts, NaN blocks and overload steps counted since boot.
 void audioReport(Print& out);
 
 // SAI and DMA errors since boot, and the HAL error bits seen.
@@ -67,6 +69,18 @@ struct AudioHealth {
   uint32_t nanBlocks = 0;  // blocks discarded before CLEANUP EQ's back half for a NaN or an infinity
 };
 AudioHealth audioHealth();
+
+// The load rule (core/load_rule.h). Call once per loop pass, ahead of publishing. It takes the late
+// window's trip from the audio interrupt and runs the rule over it.
+// `panel` carries the toggle levels, and `layoutApplied` is true on the pass a layout apply or card
+// swap happened. The step it returns holds nothing when its slot is -1. A hold that ends by a toggle,
+// a changed layout or its wait shows only in audioHeldMask().
+LoadStep audioLoadRulePoll(uint32_t nowMs, const Layout& layout, const PanelReading& panel, bool layoutApplied);
+
+// The load rule's state, for the snapshot, the status reply and the voice screen's OVERLOAD row. Main
+// loop only.
+uint8_t audioHeldMask();            // bit s set while slot s is held
+uint32_t audioLoadSteps();          // holds made since boot
 
 // Hands a complete snapshot to the audio interrupt. Lock-free, call from the main loop. A snapshot with
 // the layout the interrupt runs is adopted at once; a different layout fades the output out and in
