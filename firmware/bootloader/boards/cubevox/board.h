@@ -13,7 +13,7 @@ extern "C" {
 
 // Shown in INFO_UF2.TXT and DIAG.TXT. Bumped with every bootloader change; independent of
 // VERSION.txt because the two programs ship on different paths.
-#define CV_BOOT_VERSION "0.07"
+#define CV_BOOT_VERSION "0.08"
 
 //--------------------------------------------------------------------+
 // Board identity

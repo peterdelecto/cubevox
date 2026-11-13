@@ -385,8 +385,10 @@ static CvDriveState driveState(void) {
   return state;
 }
 
-static void diagRefresh(void) {
+// INFO_UF2.TXT and DIAG.TXT are rebuilt together, so Installed and installed always agree.
+static void driveTextsRefresh(void) {
   const CvDriveState state = driveState();
+  cvInfoText(&state);
   cvDiagWrite(&state);
   gState.session.diagDirty = false;
   gState.diagMs = elapsedMs();
@@ -396,9 +398,7 @@ static void diagRefresh(void) {
 // Installed and installed say what the flash holds now.
 static void mountRefresh(void) {
   if (gState.session.writeBegun) imageRead();
-  const CvDriveState state = driveState();
-  cvInfoText(&state);
-  diagRefresh();
+  driveTextsRefresh();
 }
 
 char const* board_uf2_info(uint32_t* len) {
@@ -462,7 +462,7 @@ static void updateModeStart(void) {
   regionRead();
   vbusStart();
   cvSessionStart(&gState.session, gState.decision.reason, vbusPresent(), elapsedMs());
-  diagRefresh();
+  driveTextsRefresh();
   cvOledStart();
   screenRefresh();
 }
@@ -495,7 +495,7 @@ void board_dfu_task(void) {
   const CvTickAction action = cvSessionTick(&gState.session, timeoutArmed(), nowMs);
   if (action == CvTickRestart) board_dfu_complete();
   if (action == CvTickTimeout) NVIC_SystemReset();
-  if (gState.session.diagDirty && nowMs - gState.diagMs >= CV_DIAG_REFRESH_MS) diagRefresh();
+  if (gState.session.diagDirty && nowMs - gState.diagMs >= CV_DIAG_REFRESH_MS) driveTextsRefresh();
   screenRefresh();
 }
 

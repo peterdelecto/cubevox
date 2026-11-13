@@ -311,6 +311,11 @@ A 32-byte header sits at application offset 0x400, after the 0x298-byte vector t
    unmarked, so the start finds the image invalid and offers the drive again. An eject with nothing
    written changes nothing. The cable, host and transfer state is `CvUpdateSession` in
    `boot_decide.c`, stepped by the host tests. Bootloader v0.07.
+9. `INFO_UF2.TXT` and `DIAG.TXT` are rebuilt together: at every USB connect, and while the drive is
+   up whenever a block is refused, a write fails or the last block arrives. The drive stays up
+   after the last block, so `Installed:` follows the image check without a restart; the Mac shows
+   the new text after it unmounts and mounts the drive. Bootloader v0.08 (drill 7 on board 1,
+   2026-11-13: v0.07 rebuilt `INFO_UF2.TXT` only at a USB connect and kept the old version there).
 
 ## OLED in update mode
 The bootloader drives the SH1106 over I2C2 (PB10/PB11) through `firmware/cubevox/src/board/sh1106.c`,
