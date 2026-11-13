@@ -9,8 +9,8 @@
 # port present it sends enter_dfu, waits for /Volumes/CUBEVOX, copies <out dir>/cubevox.uf2 onto
 # it and ejects the drive, which restarts the box, waits for the drive to go and the box's port to
 # return, and prints the boot report. With no serial port it waits up to WAIT seconds (default 300)
-# for the drive. A failed start or a MENU held at power-on brings the drive up, and so does a
-# bootloader that has no application yet.
+# for the drive. A failed start brings the drive up, and so does a bootloader that has no
+# application yet.
 #
 # --rom goes through the ST ROM DFU with dfu-util, for a box whose application is unreachable. It
 # writes <out dir>/cubevox.ino.bin at the application start (0x08020000, read from boot_block.h),
@@ -137,13 +137,13 @@ drive_flash() {
     if "${PORT_TOOL[@]}" --port "$box_port" --request enter_dfu >/dev/null; then
       drive_wait="$MOUNT_WAIT"
     else
-      echo "[flash] the box did not accept enter_dfu; switch it on again while holding MENU"
+      echo "[flash] the box did not accept enter_dfu; use MENU > Update firmware, or --rom"
     fi
   fi
 
   echo "[flash] waiting for /Volumes/$VOLUME"
   if ! volume="$("${PORT_TOOL[@]}" --wait-volume "$VOLUME" --wait "$drive_wait")"; then
-    echo "        hold MENU while switching the box on, or put the bootloader in with bootloader/flash.sh;"
+    echo "        use MENU > Update firmware on the box, or put the bootloader in with bootloader/flash.sh;"
     echo "        a box without the bootloader enters the ST ROM DFU instead, so use --rom"
     exit 1
   fi

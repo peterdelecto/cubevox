@@ -58,7 +58,7 @@ What can go wrong:
 1. A hold that ends just under 600 ms (599 ms) reads as a click and acts on the row under the cursor. The menu closes only once the full 600 ms has passed.
 2. A hold on the update confirm screen does nothing: EXIT is not on that screen, a click there starts the update, and a long press must not start it. A turn cancels, as before. The starting screen takes no input, as before. The chain view, which no row opens, ignores a hold too.
 3. A hold with the menu closed opens the list, once the 600 ms is up, as a click does.
-4. Holding MENU at power-on belongs to the bootloader (`2026-10-24-field-update-design.md`) and is not this. A button still down when the firmware starts reports nothing when it is let go.
+4. The bootloader reads no MENU at a start (v0.09, `2026-10-24-field-update-design.md`), so a hold at power-on is not this either. A button still down when the firmware starts reports nothing when it is let go.
 5. The press itself, a hold and a click each count as activity for the 15 s menu timeout and for the screen dimming. So a press that starts just before the timeout keeps the list open: the click acts on its row, and a hold closes the list and does not open it again.
 
 Detection lives in `core/menu_button.h` (`MenuButton`), fed the debounced level by `board/input.cpp` and by the emulator's window; the time counts from the debounced press. `UiInput` carries `click` (a release before 600 ms), `hold` (sent once, at 600 ms) and `press` (the debounced down edge, sent once per press, never for a button already down at power-on).

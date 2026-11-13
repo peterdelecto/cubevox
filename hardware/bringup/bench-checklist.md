@@ -46,7 +46,7 @@ carry a measured number from the audit keep that number.
 | BO4 | Pull the cable in the middle of a copy, wait 3 s, plug it back in, and record the screens. | The OLED shows "The cable came out." (field-update spec failure table). The CUBEVOX drive is back on the replug, and a full copy then completes. | boot B1, pulled cable |
 | BO5 | Force a double ECC error in log sector 2. | DIAG.TXT shows `flash log: unreadable at 0x814xxxx`, which confirms the FAIL_ECC_ADDR decode, and the box stays in update mode. | boot B8 (unsure item) and answer 4 |
 | BO6 | Cut 9 V during sector 1's erase, then drag the release once. | The first copy completes with no reset in the middle. | boot B9, torn word survives |
-| BO7 | Enter update mode by the menu, by the app request and by MENU at power-on, many times over. | The CUBEVOX drive appears within 3 s on every entry. | boot answer 5, TinyUSB core reset loops |
+| BO7 | Enter update mode by the menu, and by the app request, many times over. | The CUBEVOX drive appears within 3 s on every entry. | boot answer 5, TinyUSB core reset loops |
 | BO8 | Cold-start every board and watch for the update screen or the app. | HSE starts inside its 100 ms timeout on every board. A miss shows "The clock failed." with the drive up on HSI48, not a dark box (BO15). | boot answer 6 and B13, missing crystal |
 | BO9 | Scope I2C2 SCL while the bootloader draws a screen. | SCL runs near 400 kHz. | boot C7, CV_OLED_TIMINGR |
 | BO10 | Hold the box in update mode and watch K102 and XSMT. | K102 stays open and XSMT stays low through update mode. The bootloader never drives PB5 or PC5. | boot pins; same measurement as AU2 |

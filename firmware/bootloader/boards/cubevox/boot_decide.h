@@ -29,7 +29,6 @@ typedef enum { CvImageValid, CvImageInvalid } CvImageStatus;
 typedef enum { CvActionRunApp, CvActionUpdateMode } CvBootAction;
 
 typedef struct {
-  bool menuHeld;
   CvImageStatus image;
   // The CvClockStep that failed at this start, 0 when the clocks run as designed.
   uint32_t clockStep;
@@ -108,7 +107,7 @@ void cvBootAdopt(struct CvBootBlock* block, uint32_t resetFlags);
 bool cvBootRequestPending(const struct CvBootBlock* block);
 
 // Evaluates the decision table top to bottom and updates the block. Clock failure first, then
-// MENU, a pending read fault, the bootloader's own resume request, the application's request, the
+// a pending read fault, the bootloader's own resume request, the application's request, the
 // image, and the start counter.
 //
 // Update mode stores the reason in lastReason. Running the application adds one to bootFails and
@@ -134,7 +133,7 @@ CvBootDecision cvBootDecide(struct CvBootBlock* block, const CvBootInputs* in);
 void cvBootRecordFault(struct CvBootBlock* block, const CvFaultInfo* fault);
 
 // True when update mode may fall back to the application after CV_UPDATE_TIMEOUT_MS. That holds
-// when the reason is MenuHeld, AppRequest or BootFault, the image is valid, no host has enumerated
+// when the reason is AppRequest or BootFault, the image is valid, no host has enumerated
 // since the cable went in, and no write has begun.
 bool cvBootTimeoutAllowed(const struct CvBootBlock* block, CvImageStatus image, bool hostSeen,
                           bool writeBegun);
