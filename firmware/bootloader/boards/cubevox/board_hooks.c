@@ -18,7 +18,6 @@
 #include "screens.h"
 
 CV_STATIC_ASSERT(family_from_boot_block, BOARD_UF2_FAMILY_ID == CV_UF2_FAMILY_CUBEVOX);
-CV_STATIC_ASSERT(menu_settles_before_timeout, CV_MENU_SETTLE_MS < CV_UPDATE_TIMEOUT_MS);
 CV_STATIC_ASSERT(dbeccerr_is_cmsis, CV_FLASH_SR_DBECCERR == FLASH_SR_DBECCERR);
 CV_STATIC_ASSERT(ecc_address_is_cmsis, CV_FLASH_ECC_ADDR == FLASH_ECC_FA_FAIL_ECC_ADDR);
 CV_STATIC_ASSERT(bank2_base_is_cmsis, CV_BANK2_BASE == FLASH_BANK2_BASE);
@@ -187,20 +186,6 @@ static void optionBytesCheck(struct CvBootBlock* block) {
 // Boot decision
 //--------------------------------------------------------------------+
 
-static void menuSwitchStart(void) {
-  GPIO_InitTypeDef pin = {0};
-  pin.Pin = CV_MENU_PIN;
-  pin.Mode = GPIO_MODE_INPUT;
-  pin.Pull = GPIO_PULLUP;
-  HAL_GPIO_Init(CV_MENU_PORT, &pin);
-}
-
-// Sampled once the pull-up has had CV_MENU_SETTLE_MS; the image check overlaps that wait.
-static bool menuSwitchHeld(void) {
-  while (elapsedMs() < CV_MENU_SETTLE_MS) {}
-  return HAL_GPIO_ReadPin(CV_MENU_PORT, CV_MENU_PIN) == GPIO_PIN_RESET;
-}
-
 // Header and CRC, then the port's stack and reset vector check, so check_dfu_mode's own
 // board_app_valid() never disagrees with the decision. A fault in here is an unreadable image.
 static void imageRead(void) {
@@ -258,11 +243,10 @@ void board_init2(void) {
   gState.adopted = true;
   SCB->SHCSR |= SCB_SHCSR_MEMFAULTENA_Msk | SCB_SHCSR_BUSFAULTENA_Msk | SCB_SHCSR_USGFAULTENA_Msk;
   optionBytesCheck(block);
-  menuSwitchStart();
 
   const bool pending = cvBootRequestPending(block);
   if (!pending) imageRead();
-  const CvBootInputs in = {menuSwitchHeld(), pending ? CvImageInvalid : imageStatus(), cvClockFailedStep()};
+  const CvBootInputs in = {pending ? CvImageInvalid : imageStatus(), cvClockFailedStep()};
   gState.decision = cvBootDecide(block, &in);
   if (pending) imageAfterDecision();
   if (gState.decision.action == CvActionUpdateMode) updateModeStart();
@@ -289,10 +273,8 @@ static void watchdogStart(void) {
   IWDG1->KR = CV_IWDG_KEY_RELOAD;
 }
 
-// Before the jump to the application: the MENU pin back to its reset state, and the watchdog that
-// ends a hang in setup() with a counted start.
+// Before the jump to the application: the watchdog that ends a hang in setup() with a counted start.
 void board_teardown2(void) {
-  HAL_GPIO_DeInit(CV_MENU_PORT, CV_MENU_PIN);
   watchdogStart();
 }
 

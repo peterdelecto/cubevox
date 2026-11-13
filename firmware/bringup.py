@@ -1198,7 +1198,7 @@ def drill_layout(ctx):
             f"{'survived' if kept else 'did NOT survive'} the update ({r.back_s:.1f} s); original layout set again", "")
 
 
-# -- drills 10 to 12: the operator at the box
+# -- drills 10 to 12: drill 10 is removed; 11 and 12 need the operator at the box
 
 def countdown(seconds):
     """Sleeps with a progress line every 10 s, because the box is silent for the whole wait."""
@@ -1210,18 +1210,8 @@ def countdown(seconds):
         left -= step
 
 
-def drill_menu_held(ctx):
-    ctx.app()
-    ctx.drop_port()
-    if not ask_operator("Hold MENU, switch the 9 V off and on while holding it, "
-                        "and release when the OLED says 'Drop the firmware on'."):
-        return FAIL, "operator says MENU was not held through the power cycle", ""
-    if cubevox_port.wait_volume(VOLUME, REPLUG_WAIT_S) is None:
-        return FAIL, f"{VOLUME} did not appear {REPLUG_WAIT_S:g} s after power-on", ""
-    reason = parse_fields(read_drive_text(ctx.volume(), "DIAG.TXT")).get("reason", "?")
-    r = install(ctx, ctx.files["bench"], COPY_NAME)
-    return ((PASS if reason == "MenuHeld" else FAIL),
-            f"DIAG.TXT reason {reason}; a full copy then restarted the box ({r.back_s:.1f} s)", "")
+def drill_removed(ctx):
+    return SKIPPED, "removed: bootloader v0.09 does not read MENU at a start", ""
 
 
 def drill_no_computer(ctx):
@@ -1288,7 +1278,7 @@ DRILLS = (
     (7, "flipped byte lands in update mode", drill_flipped_byte, False),
     (8, "failed starts land in update mode", drill_failed_starts, False),
     (9, "layout survives an update", drill_layout, False),
-    (10, "MENU held at power-on", drill_menu_held, True),
+    (10, "removed (no MENU path since bootloader v0.09)", drill_removed, False),
     (11, "no computer, back to the application", drill_no_computer, True),
     (12, "menu entry and confirm screen", drill_menu_entry, True),
     (13, "release .uf2 copy", drill_release, False),
@@ -1315,7 +1305,7 @@ def run_drill(ctx, number, name, fn, operator):
 
 
 def update_drills(log, port, a):
-    """Runs the 13 drills. Takes over `port`, the open port of the running bench application."""
+    """Runs the drills 1 to 13 (10 is removed). Takes over `port`, the open port of the running bench application."""
     with tempfile.TemporaryDirectory(prefix="cubevox-update-") as tmp:
         ctx = Ctx(log, not a.no_prompt, tmp)
         ctx.port = port

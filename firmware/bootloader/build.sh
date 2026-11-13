@@ -268,7 +268,7 @@ drive_texts() {
 
   expect_line "$dir/DIAG-empty.TXT" "flash log: empty"
   expect_log_order "$dir/DIAG-empty.TXT" ""
-  expect_line "$dir/DIAG-unreadable.TXT" "reason: MenuHeld"
+  expect_line "$dir/DIAG-unreadable.TXT" "reason: AppRequest"
   expect_line "$dir/DIAG-unreadable.TXT" "flash log: unreadable at 0x8141230"
   expect_log_order "$dir/DIAG-unreadable.TXT" ""
   expect_line "$dir/DIAG-bank2.TXT" "flash log: unreadable at 0x8101230"
