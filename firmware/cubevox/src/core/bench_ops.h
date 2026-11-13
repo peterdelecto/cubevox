@@ -41,6 +41,7 @@ enum class BenchOp : uint8_t {
   FailRestart,
   FailAudioStart,
   Burn,
+  DiagClear,
   Count,
 };
 
@@ -50,9 +51,10 @@ constexpr int kBenchOpCount = static_cast<int>(BenchOp::Count);
 // real name is at least two characters shorter than it.
 constexpr size_t kOpNameBytes = 20;
 
-// Query ops are read-only and exist in every build. Bench ops act on the box and exist only in
-// bench builds.
-enum class OpClass : uint8_t { Query, Bench };
+// Query ops are read-only and exist in every build. Service ops act on the box in a way a box
+// leaving for the singer needs, so they exist in every build too. Bench ops exist only in bench
+// builds.
+enum class OpClass : uint8_t { Query, Service, Bench };
 
 constexpr int kMinBenchSlot = 1;  // slot_off, slot_on and set_knob take the panel numbering
 constexpr int kMaxBenchSlot = kSlotCount;
@@ -88,11 +90,11 @@ BenchOp benchOp(int index);
 // "" for BenchOp::Count.
 const char* opName(BenchOp op);
 
-// Bench for BenchOp::Count, so an invalid op never counts as a query.
+// Bench for BenchOp::Count, so an invalid op is never allowed in a release build.
 OpClass opClass(BenchOp op);
 
 // Looks up an op by its wire name.
 bool opFromName(const char* name, BenchOp& out);
 
-// Queries run everywhere; bench ops run only when `benchBuild` is true.
+// Queries and service ops run everywhere; bench ops run only when `benchBuild` is true.
 bool opAllowed(BenchOp op, bool benchBuild);

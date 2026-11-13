@@ -62,6 +62,7 @@ carry a measured number from the audit keep that number.
 | BO20 | Start a Finder copy of a release .uf2, cancel it at about 30 %, and drop the same file again. Then drop a different release's .uf2. | Both copies complete, and the box restarts into the new image each time. | boot B2 and B3, restart of a cut transfer |
 | BO21 | Cut the 9 V three times, each within 5 s of a start. | Each start is normal and the boot report reads `boot fails 0`, because a power-on clears the count. "Startup failed." never appears. | health A2, start counter and power dips; same cut as HE2 |
 | BO22 | Time the boot CRC on today's image and on an 896 KB image. | Both times are logged. Today's image stays under the 20 ms boot delay budget of the field-update spec, and the 896 KB time is recorded as the limit for the largest image. | field-update spec, boot delay budget (the CRC time at 360 MHz is not measured yet) |
+| BO23 | Before a box goes to Adam, run `term.py -s '{"id":1,"cmd":"bench","op":"diag_clear"}'` on the release image, then read DIAG.TXT from the update drive. | The reply is ok, and DIAG.TXT reads `flash log: empty` until the box next writes an entry. A `diag log busy` reply is repeated a moment later. | field-update spec, Diagnostics item 4 |
 
 ## App boot, bank 2, faults and watchdog
 

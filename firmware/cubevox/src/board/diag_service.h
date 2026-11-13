@@ -27,5 +27,10 @@ void diagNoteAudioFault(const char* cause);
 // True while an entry is queued or being written.
 bool diagBusy();
 
+// Queues an erase of the whole log, so a box can leave with no entries. False, with nothing
+// changed, while the log is busy, closed, or the layout record holds the flash. The erase runs from
+// diagPoll() like the one a full log starts. The sequence keeps counting for the entries after it.
+bool diagClear();
+
 // The "[boot] diag log: ..." line: the entry count and last sequence, empty, or error.
 void diagReportBoot(Print& out);

@@ -770,6 +770,7 @@ void checkOpTable() {
   protocol::Request r;
   std::string err;
   int queries = 0;
+  int services = 0;
   for (int i = 0; i < kBenchOpCount; ++i) {
     const BenchOp op = benchOp(i);
     BenchOp back;
@@ -780,15 +781,23 @@ void checkOpTable() {
                              (opTakesKnob(op) ? ",\"knob\":2,\"value\":40" : "") +
                              (opTakesCycles(op) ? ",\"cycles\":1000" : "") + "}";
     check(parses(line.c_str(), r, err, true) && r.cmd == protocol::Command::Bench && r.op == op, "ops: every op round-trips in a bench build");
-    const bool query = opClass(op) == OpClass::Query;
-    queries += query ? 1 : 0;
+    const bool inRelease = opClass(op) != OpClass::Bench;
+    queries += opClass(op) == OpClass::Query ? 1 : 0;
+    services += opClass(op) == OpClass::Service ? 1 : 0;
     check(opAllowed(op, true), "ops: bench build allows every op");
-    check(opAllowed(op, false) == query, "ops: release build allows queries only");
-    check(parses(line.c_str(), r, err, false) == query &&
-              (query || err == std::string("op not in this build: ") + opName(op)),
+    check(opAllowed(op, false) == inRelease, "ops: release build allows queries and service ops only");
+    check(parses(line.c_str(), r, err, false) == inRelease &&
+              (inRelease || err == std::string("op not in this build: ") + opName(op)),
           "ops: release build parse follows the class");
   }
-  check(queries == 3, "ops: three query ops");
+  check(kBenchOpCount == 32, "ops: thirty-two ops");
+  check(queries == 3 && services == 1, "ops: three query ops and one service op");
+  check(opClass(BenchOp::DiagClear) == OpClass::Service && opAllowed(BenchOp::DiagClear, false) &&
+            opAllowed(BenchOp::DiagClear, true),
+        "ops: diag_clear runs in a release build");
+  int releaseOps = 0;
+  for (int i = 0; i < kBenchOpCount; ++i) releaseOps += opAllowed(benchOp(i), false) ? 1 : 0;
+  check(releaseOps == 4, "ops: every other bench op stays out of a release build");
   check(kBenchOpCount == static_cast<int>(BenchOp::Count) && kMaxBenchSlot == kSlotCount, "ops: counts derive from their sources");
   BenchOp none;
   check(!opFromName("nope", none) && !opFromName("", none) && !opFromName("Report", none), "ops: lookup is exact");
@@ -932,7 +941,7 @@ void checkHelloOps() {
   }
   StringWriter rel;
   protocol::replyHello(rel, 1, "v", "Default", defaultLayout(), false);
-  check(has(rel.out, "\"bench_ops\":[\"report\",\"stats\",\"record_status\"],") && !has(rel.out, "\"fault\""),
+  check(has(rel.out, "\"bench_ops\":[\"report\",\"stats\",\"record_status\",\"diag_clear\"],") && !has(rel.out, "\"fault\""),
         "ops: release hello lists the three queries only");
 }
 

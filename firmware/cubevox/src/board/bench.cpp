@@ -5,6 +5,7 @@
 #include <array>
 
 #include "board/audio.h"
+#include "board/diag_service.h"
 #include "board/fault.h"
 #include "board/record_service.h"
 #include "board/serial_link.h"
@@ -73,6 +74,9 @@ BenchResult benchRun(BenchOp op, const BenchArgs& args, void (*bootReport)()) {
     case BenchOp::Report: bootReport(); return {};
     case BenchOp::Stats: reportAudioStats(); return {};
     case BenchOp::RecordStatus: recordReportStatus(serialOut()); return {};
+    case BenchOp::DiagClear:
+      if (!diagClear()) return {false, "diag log busy"};
+      return {};
     default: break;  // bench-class ops
   }
 #if CUBEVOX_BENCH

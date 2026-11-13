@@ -38,10 +38,12 @@ SLOT_LETTERS = frozenset("12345678")  # slot_off N
 DFU_LETTER = "d"           # the enter_dfu command
 
 QUERY_OPS = {"report", "stats", "record_status"}      # every build
+SERVICE_OPS = {"diag_clear"}                           # every build; no letter of their own
+RELEASE_OPS = QUERY_OPS | SERVICE_OPS                  # what a release image lists
 ARG_OPS = {"slot_off", "slot_on", "set_knob"}          # ops with arguments and no letter of their own
 FLAG_OPS = {"bypass", "cleanup_eq", "fail_restart"}  # each call flips a forced state; no letter of their own
 DRILL_OPS = {"stream_fault", "fail_audio_start", "burn"}               # drills with no letter of their own
-ALL_OPS = set(LETTER_OPS.values()) | ARG_OPS | FLAG_OPS | DRILL_OPS  # the bench build lists these
+ALL_OPS = set(LETTER_OPS.values()) | ARG_OPS | FLAG_OPS | DRILL_OPS | SERVICE_OPS  # the bench build lists these
 
 _ids = itertools.count(1)
 

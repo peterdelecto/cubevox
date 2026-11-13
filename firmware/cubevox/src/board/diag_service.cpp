@@ -133,6 +133,8 @@ void diagNoteAudioFault(const char* cause) {
 
 bool diagBusy() { return gLog.busy(); }
 
+bool diagClear() { return gLog.clear(); }
+
 void diagReportBoot(Print& out) {
   if (gFailed) {
     out.println("[ERROR] diag log: error");

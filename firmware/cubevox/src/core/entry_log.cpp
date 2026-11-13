@@ -70,11 +70,21 @@ void EntryLog::append(const uint8_t* entry) {
   hasPending_ = true;
 }
 
+bool EntryLog::clear() {
+  if (!open_ || busy() || (gate_ != nullptr && !gate_())) return false;
+  clearPending_ = true;
+  return true;
+}
+
 void EntryLog::poll() {
   if (gate_ != nullptr && !gate_()) return;
   switch (phase_) {
     case Phase::Idle:
-      if (hasPending_) startWrite();
+      if (clearPending_) {
+        startClear();
+      } else if (hasPending_) {
+        startWrite();
+      }
       break;
     case Phase::Erasing: pollErase(); break;
     case Phase::Programming: pollProgram(); break;
@@ -97,6 +107,17 @@ void EntryLog::startWrite() {
   phase_ = Phase::Erasing;
 }
 
+// The sector is unreadable as a log from here on, so a failed erase leaves the next entry to
+// erase again.
+void EntryLog::startClear() {
+  clearPending_ = false;
+  clearing_ = true;
+  next_ = slots_;
+  count_ = 0;
+  io_.eraseStart(sector_);
+  phase_ = Phase::Erasing;
+}
+
 void EntryLog::stamp() {
   uint8_t* entry = writingEntry_.data();
   const size_t crcAt = entryBytes_ - kCrcBytes;
@@ -106,6 +127,7 @@ void EntryLog::stamp() {
 
 void EntryLog::abandon() {
   error_ = true;
+  clearing_ = false;
   phase_ = Phase::Idle;
 }
 
@@ -118,7 +140,8 @@ void EntryLog::pollErase() {
   }
   next_ = 0;
   count_ = 0;
-  phase_ = Phase::Programming;
+  phase_ = clearing_ ? Phase::Idle : Phase::Programming;
+  clearing_ = false;
 }
 
 void EntryLog::pollProgram() {
