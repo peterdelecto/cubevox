@@ -716,6 +716,44 @@ void checkBootMarkUpdated() {
   check(b.faultAddress == kLogWord, "boot: and the start into the new image still carries it");
 }
 
+// The updater's mark after a bootloader write: it survives the restart into the new bootloader,
+// changes no decision, and goes with the next firmware install or a power-on.
+void checkBootUpdatedMark() {
+  CvBootBlock plain = bootBlock();
+  CvBootBlock marked = bootBlock();
+  check(!cvBootUpdatedMarked(&plain), "mark: a clean block carries no bootloader-updated mark");
+  cvBootUpdatedMarkSet(&marked);
+  check(cvBootUpdatedMarked(&marked), "mark: the updater's mark reads back");
+  const CvBootDecision withMark = decide(marked, CvImageInvalid);
+  const CvBootDecision without = decide(plain, CvImageInvalid);
+  check(decided(withMark, without.action, without.reason, without.eraseAddress) &&
+            withMark.imageReadable == without.imageReadable,
+        "mark: the decision with the mark is the decision without it");
+  check(decided(withMark, CvActionUpdateMode, CvReasonImageInvalid) && cvBootUpdatedMarked(&marked),
+        "mark: it survives the restart into the new bootloader, which waits with no image");
+
+  cvBootMarkUpdated(&marked);
+  check(!cvBootUpdatedMarked(&marked), "mark: a complete firmware install clears it");
+
+  CvBootBlock cut = bootBlock();
+  cvBootUpdatedMarkSet(&cut);
+  decide(cut, inputs(CvImageInvalid), kPowerOn);
+  check(!cvBootUpdatedMarked(&cut), "mark: a power-on clears it");
+
+  CvBootBlock half = bootBlock();
+  cvBootUpdatedWordsPut(&half, CV_BOOT_UPDATED_MARK, 0u);
+  check(!cvBootUpdatedMarked(&half), "mark: the magic without its complement is no mark");
+  cvBootUpdatedWordsPut(&half, 0xFFFFFFFFu, 0xFFFFFFFFu);
+  check(!cvBootUpdatedMarked(&half), "mark: erased bytes are no mark");
+
+  // Update mode at the new bootloader's start: the mark picks the screen and nothing else.
+  CvUpdateSession s;
+  cvSessionStart(&s, CvReasonImageInvalid, true, 0u);
+  s.bootUpdated = true;
+  check(cvSessionScreen(&s, false, false) == CvScreenBootUpdated, "mark: update mode says the bootloader updated");
+  check(!cvSessionTimeoutArmed(&s, &plain, CvImageInvalid), "mark: no image, so no timeout, as without it");
+}
+
 // BOR level 3 and sector 0 write protection, programmed once per power-on at most.
 void checkOptionBytes() {
   constexpr uint32_t kBor3 = 3u << CV_OPTSR_BOR_LEV_POS;
@@ -1088,32 +1126,52 @@ struct ScreenCase {
   const char* what;
 };
 
-// reason, imageValid, writeBegun, accepted, refused, failed, cableOut, timeoutArmed
+// reason, imageValid, writeBegun, accepted, refused, failed, cableOut, timeoutArmed, bootUpdated
 const ScreenCase kScreenCases[] = {
-      {{CvReasonAppRequest, true, false, false, false, false, false, true}, CvScreenWaitMenu, "menu entry"},
-      {{CvReasonAppRequest, false, false, false, false, false, false, false}, CvScreenWaitNoImage,
+      {{CvReasonImageInvalid, false, false, false, false, false, false, false, true}, CvScreenBootUpdated,
+       "no image after a bootloader update"},
+      {{CvReasonAppRequest, false, false, false, false, false, false, false, true}, CvScreenBootUpdated,
+       "a request with no image after a bootloader update"},
+      {{CvReasonAppRequest, true, false, false, false, false, false, true, true}, CvScreenWaitMenu,
+       "the bootloader-updated mark with an image installed changes nothing"},
+      {{CvReasonBootFailed, true, false, false, false, false, false, false, true}, CvScreenWaitBootFailed,
+       "the mark leaves three failed starts as they are"},
+      {{CvReasonImageInvalid, false, true, true, false, false, false, false, true}, CvScreenWriting,
+       "the firmware arriving after a bootloader update"},
+      {{CvReasonImageInvalid, false, true, true, false, true, false, false, true}, CvScreenWaitNoImage,
+       "a firmware write that fails after a bootloader update stops the update"},
+      {{CvReasonImageInvalid, false, true, false, false, false, false, false, true}, CvScreenWaitNoImage,
+       "a firmware copy cut short after a bootloader update"},
+      {{CvReasonImageInvalid, false, false, false, false, false, true, false, true}, CvScreenCableOut,
+       "a cable pulled after a bootloader update"},
+      {{CvReasonClockFailed, false, false, false, false, false, false, false, true}, CvScreenClockFailed,
+       "a failed clock after a bootloader update"},
+      {{CvReasonAppRequest, true, false, false, false, false, false, true, false}, CvScreenWaitMenu, "menu entry"},
+      {{CvReasonAppRequest, false, false, false, false, false, false, false, false}, CvScreenWaitNoImage,
        "a request with no valid image"},
-      {{CvReasonBootFault, true, false, false, false, false, false, true}, CvScreenWaitMenu,
+      {{CvReasonBootFault, true, false, false, false, false, false, true, false}, CvScreenWaitMenu,
        "a bootloader fault with a valid image"},
-      {{CvReasonBootFailed, true, false, false, false, false, false, false}, CvScreenWaitBootFailed,
+      {{CvReasonBootFailed, true, false, false, false, false, false, false, false}, CvScreenWaitBootFailed,
        "three failed starts"},
-      {{CvReasonImageInvalid, false, false, false, false, false, false, false}, CvScreenWaitNoImage,
+      {{CvReasonImageInvalid, false, false, false, false, false, false, false, false}, CvScreenWaitNoImage,
        "an invalid image"},
-      {{CvReasonClockFailed, true, false, false, false, false, false, false}, CvScreenClockFailed,
+      {{CvReasonClockFailed, true, false, false, false, false, false, false, false}, CvScreenClockFailed,
        "a failed clock"},
-      {{CvReasonAppRequest, true, true, true, false, false, false, false}, CvScreenWriting, "blocks arriving"},
-      {{CvReasonAppRequest, true, false, false, true, false, false, true}, CvScreenWrongFile, "refused blocks"},
-      {{CvReasonAppRequest, true, true, true, true, true, false, false}, CvScreenWaitNoImage,
+      {{CvReasonAppRequest, true, true, true, false, false, false, false, false}, CvScreenWriting,
+       "blocks arriving"},
+      {{CvReasonAppRequest, true, false, false, true, false, false, true, false}, CvScreenWrongFile,
+       "refused blocks"},
+      {{CvReasonAppRequest, true, true, true, true, true, false, false, false}, CvScreenWaitNoImage,
        "a refusal after accepted blocks stops the update"},
-      {{CvReasonAppRequest, true, true, true, false, true, false, false}, CvScreenWaitNoImage,
+      {{CvReasonAppRequest, true, true, true, false, true, false, false, false}, CvScreenWaitNoImage,
        "a failed write stops the update"},
-      {{CvReasonAppRequest, true, true, false, false, false, true, false}, CvScreenCableOut,
+      {{CvReasonAppRequest, true, true, false, false, false, true, false, false}, CvScreenCableOut,
        "a cable pulled mid-copy"},
-      {{CvReasonImageInvalid, false, false, false, false, false, true, false}, CvScreenCableOut,
+      {{CvReasonImageInvalid, false, false, false, false, false, true, false, false}, CvScreenCableOut,
        "a cable pulled with no image to return to"},
-      {{CvReasonAppRequest, true, false, false, false, false, true, true}, CvScreenWaitMenu,
+      {{CvReasonAppRequest, true, false, false, false, false, true, true, false}, CvScreenWaitMenu,
        "a cable pulled before any write counts down again"},
-      {{CvReasonAppRequest, true, true, false, false, false, false, false}, CvScreenWaitNoImage,
+      {{CvReasonAppRequest, true, true, false, false, false, false, false, false}, CvScreenWaitNoImage,
        "a copy cut short with the cable back"},
 };
 
@@ -1233,6 +1291,7 @@ void checkBootDecide() {
   checkBootClock();
   checkBootTimeout();
   checkBootMarkUpdated();
+  checkBootUpdatedMark();
   checkOptionBytes();
   checkUf2Filter();
   checkUf2Session();

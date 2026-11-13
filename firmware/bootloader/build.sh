@@ -1,14 +1,17 @@
 #!/usr/bin/env bash
 # Builds the cubevox TinyUF2 bootloader: adafruit/tinyuf2 at a pinned commit, patches/, and the
-# boards in boards/. Never flashes; flash.sh writes it through the ROM DFU (shop only).
+# boards in boards/, then the bootloader file: the updater (updater/) carrying that bootloader,
+# stamped as an application image and wrapped as UF2. Never flashes; flash.sh installs it.
 #
-#   ./build.sh               # cubevox board into $OUT (default /tmp/cubevox-boot-cubevox)
+#   ./build.sh               # into $OUT (default /tmp/cubevox-boot-cubevox): cubevox-bootloader.bin
+#                            # and .elf, cubevox-bootloader-v<version>.uf2, the updater in updater/
 #   ./build.sh --outdir      # print the output dir and exit
 #   ./build.sh --proofs      # host build of screens.c; numbered PNGs and diag-sample.txt in build/proofs/boot/
 #   ./build.sh --selftest    # host checks: the image check against tools/stamp_image.py and on cut
 #                            # copies and lying headers, the screens,
-#                            # the drive texts, flash.sh's option byte edit, and upstream's ghostfat
-#                            # selftest on the patched tree
+#                            # the drive texts, flash.sh's option byte edit, the updater's check on
+#                            # the built bootloader and on lying payloads (builds both into $OUT
+#                            # when missing), and upstream's ghostfat selftest on the patched tree
 #   ./build.sh --help        # print this text
 #
 # The checkout is build/tinyuf2 (gitignored). Every build resets it to the pin, links
@@ -194,7 +197,27 @@ selftest() {
   "$HOST/proof" --check
   drive_texts "$dir"
   python3 -I "$BL/tools/option_bytes.py" selftest
+  updater_selftest
   ghostfat_selftest
+}
+
+# The updater's payload check on the built bootloader and on lying payloads made from it, then on
+# the bootloader file the build wrote. Builds both into $OUT first when the bootloader is missing.
+updater_selftest() {
+  local version
+  version="$(boot_version)"
+  if [ ! -f "$OUT/cubevox-bootloader.bin" ] || [ ! -f "$OUT/updater/cubevox-bootloader-v$version.bin" ]; then
+    echo "[selftest] no bootloader file in $OUT; building it"
+    checkout
+    dependencies
+    patch_tree
+    toolchain
+    build_board
+    build_updater
+  fi
+  "$HOST/updatercheck" payload "$OUT/cubevox-bootloader.bin"
+  echo "[selftest] PASS: cubevox-bootloader-v$version.bin carries the bootloader, $("$HOST/updatercheck" image \
+    "$OUT/updater/cubevox-bootloader-v$version.bin" "$OUT/cubevox-bootloader.bin")"
 }
 
 expect_line() {
@@ -370,7 +393,112 @@ build_board() {
   fi
   echo "[build] cubevox-bootloader.bin $size bytes of $BIN_LIMIT, sha256 $(shasum -a 256 "$OUT/cubevox-bootloader.bin" | cut -d' ' -f1)"
   "$TC/arm-none-eabi-size" "$OUT/cubevox-bootloader.elf"
-  echo "[build] $OUT"
+}
+
+# The version text in board.h, the one string build.sh reads that is not an integer.
+boot_version() {
+  sed -n 's/^#define CV_BOOT_VERSION "\([0-9.]*\)"$/\1/p' "$BL/boards/cubevox/board.h"
+}
+
+# Flags for the updater. Soft float: nothing in it computes in floating point, so it never depends
+# on the FPU state the bootloader leaves.
+UPDATER_FLAGS=(-mthumb -mcpu=cortex-m7 -mfloat-abi=soft -Os -g -ffunction-sections -fdata-sections
+               -DSTM32H743xx -DHSE_VALUE=25000000U)
+
+# The updater (updater/): linked at the application start, carrying $OUT/cubevox-bootloader.bin.
+# Stamped with header version text boot-<version> and wrapped as the bootloader file, which
+# stamp_image.py and updatercheck must both accept.
+build_updater() {
+  local version dir bin length crc obj objs=() src
+  version="$(boot_version)"
+  if [ -z "$version" ]; then
+    echo "[ERROR] CV_BOOT_VERSION in boards/cubevox/board.h is missing"
+    exit 1
+  fi
+  dir="$OUT/updater"
+  bin="$OUT/cubevox-bootloader.bin"
+  rm -rf "$dir"
+  mkdir -p "$dir/obj"
+  length=$(($(wc -c < "$bin")))
+  crc="$(python3 -I -c 'import sys, zlib; print("0x%08X" % zlib.crc32(open(sys.argv[1], "rb").read()))' "$bin")"
+
+  local hal="$TU/lib/mcu/st/stm32h7xx_hal_driver"
+  local inc=(-I"$BL/updater" -I"$BL/boards/cubevox" -I"$REPO/firmware/cubevox/src/board"
+             -I"$REPO/tools/font-editor/fonts" -I"$TU/ports/stm32h7" -I"$TU/lib/CMSIS_5/CMSIS/Core/Include"
+             -I"$TU/lib/mcu/st/cmsis_device_h7/Include" -I"$hal/Inc")
+  local own=("$BL/updater/updater.c" "$BL/updater/updater_check.c"
+             "$BL/boards/cubevox/oled.c" "$BL/boards/cubevox/screens.c" "$BL/boards/cubevox/image_check.c"
+             "$BL/boards/cubevox/boot_decide.c" "$REPO/firmware/cubevox/src/board/sh1106.c")
+  local vendor=("$TU/lib/mcu/st/cmsis_device_h7/Source/Templates/system_stm32h7xx.c")
+  for src in hal hal_cortex hal_rcc hal_rcc_ex hal_gpio hal_adc hal_adc_ex hal_pwr hal_pwr_ex; do
+    vendor+=("$hal/Src/stm32h7xx_$src.c")
+  done
+  unset CFLAGS CPPFLAGS CXXFLAGS LDFLAGS
+  for src in "${own[@]}"; do
+    obj="$dir/obj/$(basename "${src%.*}").o"
+    run_logged "$dir/build.log" "$TC/arm-none-eabi-gcc" "${UPDATER_FLAGS[@]}" -std=gnu11 -Wall -Wextra -Werror \
+      "${inc[@]}" -c "$src" -o "$obj"
+    objs+=("$obj")
+  done
+  # The RAM code: no loop may turn into a call to memset or memcpy, which live in flash.
+  run_logged "$dir/build.log" "$TC/arm-none-eabi-gcc" "${UPDATER_FLAGS[@]}" -std=gnu11 -Wall -Wextra -Werror \
+    -fno-tree-loop-distribute-patterns -fno-builtin "${inc[@]}" -c "$BL/updater/updater_ram.c" -o "$dir/obj/updater_ram.o"
+  objs+=("$dir/obj/updater_ram.o")
+  for src in "$BL/updater/power_limits.cpp" "$BL/boards/cubevox/fonts.cpp"; do
+    obj="$dir/obj/$(basename "${src%.*}").o"
+    run_logged "$dir/build.log" "$TC/arm-none-eabi-g++" "${UPDATER_FLAGS[@]}" -std=c++17 -fno-exceptions -fno-rtti \
+      -fno-threadsafe-statics -Wall -Wextra -Werror "${inc[@]}" -c "$src" -o "$obj"
+    objs+=("$obj")
+  done
+  for src in "${vendor[@]}"; do
+    obj="$dir/obj/$(basename "${src%.*}").o"
+    run_logged "$dir/build.log" "$TC/arm-none-eabi-gcc" "${UPDATER_FLAGS[@]}" -std=gnu11 "${inc[@]}" -c "$src" -o "$obj"
+    objs+=("$obj")
+  done
+  run_logged "$dir/build.log" "$TC/arm-none-eabi-gcc" "${UPDATER_FLAGS[@]}" -x assembler-with-cpp \
+    -DCV_PAYLOAD_BIN="\"$bin\"" -DCV_PAYLOAD_LENGTH="$length" -DCV_PAYLOAD_CRC="$crc" \
+    -c "$BL/updater/payload.S" -o "$dir/obj/payload.o"
+  objs+=("$dir/obj/payload.o")
+  run_logged "$dir/link.log" "$TC/arm-none-eabi-gcc" "${UPDATER_FLAGS[@]}" -nostartfiles --specs=nano.specs \
+    -T "$BL/updater/updater.ld" -Wl,--gc-sections -Wl,--no-warn-rwx-segments -Wl,-Map="$dir/updater.map" "${objs[@]}" -o "$dir/updater.elf"
+  ram_calls_check "$dir/updater.elf" "$dir/obj/updater_ram.o"
+
+  local name="cubevox-bootloader-v$version"
+  "$TC/arm-none-eabi-objcopy" -O binary "$dir/updater.elf" "$dir/updater-unstamped.bin"
+  local stamp=(python3 -I "$REPO/tools/stamp_image.py")
+  run_logged "$dir/stamp.log" "${stamp[@]}" stamp "$dir/updater-unstamped.bin" --out "$dir/$name.bin"
+  run_logged "$dir/uf2.log" "${stamp[@]}" uf2 "$dir/$name.bin" "$OUT/$name.uf2" --family cubevox
+  local checked carried
+  checked="$("${stamp[@]}" check "$OUT/$name.uf2")"
+  if [ "$(awk '{ print $1, $2 }' <<<"$checked")" != "ok boot-$version" ]; then
+    echo "[ERROR] stamp_image.py check on $name.uf2 says '$checked', expected ok boot-$version"
+    exit 1
+  fi
+  if ! carried="$("$HOST/updatercheck" image "$dir/$name.bin" "$bin")"; then
+    exit 1
+  fi
+  echo "[build] updater: $checked; carries the bootloader, $carried"
+  echo "[build] $name.uf2 $(($(wc -c < "$OUT/$name.uf2"))) bytes, sha256 $(shasum -a 256 "$OUT/$name.uf2" | cut -d' ' -f1)"
+}
+
+# The updater's RAM code (.ramfunc) keeps running while bank 1 erases and after the updater's own
+# sector is gone. updater_ram.o may need no symbol from elsewhere but the stack top, so it calls
+# nothing in flash, and no constant in the linked code may point past sector 0 into flash (the
+# updater's code, or bank 2). 0x08020000 is the end of sector 0.
+ram_calls_check() {
+  local elf="$1" obj="$2" undefined outside
+  undefined="$("$TC/arm-none-eabi-nm" -u "$obj" | awk '{ print $NF }' | paste -sd' ' -)"
+  if [ "$undefined" != "_estack" ]; then
+    echo "[ERROR] updater_ram.o needs '$undefined' from elsewhere; only _estack may come from outside it"
+    exit 1
+  fi
+  outside="$("$TC/arm-none-eabi-objdump" -d -j .ramfunc "$elf" |
+    awk '$3 == ".word" && $4 ~ /^0x08(0[2-9a-f]|1)/ && $4 != "0x08020000" { print }')"
+  if [ -n "$outside" ]; then
+    echo "[ERROR] the updater's RAM code holds a flash address past sector 0:"
+    echo "$outside"
+    exit 1
+  fi
 }
 
 case "$MODE" in
@@ -383,5 +511,8 @@ case "$MODE" in
     patch_tree
     toolchain
     build_board
+    host_tools
+    build_updater
+    echo "[build] $OUT"
     ;;
 esac

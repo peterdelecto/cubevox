@@ -78,6 +78,8 @@ typedef struct {
   bool cableOut;
   // cvBootTimeoutAllowed holds, so the waiting screen counts down.
   bool timeoutArmed;
+  // The updater wrote this bootloader and no firmware has gone in since (cvBootUpdatedMarked).
+  bool bootUpdated;
 } CvScreenInputs;
 
 // A level that follows a raw input only after the input holds steady.
@@ -139,9 +141,32 @@ bool cvBootTimeoutAllowed(const struct CvBootBlock* block, CvImageStatus image, 
                           bool writeBegun);
 
 // After a complete UF2 write. Zeroes the counter and clears the request, the reason, the
-// bootloader's fault registers and the application's summary. A fault address in bank 2 stays for
-// the new application, which erases that log sector and clears it; any other is cleared.
+// bootloader's fault registers, the application's summary and the bootloader-updated mark. A fault
+// address in bank 2 stays for the new application, which erases that log sector and clears it; any
+// other is cleared.
 void cvBootMarkUpdated(struct CvBootBlock* block);
+
+// The bootloader-updated mark: the first two words of bootReserved hold CV_BOOT_UPDATED_MARK and
+// its complement. The updater writes it once sector 0 compares, never when it keeps the old
+// bootloader. The bootloader reads it only to choose the waiting screen while no image is
+// installed; cvBootMarkUpdated and a power-on clear it. Code that does not know the mark leaves
+// bootReserved alone, so it changes nothing else.
+#define CV_BOOT_UPDATED_MARK 0x4C425055u  // the bytes U P B L
+
+// Byte by byte, so the updater's RAM code needs no library call.
+static inline void cvBootUpdatedWordsPut(struct CvBootBlock* block, uint32_t first, uint32_t second) {
+  for (uint32_t i = 0; i < 4u; ++i) {
+    block->bootReserved[i] = (uint8_t)(first >> (8u * i));
+    block->bootReserved[4u + i] = (uint8_t)(second >> (8u * i));
+  }
+}
+
+static inline void cvBootUpdatedMarkSet(struct CvBootBlock* block) {
+  cvBootUpdatedWordsPut(block, CV_BOOT_UPDATED_MARK, ~CV_BOOT_UPDATED_MARK);
+}
+
+// True when both words of the mark are in place.
+bool cvBootUpdatedMarked(const struct CvBootBlock* block);
 
 // ---- Option bytes -------------------------------------------------------------------------
 
@@ -258,6 +283,8 @@ typedef struct {
   uint32_t sessionSectors;
   // DIAG.TXT lags what update mode knows.
   bool diagDirty;
+  // cvBootUpdatedMarked at update mode's start. It picks a screen and nothing else.
+  bool bootUpdated;
 } CvUpdateSession;
 
 // A UF2 block as the board's filter sees it.

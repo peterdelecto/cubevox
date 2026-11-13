@@ -444,6 +444,7 @@ static void updateModeStart(void) {
   regionRead();
   vbusStart();
   cvSessionStart(&gState.session, gState.decision.reason, vbusPresent(), elapsedMs());
+  gState.session.bootUpdated = cvBootUpdatedMarked(CV_BLOCK);
   driveTextsRefresh();
   cvOledStart();
   screenRefresh();

@@ -83,7 +83,8 @@ copies the same `.uf2` file to the same drive. The firmware structure rules of
    sector is the erase unit, so nothing else may live there.
 4. Bank 2 is never written by the bootloader. It reads sector 2 for `DIAG.TXT` only.
 5. Bank 1 sector 0 is write protected by the bootloader's option byte step, so no application bug
-   can erase it. `firmware/bootloader/flash.sh` clears the protection before a shop reflash.
+   can erase it. `firmware/bootloader/flash.sh --rom` clears the protection before a shop reflash,
+   and the updater in the bootloader file clears it before it rewrites the sector.
 
 ## Shared boot block
 Both programs agree on 256 bytes at the top of DTCM. `boot_block.h` defines the struct, the
@@ -259,7 +260,7 @@ A 32-byte header sits at application offset 0x400, after the 0x298-byte vector t
    sector 0 protection it reads itself. The step marks itself interrupted before it programs, so a
    fault or reset mid-change reads as a failure, and a failure is not tried again until the next
    power-on.
-4. The ROM DFU skips a protected sector without an error. `firmware/bootloader/flash.sh` therefore
+4. The ROM DFU skips a protected sector without an error. `firmware/bootloader/flash.sh --rom` therefore
    clears the protection through the ROM's option byte area before it writes, and the new
    bootloader sets it again at its first start.
 
@@ -383,7 +384,7 @@ lines of 21 characters; the extension `uf2` never appears on screen because the 
 | Bootloader faults | reset, update mode again for the same reason; a second fault there runs a valid image | the waiting screen | `reason BootFault`, `boot fault: pc cfsr hfsr bfar` |
 | Crystal or PLL1 fails | HSI, USB on HSI48 with CRS, update mode | `The clock failed.` | `reason ClockFailed`, `clock: failed in <step>` |
 | Bootloader hangs | power cycle | screen frozen, then normal | nothing |
-| Bootloader itself damaged | shop only | box dark | BOOT0 inside the enclosure, `firmware/bootloader/flash.sh` |
+| Bootloader itself damaged | shop only | box dark | BOOT0 inside the enclosure, `firmware/bootloader/flash.sh --rom` |
 
 ## Diagnostics
 1. `DIAG.TXT` is 4096 bytes, built when the drive mounts and again, at most every 250 ms, after a
@@ -470,12 +471,15 @@ not, and this spec ends it.
 ```
 firmware/bootloader/
   README.md                 pin, toolchain, build, flash, drills, licences
-  build.sh                  clones adafruit/tinyuf2 at the pin into build/tinyuf2, applies patches/, make BOARD=cubevox; --selftest, --proofs
-  flash.sh                  ROM DFU of the bootloader at 0x08000000 (BOOT0 held), clears sector 0 protection first, reads back; shop only
+  build.sh                  clones adafruit/tinyuf2 at the pin into build/tinyuf2, applies patches/, make BOARD=cubevox,
+                            then the bootloader file cubevox-bootloader-v<version>.uf2; --selftest, --proofs
+  flash.sh                  the bootloader file through the CUBEVOX drive, then the firmware; --rom: ROM DFU of the
+                            bootloader at 0x08000000 (BOOT0 held), clears sector 0 protection first, reads back
+  updater/                  the updater the bootloader file carries (2026-11-13-bootloader-update-design.md)
   patches/                  01-12: flash bound and NOINIT origin, optional CURRENT.UF2 and INDEX.HTM, board files, block filter,
                             DFU task hook, weak dfu_complete, double-tap default, write state reset, failed write not counted,
                             root directory hook, 1 ms SysTick, complete on eject; sent upstream
-  tools/                    imagecheck, drivetext, proof (host programs for --selftest and --proofs), option_bytes.py (flash.sh)
+  tools/                    imagecheck, drivetext, proof, updatercheck (host programs for --selftest and --proofs), option_bytes.py (flash.sh --rom)
   boards/cubevox/           board.h, board.mk, board_hooks.c (TinyUF2 hooks, fault entry, option bytes, cable, watchdog),
                             boot_decide.c (pure policy), clock.c, oled.c, screens.c, diag.c, image_check.c, text.h, fonts.cpp
 ```
@@ -501,10 +505,10 @@ firmware/bootloader/
 6. `build.sh --selftest` runs the image check against `stamp_image.py`, the screen wording and rows,
    the `DIAG.TXT` and `INFO_UF2.TXT` texts, `option_bytes.py`'s own test, and upstream's
    `test_ghostfat` on the patched tree.
-5. Bootloader self-update in the field is not a supported path. TinyUF2's self-update image exists
-   and could be used as a last resort; it rewrites sector 0 with a window of about 2 s in which a
-   power loss leaves the box for the shop, and it would first have to clear sector 0's write
-   protection. The bootloader is kept small so that it never needs it.
+5. The bootloader updates from the `CUBEVOX` drive with a bootloader file, as
+   `2026-11-13-bootloader-update-design.md` describes. A power loss in the about 2 s while the
+   updater rewrites sector 0 leaves the box without a bootloader, and BOOT0 with
+   `firmware/bootloader/flash.sh --rom` recovers it.
 
 ## USB identity
 1. The box only ever meets two computers, so no registered ids are sought. The application keeps
@@ -517,10 +521,13 @@ firmware/bootloader/
    the boot report, and the bringup log maps box number to that UID.
 
 ## Shop steps, every unit
-1. Board on the bench, enclosure open, 9 V on. Hold BOOT0 down through the whole run and tap NRST.
-   `firmware/bootloader/flash.sh` clears sector 0's write protection when a bootloader set it,
-   writes the bootloader with dfu-util at 0x08000000, reads it back and starts it; let go of BOOT0
-   when it says so. Expected within 3 s: OLED `The update stopped.`, `CUBEVOX` drive mounted,
+1. Board on the bench, 9 V on. A board with no bootloader yet: enclosure open, hold BOOT0 down
+   through the whole run and tap NRST. `firmware/bootloader/flash.sh --rom` clears sector 0's write
+   protection when a bootloader set it, writes the bootloader with dfu-util at 0x08000000, reads it
+   back and starts it; let go of BOOT0 when it says so. A board that runs a bootloader takes a new
+   one through the drive with no buttons: `firmware/bootloader/flash.sh` copies the bootloader file,
+   waits for the drive to return with the new version and `Installed: none`, then installs the
+   firmware (`2026-11-13-bootloader-update-design.md`). Expected after the ROM path within 3 s: OLED `The update stopped.`, `CUBEVOX` drive mounted,
    `INFO_UF2.TXT` reads `Installed: none`, `DIAG.TXT` reads
    `option bytes: programmed, BOR level 3, sector 0 protected`.
 2. Drag the release `.uf2` from Finder. This is Adam's path and doubles as its acceptance test.
