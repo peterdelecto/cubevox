@@ -62,6 +62,11 @@ Card nextSwapCard(SwapSlot which, Card current);
 // The menu's word for the card of `which` that `layout` holds, the first card's word when it holds none.
 const char* swapWord(const Layout& layout, SwapSlot which);
 
+// Writes the word for card `c` in capitals into `out`, which holds `size` bytes, and returns its
+// length. A card of a swappable slot gives the menu's word for it (SPRING, OCTAVE). Any other card
+// gives its name in capitals.
+size_t cardWord(Card c, char* out, size_t size);
+
 // The name to show for a stored layout name: the name itself, or "Default" when it is empty.
 const char* layoutDisplayName(const char* stored);
 
@@ -76,6 +81,10 @@ struct LayoutCheck {
 
   bool ok() const { return error == LayoutError::None; }
 };
+
+// True when a card behind the Autotune card in slot `slot` reads its tracker, so its engine keeps
+// running with the slot off. Bit t of `liveMask` says slot t's card is running.
+bool autotuneHasReader(const Layout& layout, int slot, uint8_t liveMask);
 
 // The cost sums layoutValid holds against the budget lines, in percent of a block: the fixed term, each
 // placed card's row, and one tracker row for Autotune plus one for each Formant or Apraxia card not

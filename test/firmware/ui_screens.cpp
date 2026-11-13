@@ -1713,6 +1713,81 @@ void checkLoad() {
   check(boxIsText && restLit, "load: the box behind the figure is blanked and nothing outside it changes");
 }
 
+// ---------------------------------------------------------------------------------------------
+// OVERLOAD row
+
+constexpr uint8_t slotBit(int slot) { return static_cast<uint8_t>(1u << slot); }
+
+std::string overloadOf(const Layout& layout, uint8_t held) {
+  char text[kDisplayCols + 1];
+  overloadText(layout, held, text, sizeof(text));
+  return text;
+}
+
+// Deepthroat in slot 6, whose word is the longest.
+Layout deepLayout() {
+  Layout layout = defaultLayout();
+  layout.card[5] = Card::Growl;
+  return layout;
+}
+
+// One card reads by the menu's word for it, or its name in capitals when it has no SLOT row. More than
+// one reads the count.
+void checkOverloadText() {
+  const Layout layout = defaultLayout();  // slot 2 Autotune, 3 Octave, 5 Echo, 8 Spring Reverb
+  check(overloadOf(layout, 0).empty(), "overload: nothing held, no row");
+  check(overloadOf(layout, slotBit(7)) == "OVERLOAD: SPRING", "overload: Spring Reverb reads by the menu's word, SPRING");
+  check(overloadOf(layout, slotBit(2)) == "OVERLOAD: OCTAVE", "overload: Octave reads OCTAVE");
+  check(overloadOf(layout, slotBit(1)) == "OVERLOAD: AUTOTUNE", "overload: Autotune has no SLOT row and reads its name");
+  check(overloadOf(layout, slotBit(4)) == "OVERLOAD: ECHO", "overload: Echo has no SLOT row and reads its name");
+  check(overloadOf(layout, slotBit(7) | slotBit(2)) == "OVERLOAD: 2 CARDS", "overload: two cards read the count");
+  check(overloadOf(layout, 0xFF & ~slotBit(0)) == "OVERLOAD: 7 CARDS", "overload: seven cards read 7");
+  check(overloadOf(deepLayout(), slotBit(5)) == "OVERLOAD: DEEPTHROAT", "overload: the longest word fits alone");
+  check(overloadOf(deepLayout(), slotBit(5)).size() == 20, "overload: the longest row is 20 columns");
+  Layout mob = defaultLayout();
+  mob.card[3] = Card::Crowd;
+  check(overloadOf(mob, slotBit(3)) == "OVERLOAD: MOB", "overload: Mob reads MOB");
+}
+
+// Text row 0 in 5x7 with 1 px of padding, moved by the walk. It sits clear of the meter box and the
+// scope at every walk position.
+void checkOverloadRow() {
+  const Layout layout = defaultLayout();
+  const Walk walks[] = {{0, 0}, {-1, -1}, {1, 1}, {1, -1}, {-1, 1}};
+  for (const Walk& w : walks) {
+    Canvas drawn;
+    drawOverload(drawn, layout, slotBit(7), w);
+    Canvas want;
+    want.drawText(1 + w.x, 1 + w.y, font5x7(), "OVERLOAD: SPRING");
+    check(sameRows(drawn, want, 0, kCanvasHeight), "overload: the row sits at 1 px from the edges, shifted by the walk");
+    check(rowsBlank(drawn, 9, kCanvasHeight), "overload: nothing draws below row 8, so the meter box and scope stay clear");
+  }
+  Canvas none;
+  drawOverload(none, layout, 0, Walk{0, 0});
+  check(rowsBlank(none, 0, kCanvasHeight), "overload: an empty mask draws nothing");
+
+  // The longest row at the far walk stays inside the panel.
+  Canvas widest;
+  drawOverload(widest, deepLayout(), slotBit(5), Walk{1, 0});
+  bool lastColumnDark = true;
+  for (int y = 0; y < kCanvasHeight; ++y) lastColumnDark = lastColumnDark && !lit(widest, kCanvasWidth - 1, y);
+  check(lastColumnDark, "overload: the longest row keeps the last panel column dark");
+
+  const ScopeFrame silent{};
+  Canvas one;
+  renderVoice(one, silent, 0, Walk{0, 0});
+  drawOverload(one, layout, slotBit(7), Walk{0, 0});
+  writePgm(one, "oled-overload-1-one-card.pgm");
+  Canvas longest;
+  renderVoice(longest, silent, 0, Walk{0, 0});
+  drawOverload(longest, deepLayout(), slotBit(5), Walk{0, 0});
+  writePgm(longest, "oled-overload-2-longest-word.pgm");
+  Canvas several;
+  renderVoice(several, silent, 0, Walk{0, 0});
+  drawOverload(several, layout, slotBit(2) | slotBit(3) | slotBit(5), Walk{0, 0});
+  writePgm(several, "oled-overload-3-several-cards.pgm");
+}
+
 }  // namespace
 
 void checkScreens() {
@@ -1747,4 +1822,6 @@ void checkScreens() {
   checkToggle();
   checkReadoutTitleBar();
   checkLoad();
+  checkOverloadText();
+  checkOverloadRow();
 }

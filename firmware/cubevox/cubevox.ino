@@ -88,8 +88,25 @@ ChainSnapshot gCompose;
 
 // Rebuilds the snapshot from the layout, panel and settings, then hands it to the audio interrupt.
 void publishSnapshot() {
-  composeSnapshotInto(gCompose, gLayout, controlsReading(), gSettings, benchOverrides());
+  composeSnapshotInto(gCompose, gLayout, controlsReading(), gSettings, benchOverrides(), audioHeldMask());
   audioPublish(gCompose);
+}
+
+// True on the pass after a layout apply or a card swap, which clears the load rule's holds.
+bool gLayoutApplied = false;
+
+// Runs the load rule over the pass. A step goes to DIAG.TXT, and any change of the held mask, a step
+// or a release, sends a snapshot so the slot's fade starts at once.
+void runLoadRule(uint32_t nowMs) {
+  const uint8_t before = audioHeldMask();
+  const LoadStep step = audioLoadRulePoll(nowMs, gLayout, controlsReading(), gLayoutApplied);
+  gLayoutApplied = false;
+  if (step.slot >= 0) {
+    char text[64];
+    loadStepText(step, text, sizeof text);
+    diagNoteAudioFault(text);
+  }
+  if (audioHeldMask() != before) gPublish.markStale();
 }
 
 // The encoder's turns and clicks for the menu. While a planned reset waits on the flash the menu
@@ -106,6 +123,7 @@ bool applyAction(UiAction action, uint32_t nowMs) {
   switch (ui::applyAction(action, gSettings, gLayout)) {
     case ui::ApplyResult::SettingsChanged: return true;
     case ui::ApplyResult::LayoutChanged:
+      gLayoutApplied = true;
       gPublish.markStale();
       return true;
     case ui::ApplyResult::EnterDfu: enterDfu(nowMs); break;
@@ -142,6 +160,8 @@ void replyStatus(uint32_t id) {
   status.saiErrors = health.errors.count;
   status.restarts = health.restarts;
   status.nanBlocks = health.nanBlocks;
+  status.heldMask = audioHeldMask();
+  status.steps = audioLoadSteps();
   status.stalled = faultAudioStalled();
   status.powerTrips = powerSenseTrips();
   status.floorDbfs = peakDbfs(audioTakeGatePeak());
@@ -160,6 +180,7 @@ void replySetLayout(const protocol::Request& req, uint32_t nowMs) {
   protocol::applySettings(req, gSettings);  // only the fields the request carried
   recordSetName(req.name);
   recordRequestSave(gLayout, gSettings, nowMs);
+  gLayoutApplied = true;
   gPublish.markStale();  // goes out after controlsPoll() re-seeds the knobs for the new cards
   protocol::replyOk(serialWriter(), req.id);
 }
@@ -323,13 +344,14 @@ void loop() {
   diagPoll();
   plannedResetPoll(nowMs);  // after both stores took their step this pass
   runJackSwitch(nowMs);
+  runLoadRule(nowMs);  // before the publish, so a hold or a release goes out this pass
   // The first publish carries the real panel; mutePoll sees the hold lift on the next pass.
   if (gPublish.take(controlsSeeded(), controlsTakeChanged() || settingsChanged)) publishSnapshot();
 
   const bool switchOn = topSwitchEngaged(gSettings.topSwitch, muteActive(), muteBypassOn());
   gDim.noteTopSwitch(switchOn, nowMs);
   refreshLoad(nowMs);
-  const UiContext ctx{gLayout, controlsReading(), gSettings, switchOn, gLoadPercent};
+  const UiContext ctx{gLayout, controlsReading(), gSettings, switchOn, gLoadPercent, audioHeldMask()};
   LastMoved touch;
   if (controlsTakeTouch(touch)) {
     gDim.noteActivity(nowMs);
