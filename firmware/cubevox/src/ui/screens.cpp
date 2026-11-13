@@ -201,6 +201,38 @@ void renderMuted(Canvas& canvas, const char* word) {
   drawCentred(canvas, (kCanvasHeight - font16x24().height) / 2, font16x24(), word);
 }
 
+void overloadText(const Layout& layout, uint8_t held, char* out, size_t size) {
+  if (size == 0) return;
+  out[0] = '\0';
+  int count = 0;
+  int last = 0;
+  for (int s = 0; s < kSlotCount; ++s) {
+    if (!((held >> s) & 1u)) continue;
+    ++count;
+    last = s;
+  }
+  if (count == 0) return;
+  if (count > 1) {
+    snprintf(out, size, "OVERLOAD: %d CARDS", count);
+    return;
+  }
+  char word[24];
+  cardWord(layout.card[static_cast<size_t>(last)], word, sizeof(word));
+  snprintf(out, size, "OVERLOAD: %s", word);
+}
+
+void drawOverload(Canvas& canvas, const Layout& layout, uint8_t held, Walk walk) {
+  char text[kDisplayCols + 1];
+  overloadText(layout, held, text, sizeof(text));
+  if (text[0] == '\0') return;
+  const FontDesc& font = font5x7();
+  const int width = Canvas::textWidth(font, text);
+  const int x = kScreenPad + walk.x;
+  const int y = kScreenPad + walk.y;
+  canvas.fillRect(x, y, width, font.height, false);
+  canvas.drawText(x, y, font, text);
+}
+
 void drawLoad(Canvas& canvas, int percent) {
   const FontDesc& font = font5x7();
   const int shown = percent < 0 ? 0 : (percent > kMaxLoadPercent ? kMaxLoadPercent : percent);

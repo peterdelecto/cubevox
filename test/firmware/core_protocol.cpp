@@ -408,6 +408,7 @@ void checkStatusReply() {
   check(JsonReader(w.out).valid() &&
             w.out == "{\"id\":15,\"ok\":true,\"cpu_mean\":54.66,\"cpu_worst\":71,\"late\":0,\"dry_blocks\":0,\"muted\":true,\"seq\":9,"
                      "\"rec_errors\":2,\"serial_dropped\":5,\"stray_bytes\":8,\"boot_fails\":0,"
+                     "\"held\":0,\"steps\":0,"
                      "\"overruns\":0,\"sai_errors\":0,\"restarts\":0,\"nan_blocks\":0,"
                      "\"power_trips\":0,\"stalled\":false,\"reply_overflows\":0,"
                      "\"floor_dbfs\":-120,\"update_reason\":\"none\"}\n",
@@ -427,6 +428,15 @@ void checkStatusReply() {
   protocol::replyStatus(w, 16, s);
   check(JsonReader(w.out).valid() && has(w.out, "\"reply_overflows\":0,\"floor_dbfs\":-62.37,\"update_reason\""),
         "proto: status carries the input gate's floor in dBFS to two decimals");
+
+  w = StringWriter();
+  s.heldMask = 0x84;
+  s.steps = 3;
+  protocol::replyStatus(w, 21, s);
+  check(JsonReader(w.out).valid() && has(w.out, "\"boot_fails\":0,\"held\":132,\"steps\":3,\"overruns\":"),
+        "proto: status carries the load rule's held mask and steps");
+  s.heldMask = 0;
+  s.steps = 0;
 
   w = StringWriter();
   s.bootFails = 2;
@@ -468,6 +478,7 @@ void checkStatusWidest() {
   s.late = s.seq = s.recordErrors = s.serialDropped = s.strayBytes = s.bootFails = 0xFFFFFFFFu;
   s.overruns = s.saiErrors = s.restarts = s.nanBlocks = s.powerTrips = 0xFFFFFFFFu;
   s.stalled = true;
+  s.heldMask = s.steps = 0xFFFFFFFFu;
   s.floorDbfs = -123.456f;
   s.updateReason = "ImageUnreadable";
   protocol::replyStatus(w, 0xFFFFFFFFu, s);

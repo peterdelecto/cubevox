@@ -278,7 +278,7 @@ DrumSynthV3 are references to read, and nothing in `firmware/` is copied from th
   is 1 to 31 printable ASCII characters. `status` reports CPU mean and worst since the previous `status` (its own
   window; the bench peaks are untouched), cumulative `late` and `dry_blocks` (the blocks that skipped the chain and
   passed the dry input after a late one), `muted`, the record `seq` and `rec_errors`,
-  `serial_dropped`, `stray_bytes`, `boot_fails`, `update_reason`, the audio counters `overruns`, `sai_errors`,
+  `serial_dropped`, `stray_bytes`, `boot_fails`, `update_reason`, the load rule's `held` and `steps`, the audio counters `overruns`, `sai_errors`,
   `restarts` and `nan_blocks`, and `power_trips`, `stalled` and `reply_overflows`. All output
   (replies, boot report, bench prints) goes through `serialOut()`, a bounded queue (`core/tx_queue`) that
   `serialLinkPoll` drains each pass with non-blocking writes sized by `Serial.availableForWrite()`; a line that does not fit is dropped whole and counted, and with no host connected

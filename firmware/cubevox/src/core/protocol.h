@@ -135,6 +135,8 @@ struct Status {
   uint32_t restarts = 0;    // audio stream restarts after a fault
   uint32_t nanBlocks = 0;   // blocks discarded before CLEANUP EQ's back half for a NaN or an infinity
   uint32_t powerTrips = 0;  // power-fail mutes, 5VA under its trip level
+  uint32_t heldMask = 0;     // slots the load rule holds off, bit s for slot s
+  uint32_t steps = 0;        // cards the load rule has held since boot
   float floorDbfs = -120.0f;  // the Input gate's detector peak over the status interval, in dBFS
   bool stalled = false;       // the stall watch muted the output and started the reset
 
