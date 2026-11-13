@@ -91,6 +91,8 @@ struct Request {
   int benchSlot = 0;             // Bench only; the slot_off, slot_on and set_knob target, 1 to kMaxBenchSlot
   int benchKnob = 0;             // Bench only; set_knob, 1 to kMaxBenchKnob
   int benchValue = 0;            // Bench only; set_knob, 0 to kMaxBenchKnobValue percent of travel
+  int benchCycles = 0;           // Bench only; burn, 0 to kMaxBenchBurnCycles
+  int benchBlocks = 0;           // Bench only; burn, 1 to kMaxBenchBurnBlocks, 0 when the request left it out
   char name[kNameBytes + 1] = {};
   int slotCount = 0;  // ids present in "slots"
   std::array<std::array<char, kIdBytes>, kSlotCount> slot = {};

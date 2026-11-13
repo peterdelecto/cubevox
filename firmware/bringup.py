@@ -25,12 +25,21 @@ the reset, a fourth fault after the minute restarts plainly, and a failed restar
 It reads the verdict from the port (the error lines, status `restarts` and `muted`, the next boot
 report) and from DIAG.TXT on the update drive, so it needs the bootloader, and the MUTE toggle up.
 
+--survival runs the drill table of docs/specs/2026-10-31-stage-survival-design.md section 3 hands-free
+on stress.py's costliest layout with every slot forced on: the overload drills with the bench op burn,
+then the restarts (stop_audio, spin, fault, fail_audio_start) and a bad update. It needs the bootloader
+and the MUTE toggle up. Each drill reports PASS, FAIL or SKIPPED with its measured numbers, and the log lists them. --dry-run, with
+--faults, --update or --survival, prints their drills (for --survival what each sends and checks) and
+opens no port.
+
   ./bringup.py --board 1                 # USB checks, then the manual questions
   ./bringup.py --board 1 --faults --dfu  # also the fault drill and the BOOT0 ROM DFU entry (reflashes)
   ./bringup.py --board 1 --panel         # also the panel walk: pots, toggles, K103, mute, OLED
   ./bringup.py --board 1 --flood         # also 10 s of status requests at full speed, then a hello
   ./bringup.py --board 1 --faults --update   # also the update drills; log board-1.md
   ./bringup.py --board 1 --stream-faults --no-prompt   # the stream fault drills, hands-free
+  ./bringup.py --board 1 --survival --no-prompt        # the survival drills, hands-free
+  ./bringup.py --board 1 --survival --dry-run          # the survival drill plan; no port
 """
 
 import argparse
@@ -55,6 +64,7 @@ REPO = os.path.dirname(FW)
 sys.path.insert(0, FW)  # python3 -I leaves the script dir out
 import bench_ops  # noqa: E402
 import cubevox_port  # noqa: E402
+import stress  # noqa: E402
 
 STAMP_TOOL = os.path.join(REPO, "tools", "stamp_image.py")
 BRINGUP_DIR = os.path.join(REPO, "hardware", "bringup")  # the logs and the checklist for a person at the bench
@@ -941,6 +951,23 @@ def flip_payload_byte(path):
     write_bytes(path, bytes(blob))
 
 
+def other_image(tmp, image):
+    """A .uf2 of the stamped `image` under another header version, stamped again: the same code with another
+    CRC, so the box takes it for a new image and the running image's mid-song mark does not count for it."""
+    data = bytearray(read_bytes(image))
+    try:
+        c = stamp_image.Contract(stamp_image.DEFAULT_HEADER)
+        version = stamp_image.parse_version(c, bytes(data), image)
+        at = c.header_offset + c.off_version + len(version) - 1
+        data[at] = ord("y") if data[at] == ord("x") else ord("x")
+        stamped, _ = stamp_image.stamp_bytes(c, bytes(data), image)
+    except stamp_image.ToolError as e:
+        raise DrillError(str(e)) from e
+    path = os.path.join(tmp, "other.bin")
+    write_bytes(path, stamped)
+    return rewrap(tmp, path, "other.uf2")
+
+
 def uf2_family(path):
     """The family id in a .uf2's first block, the eighth word of the header stamp_image.make_uf2 writes."""
     head = read_bytes(path)[:stamp_image.UF2_HEADER_BYTES]
@@ -985,6 +1012,7 @@ def prepare_files(ctx):
         "wrongbase": rewrap(ctx.tmp, image, "wrongbase.uf2", base=contract_value("CV_APP_END")),
         "foreign": rewrap(ctx.tmp, image, "foreign.uf2", family_id=0),
         "flipped": flipped,
+        "other": other_image(ctx.tmp, image),
     }
 
 
@@ -1157,28 +1185,35 @@ def trigger_reset(ctx, op, wait_s):
 
 
 def drill_failed_starts(ctx):
+    """A new image that faults at each start lands in update mode after CV_BOOT_FAIL_LIMIT starts.
+
+    The running image runs past the healthy window first, so it carries the mid-song mark, and its own
+    faults would restart the box as it was. The new image is ctx.files["other"], another CRC, so the mark
+    does not count for it. The update drills (8) and the survival drills (Bad update) both run this.
+    """
     limit = contract_value("CV_BOOT_FAIL_LIMIT")
-    healthy_s = contract_value("CV_HEALTHY_MS") / 1000.0
     ctx.app()
-    time.sleep(healthy_s + HEALTHY_MARGIN_S)  # the running start has reported healthy, so the count is 0
-    trigger_reset(ctx, "w", RESET_WAIT_S)     # a fresh start; the faults land inside its healthy window
-    seen = []
-    for n in range(1, limit + 1):
-        if wait_state(ctx, UPDATE_WAIT_S) != "app":
-            return FAIL, f"the application did not start before fault {n} of {limit}", ""
-        ctx.port = Port(wait_s=2.0, settle_s=FAST_SETTLE_S)
+    time.sleep(contract_value("CV_HEALTHY_MS") / 1000.0 + HEALTHY_MARGIN_S)  # the running image's mark is written
+    enter_update_mode(ctx, UPDATE_WAIT_S)  # the path the menu's Update firmware item takes
+    install(ctx, ctx.files["other"], COPY_NAME)
+    seen, state = [], "app"
+    while state == "app" and len(seen) <= limit:
+        if ctx.port is None:
+            ctx.port = Port(wait_s=2.0, settle_s=FAST_SETTLE_S)
         seen.append(read_boot_fails(ctx.port))
-        trigger_reset(ctx, "f", FAULT_WAIT_S)
-    state = wait_state(ctx, UPDATE_WAIT_S)
+        trigger_reset(ctx, "f", FAULT_WAIT_S)  # the new image faults as soon as its port opens
+        state = wait_state(ctx, UPDATE_WAIT_S)
+    measured = f"{len(seen)} starts"
     if state != "drive":
-        return FAIL, f"after {limit} faults the box shows {state or 'neither port nor drive'}, want the drive", ""
+        return (FAIL, f"after {len(seen)} faulting starts the box shows {state or 'neither port nor drive'}, "
+                f"want the drive", measured)
     diag = parse_fields(read_drive_text(ctx.volume(), "DIAG.TXT"))
     reason, fault = diag.get("reason", "?"), diag.get("fault", "?")
     r = install(ctx, ctx.files["bench"], COPY_NAME)
-    good = reason == "BootFailed" and not fault.startswith("none")
-    return ((PASS if good else FAIL), f"started {limit} times, then update mode; DIAG.TXT reason {reason}, "
-            f"fault {fault}; status boot_fails at each start {seen}; a full copy then restarted the box "
-            f"({r.back_s:.1f} s)", "")
+    good = len(seen) == limit and reason == "BootFailed" and not fault.startswith("none")
+    return ((PASS if good else FAIL), f"the new image faulted at {len(seen)} starts (want {limit}), then update "
+            f"mode; DIAG.TXT reason {reason}, fault {fault}; status boot_fails at each start {seen}; the bench "
+            f"image then restarted the box ({r.back_s:.1f} s)", measured)
 
 
 # -- drill 9: the layout
@@ -1276,7 +1311,7 @@ DRILLS = (
     (5, "wrong base address refused", drill_wrong_base, False),
     (6, "other family refused", drill_other_family, False),
     (7, "flipped byte lands in update mode", drill_flipped_byte, False),
-    (8, "failed starts land in update mode", drill_failed_starts, False),
+    (8, "a new image's failed starts land in update mode", drill_failed_starts, False),
     (9, "layout survives an update", drill_layout, False),
     (10, "removed (no MENU path since bootloader v0.09)", drill_removed, False),
     (11, "no computer, back to the application", drill_no_computer, True),
@@ -1551,6 +1586,468 @@ def stream_fault_drills(log, port):
             return None
 
 
+# -- survival drills (--survival): docs/specs/2026-10-31-stage-survival-design.md section 3
+# The restart code, the warm start and its times come from the boot report; the overload net from the
+# status fields held, steps, late and muted. The screen has no readout over the port, so the OVERLOAD
+# row and the tick are not read.
+
+SURVIVAL_LAYOUT = "costliest"   # stress.py layout_table()
+SURVIVAL_CLEANUP_EQ = "strong"  # the setting the stress run measures the layout at
+GAP_LIMIT_MS = 1500             # the spec's bound on the gap; the box times setup() to the relay
+WATCHDOG_S = 2.0                # board/fault.cpp kWatchdogMs: sound this long, then the restart
+WATCHDOG_TOL_S = 1.0
+STEP_LIMIT_S = 0.12             # an overload step lands inside 120 ms
+STEP_WAIT_S = 2.0
+LOAD_WAIT_FIRST_S = 2.0         # core/load_rule.h kLoadWaitFirstMs
+LOAD_WAIT_CAP_S = 16.0          # core/load_rule.h kLoadWaitCapMs
+LOAD_RESET_AFTER_S = 60.0       # core/load_rule.h kLoadResetAfterMs: a card back this long starts at 2 s again
+LOAD_WAIT_TOL_S = 0.5
+LOAD_HOLDS = 5                  # the waits 2, 4, 8, 16 and 16 s
+OVERLOAD_STAYS_S = 60.0
+RETURN_WAIT_S = 6.0
+MAX_BURN_CYCLES = 1000000       # core/bench_ops.h kMaxBenchBurnCycles
+SAVE_LOAD = 0.80                # the burn brings the mean block to 80 % of the budget
+SAVES_UNDER_LOAD = 20
+SAVE_GAP_S = 0.5
+RUN_BEFORE_REPEAT_S = 10.0
+REPEAT_FAULTS = 5
+REPEAT_GAP_S = 2.0
+STATS_SETTLE_S = 2.0
+STATUS_POLL_S = 0.02
+LATE_SETTLE_S = 0.5
+NEVER_TAKEN = ("empty", "input_gate", "autotune")  # Autotune is passed over: costliest has readers behind it
+START_LINE = r"^\[boot\] start: (warm|cold).*$"
+CODE_LINE = r"^\[boot\] restart code (\S+)"
+REPORT_END = r"^\[(boot\] pots|ERROR\] pots:)"
+
+
+class SurvivalCtx(Ctx):
+    """Ctx plus the costliest layout and what the overload drills hand on."""
+
+    def __init__(self, log, tmp, slots):
+        super().__init__(log, False, tmp)
+        self.slots = slots
+        self.budget = None   # cycles in one block
+        self.burn = None     # cycles a block that make the costliest chain late
+        self.slow = None     # the slot the overload step should take out
+        self.held_at = None  # host time the overload step was seen
+        self.back_at = None  # host time the held card came back
+
+
+def bench_ask(port, op, wait_s=5.0, **args):
+    """Sends a bench op that must answer ok. Returns the text lines the box printed before the reply."""
+    lines = []
+    reply = port.ask("bench", wait_s, lines.append, op=op, **args)
+    if not isinstance(reply, dict) or reply.get("ok") is not True:
+        raise DrillError(f"bench {op}: {str(reply)[:160]}")
+    return lines
+
+
+def status_now(port):
+    reply = port.ask("status", 1.0)
+    if not isinstance(reply, dict) or reply.get("ok") is not True:
+        raise DrillError(f"status: {str(reply)[:120]}")
+    return reply
+
+
+def poll_status(port, since, seconds, stop=None):
+    """(seconds after `since`, status reply) pairs until `seconds` after `since`, or until stop(reply) holds."""
+    seen = []
+    while time.monotonic() - since < seconds:
+        reply = status_now(port)
+        seen.append((time.monotonic() - since, reply))
+        if stop and stop(reply):
+            break
+        time.sleep(STATUS_POLL_S)
+    return seen
+
+
+def layout_state(port):
+    reply = ask_ok(port, "get_layout")
+    return reply.get("layout"), reply.get("settings")
+
+
+def card_at(ctx, slot):
+    return f"slot {slot + 1} ({ctx.slots[slot]})"
+
+
+def held_slots(mask):
+    return [s for s in range(stress.SLOTS) if mask >> s & 1]
+
+
+# -- the restarts
+
+def start_report(port):
+    """A fresh boot report from the running box."""
+    port.read(0.3)
+    port.send("r")
+    return port.read(4.0, until=REPORT_END)
+
+
+def come_back(ctx, gone, drops):
+    """After the reset that dropped the port at host time `gone`: (seconds from the drop until status reads
+    muted false, or None; the boot report). Rides out `drops` more resets, as A4's second restart."""
+    last = None
+    for _ in range(drops + 2):
+        if wait_state(ctx, UPDATE_WAIT_S) != "app":
+            raise DrillError(f"no serial port {UPDATE_WAIT_S:g} s after the reset (update mode, or no start)")
+        try:
+            ctx.port = Port(wait_s=1.0, settle_s=FAST_SETTLE_S)
+            unmuted_s = seconds_until_unmuted(ctx.port, gone, [])
+            return unmuted_s, start_report(ctx.port)
+        except PORT_ERRORS as e:
+            last = e
+            path = ctx.port.path if ctx.port is not None else None
+            ctx.drop_port()
+            if path:
+                wait_port_gone(path, RESET_GONE_S)
+    raise DrillError(f"the box did not stay up after the reset: {last}")
+
+
+def judge_restart(lines, want_code, before, after, unmuted_s):
+    """(ok, detail, measured) for one return: a warm start, the code, the same layout and settings, the panel
+    read again, and setup() to the relay inside the gap bound."""
+    start = find(lines, START_LINE)
+    code = find(lines, CODE_LINE)
+    relay = re.search(r"relay (\d+) ms", start.group(0)) if start else None
+    snapshot = re.search(r"first snapshot (\d+) ms", start.group(0)) if start else None
+    relay_ms = int(relay.group(1)) if relay else None
+    got = code.group(1) if code else "none"
+    wrong = []
+    if not start or start.group(1) != "warm":
+        wrong.append(f"start {start.group(1) if start else 'line missing'}, want warm")
+    if got != want_code:
+        wrong.append(f"code {got}, want {want_code}")
+    if after != before:
+        wrong.append("the layout or its settings changed")
+    if snapshot is None:
+        wrong.append("no first snapshot of the panel")
+    if relay_ms is None or relay_ms > GAP_LIMIT_MS:
+        wrong.append(f"setup() to relay {relay_ms if relay_ms is not None else 'not reported'}, limit {GAP_LIMIT_MS} ms")
+    if unmuted_s is None:
+        wrong.append(f"status still muted {RELAY_WAIT_S:g} s after the reset")
+    host = f"{unmuted_s:.2f} s" if unmuted_s is not None else "never"
+    detail = (f"{start.group(0) if start else 'no start line'}; code {got}; host saw status unmuted {host} after "
+              f"the port dropped, USB enumeration included")
+    measured = f"setup() to relay {relay_ms} ms" if relay_ms is not None else "relay not reported"
+    return not wrong, "; ".join(wrong + [detail]), measured
+
+
+def restart_drill(ctx, send, want_code, drops=0):
+    """Sends the op that ends in a restart and judges the return. Returns (ok, detail, measured, seconds
+    from the op to the port dropping)."""
+    port = ctx.app()
+    before = layout_state(port)
+    path = port.path
+    sent = time.monotonic()
+    send(port)
+    port.read(RESET_GONE_S)  # returns early when the reset drops the port
+    gone = time.monotonic()
+    ctx.drop_port()
+    if not wait_port_gone(path, 1.0):
+        raise DrillError(f"serial port still there {RESET_GONE_S:g} s after the op")
+    unmuted_s, lines = come_back(ctx, gone, drops)
+    bench_ask(ctx.port, "all_on")  # a restart drops the bench's forced slots
+    ok, detail, measured = judge_restart(lines, want_code, before, layout_state(ctx.port), unmuted_s)
+    return ok, detail, measured, gone - sent
+
+
+def send_letter(letter):
+    return lambda port: port.send(letter)
+
+
+def drill_a3(ctx):
+    ok, detail, measured, _ = restart_drill(ctx, send_letter("a"), "A3")
+    return (PASS if ok else FAIL), detail, measured
+
+
+def drill_w1(ctx):
+    ok, detail, measured, drop_s = restart_drill(ctx, send_letter("w"), "W1")
+    on_time = abs(drop_s - WATCHDOG_S) <= WATCHDOG_TOL_S
+    detail = f"port dropped {drop_s:.1f} s after spin, want {WATCHDOG_S:g} s; {detail}"
+    return (PASS if ok and on_time else FAIL), detail, f"{measured}, the watchdog after {drop_s:.1f} s"
+
+
+def drill_c1(ctx):
+    ok, detail, measured, _ = restart_drill(ctx, send_letter("f"), "C1")
+    entries = diag_entries_now(ctx)
+    bench_ask(ctx.app(), "all_on")
+    boot = next((e for e in entries if e.kind == "boot"), None)
+    entry_ok = boot is not None and boot.fault.startswith("C1")
+    diag = f"DIAG.TXT newest boot entry #{boot.sequence} '{boot.fault}'" if boot else "DIAG.TXT has no boot entry"
+    return (PASS if ok and entry_ok else FAIL), f"{detail}; {diag}", measured
+
+
+def drill_c1_repeated(ctx):
+    ctx.app()
+    time.sleep(RUN_BEFORE_REPEAT_S)  # past the 5 s that write the mid-song mark
+    gaps, wrong = [], []
+    for n in range(1, REPEAT_FAULTS + 1):
+        ok, detail, measured, _ = restart_drill(ctx, send_letter("f"), "C1")
+        gaps.append(measured)
+        if not ok:
+            wrong.append(f"fault {n}: {detail}")
+        time.sleep(REPEAT_GAP_S)
+    if wrong:
+        return FAIL, "; ".join(wrong), "; ".join(gaps)
+    return PASS, f"{REPEAT_FAULTS} restarts, each warm with C1 and the same layout, never update mode", "; ".join(gaps)
+
+
+def drill_a4(ctx):
+    bench_ask(ctx.app(), "fail_audio_start")
+    ok, detail, measured, _ = restart_drill(ctx, send_letter("f"), "A4", drops=1)
+    return (PASS if ok else FAIL), detail, measured
+
+
+# -- the overload net
+
+def chain_stats(port):
+    """The chain's block and per-slot cycles over STATS_SETTLE_S, with no burn."""
+    bench_ask(port, "reset_peaks")
+    time.sleep(STATS_SETTLE_S)
+    try:
+        return stress.parse_stats(bench_ask(port, "stats"))
+    except stress.StressError as e:
+        raise DrillError(str(e)) from e
+
+
+def size_burn(ctx, stats):
+    """The burn that puts the mean block past the budget by half the slowest takeable card's cycles, so blocks
+    are late with that card in and on time with it out."""
+    takeable = [s for s, card in enumerate(ctx.slots) if card not in NEVER_TAKEN]
+    ctx.slow = max(takeable, key=lambda s: stats.slot_avg[s])
+    ctx.budget = stats.budget
+    ctx.burn = max(0, min(MAX_BURN_CYCLES, stats.budget - stats.avg + stats.slot_avg[ctx.slow] // 2))
+
+
+def percent(cycles, budget):
+    return f"{100.0 * cycles / budget:.1f} %"
+
+
+def drill_overload(ctx):
+    port = ctx.app()
+    stats = chain_stats(port)
+    size_burn(ctx, stats)
+    before = status_now(port)
+    sent = time.monotonic()
+    bench_ask(port, "burn", cycles=ctx.burn)
+    seen = poll_status(port, sent, STEP_WAIT_S, lambda r: r.get("steps", 0) > before["steps"])
+    plan = (f"burn {ctx.burn} cycles a block ({percent(ctx.burn, stats.budget)}) on a chain averaging "
+            f"{percent(stats.avg, stats.budget)}")
+    if not seen or seen[-1][1]["steps"] <= before["steps"]:
+        return FAIL, f"{plan}; no step in {STEP_WAIT_S:g} s", ""
+    step_s, reply = seen[-1]
+    ctx.held_at = sent + step_s
+    held = held_slots(reply["held"])
+    muted = any(r.get("muted") for _, r in seen)
+    ok = step_s <= STEP_LIMIT_S and held == [ctx.slow] and not muted
+    detail = (f"{plan}; step {1000 * step_s:.0f} ms after the burn, limit {1000 * STEP_LIMIT_S:.0f} ms; held "
+              f"{', '.join(card_at(ctx, s) for s in held) or 'nothing'}, slowest {card_at(ctx, ctx.slow)}; "
+              f"{'MUTED' if muted else 'never muted'}; the OVERLOAD row is not read")
+    return (PASS if ok else FAIL), detail, f"{1000 * step_s:.0f} ms to the step"
+
+
+def drill_overload_ends(ctx):
+    if ctx.held_at is None:
+        return SKIPPED, "the overload drill held no card", ""
+    port = ctx.app()
+    bench_ask(port, "burn", cycles=0)
+    seen = poll_status(port, ctx.held_at, RETURN_WAIT_S, lambda r: r.get("held") == 0)
+    if not seen or seen[-1][1]["held"] != 0:
+        return FAIL, f"the card is still held {RETURN_WAIT_S:g} s after it went", ""
+    back_s = seen[-1][0]
+    ctx.back_at = ctx.held_at + back_s
+    ok = abs(back_s - LOAD_WAIT_FIRST_S) <= LOAD_WAIT_TOL_S
+    return ((PASS if ok else FAIL), f"the card came back {back_s:.2f} s after it went, want {LOAD_WAIT_FIRST_S:g} s "
+            f"± {LOAD_WAIT_TOL_S:g} s; the row is not read", f"{back_s:.2f} s to return")
+
+
+def drill_one_late(ctx):
+    port = ctx.app()
+    budget = ctx.budget or chain_stats(port).budget
+    cycles = min(budget, MAX_BURN_CYCLES)
+    before = status_now(port)
+    bench_ask(port, "burn", cycles=cycles, blocks=1)
+    time.sleep(LATE_SETTLE_S)
+    after = status_now(port)
+    late, steps = after["late"] - before["late"], after["steps"] - before["steps"]
+    return ((PASS if late == 1 and steps == 0 else FAIL),
+            f"burn {cycles} cycles for one block: {late} late, {steps} steps, want 1 and 0; the tick is not heard",
+            f"{late} late blocks")
+
+
+def drill_save_under_load(ctx):
+    port = ctx.app()
+    stats = chain_stats(port)
+    burn = max(0, min(MAX_BURN_CYCLES, int(SAVE_LOAD * stats.budget) - stats.avg))
+    before = status_now(port)
+    bench_ask(port, "burn", cycles=burn)
+    for _ in range(SAVES_UNDER_LOAD):
+        bench_ask(port, "record_save")
+        time.sleep(SAVE_GAP_S)
+    bench_ask(port, "burn", cycles=0)
+    after = status_now(port)
+    late, steps = after["late"] - before["late"], after["steps"] - before["steps"]
+    return ((PASS if late == 0 and steps == 0 else FAIL),
+            f"{SAVES_UNDER_LOAD} record_save {SAVE_GAP_S:g} s apart under a burn of {burn} cycles a block, mean block "
+            f"{percent(stats.avg + burn, stats.budget)}: {late} late, {steps} steps, want 0 and 0", f"{late} late blocks")
+
+
+def hold_lengths(seen):
+    """The lengths in seconds of the holds that began and ended inside `seen`, and every held mask seen."""
+    lengths, masks, began = [], set(), None
+    for t, reply in seen:
+        held = reply.get("held", 0)
+        if held:
+            masks.add(held)
+            began = t if began is None else began
+        elif began is not None:
+            lengths.append(t - began)
+            began = None
+    return lengths, masks
+
+
+def load_waits():
+    """The waits the load rule gives one card taken out again and again: 2, 4, 8, 16, 16 s."""
+    waits, wait = [], LOAD_WAIT_FIRST_S
+    while len(waits) < LOAD_HOLDS:
+        waits.append(wait)
+        wait = min(2 * wait, LOAD_WAIT_CAP_S)
+    return waits
+
+
+def drill_overload_stays(ctx):
+    if ctx.burn is None:
+        return SKIPPED, "the overload drill sized no burn", ""
+    port = ctx.app()
+    if ctx.back_at is not None:
+        time.sleep(max(0.0, ctx.back_at + LOAD_RESET_AFTER_S + HEALTHY_MARGIN_S - time.monotonic()))
+    before = status_now(port)
+    sent = time.monotonic()
+    bench_ask(port, "burn", cycles=ctx.burn)
+    seen = poll_status(port, sent, OVERLOAD_STAYS_S)
+    bench_ask(port, "burn", cycles=0)
+    holds, masks = hold_lengths(seen)
+    want, after = load_waits(), seen[-1][1] if seen else before
+    wrong = []
+    if len(holds) < LOAD_HOLDS or any(abs(g - w) > LOAD_WAIT_TOL_S for g, w in zip(holds, want)):
+        wrong.append(f"want holds of {', '.join(f'{w:g}' for w in want)} s ± {LOAD_WAIT_TOL_S:g} s")
+    if masks != {1 << ctx.slow}:
+        wrong.append(f"held masks {sorted(masks)}, want only {card_at(ctx, ctx.slow)}")
+    if any(r.get("muted") for _, r in seen):
+        wrong.append("status read muted")
+    if after["restarts"] != before["restarts"]:
+        wrong.append(f"{after['restarts'] - before['restarts']} stream restarts")
+    measured = f"holds {', '.join(f'{h:.1f}' for h in holds)} s"
+    detail = f"{after['steps'] - before['steps']} steps in {OVERLOAD_STAYS_S:g} s, the port stayed up"
+    return (FAIL if wrong else PASS), "; ".join(wrong + [detail]), measured
+
+
+# (case, what it sends, what it checks, function), in run order. The overload drills run first, from one
+# start, so the load rule's waits begin at 2 s; each restart drill then starts the box again.
+SURVIVAL_DRILLS = (
+    ("Overload", "reset_peaks and stats with no burn, then burn (the block budget less the mean block plus half "
+     "the slowest takeable card's mean)",
+     "one step inside 120 ms, the slowest takeable card alone in status held, muted false; ms to the step",
+     drill_overload),
+    ("Overload ends", "burn 0", "status held 0 again 2 s ± 0.5 s after the step; s to return", drill_overload_ends),
+    ("One late block", "burn (the block budget) for 1 block", "status late +1, steps +0; late count", drill_one_late),
+    ("Save under load", "burn to an 80 % mean block, record_save 20 times 0.5 s apart, burn 0",
+     "status late +0, steps +0; late count", drill_save_under_load),
+    ("Overload stays", "the overload burn for 60 s once the card has been back 60 s, then burn 0",
+     "holds of 2, 4, 8, 16, 16 s ± 0.5 s, one card only, muted false, no restart; the holds in s",
+     drill_overload_stays),
+    ("A3", "stop_audio", "a warm start, restart code A3, the same layout and settings, the panel read again, "
+     "setup() to relay <= 1500 ms; the gap", drill_a3),
+    ("W1", "spin", "the port drops 2 s ± 1 s after the op, then as A3 with W1; the gap after the watchdog", drill_w1),
+    ("C1", "fault, then enter_dfu for DIAG.TXT and the bench image copied back",
+     "as A3 with C1, and DIAG.TXT's newest boot entry reads C1; the gap", drill_c1),
+    ("C1 repeated", "10 s of running, then fault five times, 2 s after each return",
+     "each return as A3 with C1, never update mode; the gap, five times", drill_c1_repeated),
+    ("A4", "fail_audio_start, then fault", "a second restart, then as A3 with A4; the gap", drill_a4),
+    ("Bad update", "after 7 s of running, enter_dfu and the bench image under another header version (another "
+     "CRC), then fault at each start as its port opens",
+     "update mode after 3 starts, DIAG.TXT reason BootFailed, the bench image copied back; starts",
+     drill_failed_starts),
+)
+
+
+def survival_slots():
+    try:
+        return stress.layout_table()[SURVIVAL_LAYOUT][0]
+    except stress.StressError as e:
+        raise DrillError(str(e)) from e
+
+
+def survival_setup(ctx):
+    """Puts the costliest layout on the box at CLEANUP EQ STRONG with every slot forced on. Returns the layout
+    and settings it found."""
+    port = ctx.app()
+    found = layout_state(port)
+    ask_ok(port, "set_layout", name=f"survival {SURVIVAL_LAYOUT}", slots=ctx.slots,
+           settings={"cleanup_eq": SURVIVAL_CLEANUP_EQ})
+    bench_ask(port, "all_on")
+    time.sleep(stress.SETTLE_S)
+    return found
+
+
+def survival_restore(ctx, found):
+    layout, settings = found
+    port = ctx.app()
+    bench_ask(port, "burn", cycles=0)
+    ask_ok(port, "set_layout", name=layout["name"], slots=layout["slots"],
+           settings={"cleanup_eq": settings["cleanup_eq"]})
+    bench_ask(port, "slots_live")
+
+
+def run_survival_drill(ctx, number, case, fn):
+    run_drill(ctx, number, case, fn, False)
+    try:
+        bench_ask(ctx.app(), "burn", cycles=0)  # a drill that stopped early leaves no burn behind
+    except (DrillError, *PORT_ERRORS) as e:
+        print(f"[WARN] burn 0 after drill {number}: {e}", flush=True)
+
+
+def survival_drills(log, port):
+    """Runs the survival drills on the bench image. Takes over `port` and returns the open port of the running
+    application, or None when the box could not be brought back."""
+    with tempfile.TemporaryDirectory(prefix="cubevox-survival-") as tmp:
+        ctx = SurvivalCtx(log, tmp, [])
+        ctx.port = port
+        try:
+            ctx.slots = survival_slots()
+            outdir = fw_outdir("bench")
+            ctx.files = {"bench": os.path.join(outdir, "cubevox.uf2"),
+                         "other": other_image(tmp, os.path.join(outdir, "cubevox.ino.bin"))}
+            found = survival_setup(ctx)
+        except (DrillError, *PORT_ERRORS) as e:
+            log.check("survival drills", False, str(e))
+            return ctx.port
+        for number, (case, _, _, fn) in enumerate(SURVIVAL_DRILLS, 1):
+            run_survival_drill(ctx, number, case, fn)
+        try:
+            survival_restore(ctx, found)
+            return ctx.app()
+        except (DrillError, *PORT_ERRORS) as e:
+            log.check("survival drills: the layout found put back", False, str(e))
+            return None
+
+
+def survival_plan(board):
+    """--survival --dry-run: each drill, what it sends and what it checks. Opens no port."""
+    try:
+        slots = survival_slots()
+    except DrillError as e:
+        print(f"[ERROR] {e}", flush=True)
+        return 1
+    print(f"[survival] board {board}; layout {SURVIVAL_LAYOUT}: {', '.join(slots)}; CLEANUP EQ "
+          f"{SURVIVAL_CLEANUP_EQ}; every slot forced on (all_on, again after each restart)")
+    for number, (case, sends, checks, _) in enumerate(SURVIVAL_DRILLS, 1):
+        print(f"DRILL {number:02d} {case}\n  sends:  {sends}\n  checks: {checks}")
+    print("[survival] then burn 0, the layout and CLEANUP EQ found, and slots_live")
+    return 0
+
+
 MANUAL = [
     ("input current at 9.6 V", "Bench supply current at 9.6 V, before USB (mA): "),
     ("placement orientation", "U1, SOT-23s, diodes, polarised caps match the silkscreen? (y/n, note): "),
@@ -1571,6 +2068,21 @@ def manual_questions(a):
     return questions
 
 
+def dry_run(a):
+    """--dry-run: the drills that --faults, --update and --survival name. Opens no port."""
+    if not (a.faults or a.update or a.survival):
+        sys.exit("[ERROR] --dry-run goes with --faults, --update or --survival")
+    if a.faults:
+        print("[faults] stop_audio: the stall line, then a software reset; spin: a watchdog reset; "
+              "fault: the fault record after the reset")
+    if a.update:
+        for number, name, fn, operator in DRILLS:
+            doc = (fn.__doc__ or "").strip().splitlines()
+            print(f"DRILL {number:02d} {name}{' (needs the operator)' if operator else ''}"
+                  + (f"\n  {doc[0]}" if doc else ""))
+    return survival_plan(a.board) if a.survival else 0
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--board", required=True, help="board number or label for the log name")
@@ -1583,9 +2095,15 @@ def main():
     ap.add_argument("--flood", action="store_true", help="10 s of status requests at full speed, then a hello")
     ap.add_argument("--update", action="store_true",
                     help="run the 13 update drills against the bootloader's drive; the log is board-N.md")
+    ap.add_argument("--survival", action="store_true",
+                    help="run the stage survival drill table on the costliest layout (needs the bootloader)")
+    ap.add_argument("--dry-run", action="store_true",
+                    help="with --faults, --update or --survival: print the drills, open no port")
     ap.add_argument("--no-prompt", action="store_true", help="skip every question to the operator")
     ap.add_argument("--port", default=None, help="serial port, needed only when several cu.usbmodem* exist")
     a = ap.parse_args()
+    if a.dry_run:
+        return dry_run(a)
     if a.dfu and not shutil.which("dfu-util"):
         sys.exit("[ERROR] dfu-util not installed (brew install dfu-util)")  # before the operator holds BOOT0
     if a.port:
@@ -1622,6 +2140,10 @@ def run_checks(log, a):
         port = fault_drill(log, port)
     if a.stream_faults:
         port = stream_fault_drills(log, port)
+        if port is None:
+            return
+    if a.survival:
+        port = survival_drills(log, port)
         if port is None:
             return
     if a.dfu:
@@ -1665,7 +2187,9 @@ def finish(log, a):
         text = markdown_log(log, a, stamp)
     else:
         path = os.path.join(BRINGUP_DIR, f"{stamp}-board-{a.board}.txt")
-        text = f"cubevox bring-up, board {a.board}, {stamp}\n" + "\n".join(log.rows) + "\n"
+        drills = [f"DRILL {n:02d} {status:7} {name}: {detail} [measured: {measured or '-'}]"
+                  for n, name, status, detail, measured in log.drills]
+        text = f"cubevox bring-up, board {a.board}, {stamp}\n" + "\n".join(log.rows + drills) + "\n"
     with open(path, "w") as f:
         f.write(text)
     print(f"\n[bringup] {log.failed} failed; log {path}")

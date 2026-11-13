@@ -2,7 +2,7 @@
 
 The firmware takes no single-byte commands. Every bench action is a framed request,
 {"id":N,"cmd":"bench","op":"<name>"}, plus "slot" for slot_off and slot_on, and "slot", "knob" and
-"value" for set_knob. The familiar letters stay as
+"value" for set_knob, and "cycles" with an optional "blocks" for burn. The familiar letters stay as
 host-side shorthand and expand here (op names: core/bench_ops.cpp). DFU is its own command,
 enter_dfu, in every build.
 """
@@ -40,7 +40,7 @@ DFU_LETTER = "d"           # the enter_dfu command
 QUERY_OPS = {"report", "stats", "record_status"}      # every build
 ARG_OPS = {"slot_off", "slot_on", "set_knob"}          # ops with arguments and no letter of their own
 FLAG_OPS = {"bypass", "cleanup_eq", "fail_restart"}  # each call flips a forced state; no letter of their own
-DRILL_OPS = {"stream_fault", "fail_audio_start"}                         # one-shot fault drills with no letter of their own
+DRILL_OPS = {"stream_fault", "fail_audio_start", "burn"}               # drills with no letter of their own
 ALL_OPS = set(LETTER_OPS.values()) | ARG_OPS | FLAG_OPS | DRILL_OPS  # the bench build lists these
 
 _ids = itertools.count(1)
@@ -50,9 +50,10 @@ def next_id():
     return next(_ids)
 
 
-def op_line(op, slot=None, req_id=None, knob=None, value=None):
+def op_line(op, slot=None, req_id=None, knob=None, value=None, cycles=None, blocks=None):
     """The request line for a bench op, newline included. slot_off and slot_on take a slot;
-    set_knob takes a slot, a knob (1 upper, 2 lower) and a value in whole percent of travel."""
+    set_knob takes a slot, a knob (1 upper, 2 lower) and a value in whole percent of travel; burn takes
+    the cycles spun inside each chain block (0 is off) and, optionally, how many blocks it lasts."""
     req = {"id": req_id if req_id is not None else next_id(), "cmd": "bench", "op": op}
     if slot is not None:
         req["slot"] = slot
@@ -60,6 +61,10 @@ def op_line(op, slot=None, req_id=None, knob=None, value=None):
         req["knob"] = knob
     if value is not None:
         req["value"] = value
+    if cycles is not None:
+        req["cycles"] = cycles
+    if blocks is not None:
+        req["blocks"] = blocks
     return json.dumps(req) + "\n"
 
 

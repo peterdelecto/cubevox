@@ -108,7 +108,8 @@ bool gLayoutApplied = false;
 // or a release, sends a snapshot so the slot's fade starts at once.
 void runLoadRule(uint32_t nowMs) {
   const uint8_t before = audioHeldMask();
-  const LoadStep step = audioLoadRulePoll(nowMs, gLayout, controlsReading(), gLayoutApplied);
+  const std::array<bool, kSlotCount> toggles = slotToggles(controlsReading(), benchOverrides());
+  const LoadStep step = audioLoadRulePoll(nowMs, gLayout, toggles, gLayoutApplied);
   gLayoutApplied = false;
   if (step.slot >= 0) {
     char text[64];
@@ -203,6 +204,8 @@ void replyBench(const protocol::Request& req) {
   args.slot = req.benchSlot;
   args.knob = req.benchKnob;
   args.value = req.benchValue;
+  args.cycles = req.benchCycles;
+  args.blocks = req.benchBlocks;
   const BenchResult result = benchRun(req.op, args, reportBoot);
   if (result.republish) gPublish.markStale();
   if (result.error) {

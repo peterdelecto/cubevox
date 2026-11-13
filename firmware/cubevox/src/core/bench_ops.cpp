@@ -44,6 +44,7 @@ constexpr std::array<OpEntry, kBenchOpCount> kOps = {{
     {BenchOp::StreamFault, "stream_fault", OpClass::Bench},
     {BenchOp::FailRestart, "fail_restart", OpClass::Bench},
     {BenchOp::FailAudioStart, "fail_audio_start", OpClass::Bench},
+    {BenchOp::Burn, "burn", OpClass::Bench},
 }};
 
 // Every entry sits at its own enum index, and every name fits the clip width with room to spare,
@@ -89,3 +90,5 @@ bool opAllowed(BenchOp op, bool benchBuild) { return benchBuild || opClass(op) =
 bool opTakesSlot(BenchOp op) { return op == BenchOp::SlotOff || op == BenchOp::SlotOn || op == BenchOp::SetKnob; }
 
 bool opTakesKnob(BenchOp op) { return op == BenchOp::SetKnob; }
+
+bool opTakesCycles(BenchOp op) { return op == BenchOp::Burn; }

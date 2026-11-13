@@ -17,7 +17,7 @@ constexpr size_t kOpBytes = kOpNameBytes;
 // Longer than "bypass" plus its NUL, so a clipped word can never equal a real one.
 constexpr size_t kSwitchWordBytes = 8;
 constexpr int kMaxSkipDepth = 4;
-constexpr uint32_t kSlotClamp = 255;  // keeps a huge slot number out of int range; it still fails the check
+constexpr uint32_t kBenchIntClamp = 100000000;  // keeps a huge argument out of int range; it still fails its range check
 
 struct CommandName {
   const char* text;
@@ -239,6 +239,8 @@ struct Fields {
   bool hasSlot = false;
   bool hasKnob = false;
   bool hasValue = false;
+  bool hasCycles = false;
+  bool hasBlocks = false;
   bool hasName = false;
   bool hasSlots = false;
   bool nameClipped = false;
@@ -264,7 +266,7 @@ bool parseId(const char*& p, Fields& f) {
   return skipValue(p, 0);
 }
 
-// Reads a bench integer argument into `dest`. A value over kSlotClamp reads as kSlotClamp, so it fails
+// Reads a bench integer argument into `dest`. A value over kBenchIntClamp reads as kBenchIntClamp, so it fails
 // its range check. A negative integer is a type error, unless `negativeOk`, where it reads as a
 // negative value for the range check to refuse. Text, a fraction or an exponent is a type error.
 bool parseBenchInt(const char*& p, Fields& f, int& dest, bool& present, const char* typeMsg, bool negativeOk) {
@@ -274,7 +276,7 @@ bool parseBenchInt(const char*& p, Fields& f, int& dest, bool& present, const ch
   if (negative) ++p;
   uint32_t v;
   if (readUint(p, v)) {
-    const int clamped = static_cast<int>(v < kSlotClamp ? v : kSlotClamp);
+    const int clamped = static_cast<int>(v < kBenchIntClamp ? v : kBenchIntClamp);
     dest = negative ? -clamped : clamped;
     present = true;
     return true;
@@ -404,6 +406,12 @@ bool parseField(const char*& p, const char* key, Fields& f) {
   if (strcmp(key, "value") == 0) {
     return parseBenchInt(p, f, f.req.benchValue, f.hasValue, "value must be an integer", true);
   }
+  if (strcmp(key, "cycles") == 0) {
+    return parseBenchInt(p, f, f.req.benchCycles, f.hasCycles, "cycles must be an integer", false);
+  }
+  if (strcmp(key, "blocks") == 0) {
+    return parseBenchInt(p, f, f.req.benchBlocks, f.hasBlocks, "blocks must be an integer", false);
+  }
   if (strcmp(key, "name") == 0) {
     StrOut out{f.req.name, kNameBytes};  // one byte under the buffer: 31 characters fit
     const bool ok = parseText(p, f, out, "name must be a string", f.hasName);
@@ -472,21 +480,8 @@ bool inBenchRange(int v, int lo, int hi, const char* what, char* err, size_t err
   return false;
 }
 
-// Resolves the bench op and checks the build carries it and the op has the arguments it takes, in
-// range. On failure writes the reason to `err`.
-bool resolveBenchOp(Fields& f, bool benchBuild, char* err, size_t errSize) {
-  if (!f.hasOp) {
-    snprintf(err, errSize, "missing op");
-    return false;
-  }
-  if (!opFromName(f.op, f.req.op)) {
-    snprintf(err, errSize, "unknown op: %s", f.op);
-    return false;
-  }
-  if (!opAllowed(f.req.op, benchBuild)) {
-    snprintf(err, errSize, "op not in this build: %s", f.op);
-    return false;
-  }
+// Checks that the op has the arguments it takes, each in range. On failure writes the reason to `err`.
+bool checkBenchArgs(Fields& f, char* err, size_t errSize) {
   if (opTakesSlot(f.req.op)) {
     if (!f.hasSlot) {
       snprintf(err, errSize, "missing slot");
@@ -506,7 +501,33 @@ bool resolveBenchOp(Fields& f, bool benchBuild, char* err, size_t errSize) {
     if (!inBenchRange(f.req.benchKnob, kMinBenchKnob, kMaxBenchKnob, "knob", err, errSize)) return false;
     if (!inBenchRange(f.req.benchValue, 0, kMaxBenchKnobValue, "value", err, errSize)) return false;
   }
+  if (opTakesCycles(f.req.op)) {
+    if (!f.hasCycles) {
+      snprintf(err, errSize, "missing cycles");
+      return false;
+    }
+    if (!inBenchRange(f.req.benchCycles, 0, kMaxBenchBurnCycles, "cycles", err, errSize)) return false;
+    if (f.hasBlocks && !inBenchRange(f.req.benchBlocks, 1, kMaxBenchBurnBlocks, "blocks", err, errSize)) return false;
+  }
   return true;
+}
+
+// Resolves the bench op, checks the build carries it, then checks its arguments. On failure writes
+// the reason to `err`.
+bool resolveBenchOp(Fields& f, bool benchBuild, char* err, size_t errSize) {
+  if (!f.hasOp) {
+    snprintf(err, errSize, "missing op");
+    return false;
+  }
+  if (!opFromName(f.op, f.req.op)) {
+    snprintf(err, errSize, "unknown op: %s", f.op);
+    return false;
+  }
+  if (!opAllowed(f.req.op, benchBuild)) {
+    snprintf(err, errSize, "op not in this build: %s", f.op);
+    return false;
+  }
+  return checkBenchArgs(f, err, errSize);
 }
 
 bool findCommand(const char* text, Command& out) {

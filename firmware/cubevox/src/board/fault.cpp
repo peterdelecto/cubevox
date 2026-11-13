@@ -390,6 +390,12 @@ void faultReport(Print& out) {
   }
   out.println();
 
+  // The code the splash shows, so the bench reads it over the port.
+  if (gRestartCode != AudioFaultCause::None) {
+    out.print("[boot] restart code ");
+    out.println(audioFaultCode(gRestartCode));
+  }
+
   if (gLast.magic == CV_FAULT_MAGIC) {
     reportFault(out);
   } else {

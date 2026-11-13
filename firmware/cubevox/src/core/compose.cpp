@@ -26,15 +26,14 @@ float slotKnobPosition(const Layout& layout, const PanelReading& panel, const Be
   return bench.knobsPinned ? topPosition(c, knob) : panel.knob[slot][knob];
 }
 
-void applySlot(const Layout& layout, const PanelReading& panel, const BenchOverrides& bench, uint8_t held, int slot,
-               ChainSnapshot& snap) {
+void applySlot(const Layout& layout, const PanelReading& panel, const BenchOverrides& bench, bool toggleOn,
+               uint8_t held, int slot, ChainSnapshot& snap) {
   const Card c = layout.card[slot];
   ChainParams& out = snap.params;
   applyPlacement(c, out);
   for (int k = 0; k < kKnobsPerCard; ++k) applyKnob(c, k, slotKnobPosition(layout, panel, bench, slot, k), out);
-  const bool forcedOn = (bench.slotsForcedOn >> slot) & 1u;
-  const bool forcedOff = ((bench.slotsOff | held) >> slot) & 1u;  // a held card stays off whatever its toggle reads
-  const bool on = (panel.toggle[slot] || forcedOn) && !forcedOff;
+  // A held card stays off whatever its toggle reads.
+  const bool on = toggleOn && !((held >> slot) & 1u);
   applyToggle(c, on, out);
   snap.slotOn[static_cast<size_t>(slot)] = on;
 }
@@ -43,7 +42,8 @@ void applySlot(const Layout& layout, const PanelReading& panel, const BenchOverr
 void fill(ChainSnapshot& snap, const Layout& layout, const PanelReading& panel, const Settings& settings,
           const BenchOverrides& bench, uint8_t held) {
   snap.layout = layout;
-  for (int s = 0; s < kSlotCount; ++s) applySlot(layout, panel, bench, held, s, snap);
+  const std::array<bool, kSlotCount> toggles = slotToggles(panel, bench);
+  for (int s = 0; s < kSlotCount; ++s) applySlot(layout, panel, bench, toggles[static_cast<size_t>(s)], held, s, snap);
   if (bench.reverbChasm) snap.params.reverb.engine = cv::kReverbChasm;
   snap.params.eq.on = settings.cleanupEq != CleanupEq::Off && !bench.eqOff;
   snap.params.eq.cuts = settings.cleanupEq == CleanupEq::Strong;
@@ -51,6 +51,16 @@ void fill(ChainSnapshot& snap, const Layout& layout, const PanelReading& panel, 
 }
 
 }  // namespace
+
+std::array<bool, kSlotCount> slotToggles(const PanelReading& panel, const BenchOverrides& bench) {
+  std::array<bool, kSlotCount> on{};
+  for (int s = 0; s < kSlotCount; ++s) {
+    const bool forcedOn = (bench.slotsForcedOn >> s) & 1u;
+    const bool forcedOff = (bench.slotsOff >> s) & 1u;
+    on[static_cast<size_t>(s)] = (panel.toggle[static_cast<size_t>(s)] || forcedOn) && !forcedOff;
+  }
+  return on;
+}
 
 ChainSnapshot composeSnapshot(const Layout& layout, const PanelReading& panel, const Settings& settings,
                               const BenchOverrides& bench, uint8_t held) {

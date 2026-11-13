@@ -777,7 +777,8 @@ void checkOpTable() {
     check(opFromName(opName(op), back) && back == op, opName(op));
     const std::string line = std::string("{\"id\":4,\"cmd\":\"bench\",\"op\":\"") + opName(op) + "\"" +
                              (opTakesSlot(op) ? ",\"slot\":3" : "") +
-                             (opTakesKnob(op) ? ",\"knob\":2,\"value\":40" : "") + "}";
+                             (opTakesKnob(op) ? ",\"knob\":2,\"value\":40" : "") +
+                             (opTakesCycles(op) ? ",\"cycles\":1000" : "") + "}";
     check(parses(line.c_str(), r, err, true) && r.cmd == protocol::Command::Bench && r.op == op, "ops: every op round-trips in a bench build");
     const bool query = opClass(op) == OpClass::Query;
     queries += query ? 1 : 0;
@@ -831,6 +832,29 @@ void checkOpSlotParsing() {
 // A set_knob request with the given argument text spliced in, so each case names only what differs.
 std::string setKnobLine(const std::string& args) {
   return "{\"id\":4,\"cmd\":\"bench\",\"op\":\"set_knob\"" + args + "}";
+}
+
+std::string burnLine(const std::string& args) { return "{\"id\":4,\"cmd\":\"bench\",\"op\":\"burn\"" + args + "}"; }
+
+void checkOpBurnParsing() {
+  protocol::Request r;
+  std::string err;
+  check(parses(burnLine(",\"cycles\":200000").c_str(), r, err) && r.op == BenchOp::Burn && r.benchCycles == 200000 &&
+            r.benchBlocks == 0,
+        "burn: cycles parse, blocks left out");
+  check(parses(burnLine(",\"cycles\":0").c_str(), r, err) && r.benchCycles == 0, "burn: 0 turns it off");
+  check(parses(burnLine(",\"cycles\":1000000").c_str(), r, err) && r.benchCycles == 1000000, "burn: 1 000 000 parses");
+  check(parses(burnLine(",\"blocks\":1,\"cycles\":700000").c_str(), r, err) && r.benchCycles == 700000 && r.benchBlocks == 1,
+        "burn: blocks parse in any key order");
+  check(!parses(burnLine("").c_str(), r, err) && err == "missing cycles", "burn: needs cycles");
+  check(!parses(burnLine(",\"cycles\":1000001").c_str(), r, err) && err == "cycles must be 0 to 1000000", "burn: cycles over the range");
+  check(!parses(burnLine(",\"cycles\":4000000000").c_str(), r, err) && err == "cycles must be 0 to 1000000",
+        "burn: a huge cycles count is out of range");
+  check(!parses(burnLine(",\"cycles\":-1").c_str(), r, err) && err == "cycles must be an integer", "burn: negative cycles");
+  check(!parses(burnLine(",\"cycles\":1.5").c_str(), r, err) && err == "cycles must be an integer", "burn: fractional cycles");
+  check(!parses(burnLine(",\"cycles\":1000,\"blocks\":0").c_str(), r, err) && err == "blocks must be 1 to 1000", "burn: blocks 0");
+  check(!parses(burnLine(",\"cycles\":1000,\"blocks\":1001").c_str(), r, err) && err == "blocks must be 1 to 1000",
+        "burn: blocks over the range");
 }
 
 void checkOpSetKnobParsing() {
@@ -907,6 +931,7 @@ void checkBenchOps() {
   checkOpBounds();
   checkOpSlotParsing();
   checkOpSetKnobParsing();
+  checkOpBurnParsing();
   checkOpLeversRefusedInRelease();
   checkHelloOps();
 }
