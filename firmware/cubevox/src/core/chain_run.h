@@ -124,8 +124,10 @@ class SlotFades {
     for (int s = 0; s < kSlotCount; ++s) level_[static_cast<size_t>(s)] = on[static_cast<size_t>(s)] ? kSlotFadeBlocks : 0;
   }
 
-  // Moves slot `s` one block toward `on` and returns the levels around that block.
+  // Moves slot `s` one block toward `on` and returns the levels around that block. A waiting slot moves
+  // toward off whatever its toggle says.
   Step step(int s, bool on) {
+    if (waiting(s)) on = false;
     int& level = level_[static_cast<size_t>(s)];
     const int from = level;
     if (on && level < kSlotFadeBlocks) ++level;
@@ -135,8 +137,14 @@ class SlotFades {
 
   int level(int s) const { return level_[static_cast<size_t>(s)]; }
 
+  // The slots in `mask` (bit s for slot s) wait for an engine they play from to clear. They stay at the dry
+  // input with their engine stopped, so a toggle turned on in the meantime fades in once the clear is done.
+  void setWaiting(uint8_t mask) { waiting_ = mask; }
+  bool waiting(int s) const { return (waiting_ >> s) & 1u; }
+
  private:
   std::array<int, kSlotCount> level_;
+  uint8_t waiting_ = 0;
 };
 
 // Mixes the dry input `dry` into the engine output in `wet` across one block of `n` samples, with
@@ -156,8 +164,9 @@ void mixSlotFade(float* wet, const float* dry, int n, int from, int to);
 // The Autotune engine runs while its toggle is off whenever a reader behind it is on or fading: the
 // Formant engine directly behind it, a Crowd card or a Growl card. It keeps the tracker warm, and the slot
 // then passes the dry input, as an Input gate slot does, once the toggle's fade has run. While Crowd sits
-// behind it, the Autotune slot also writes its own input into the Crowd card's ring. Returns false when it
-// wrote nothing.
+// behind it, the Autotune slot also writes its own input into the Crowd card's ring. A slot that waits for an
+// engine clear (SlotFades::setWaiting) rests as a slot settled off does, even the Input gate's and Autotune's.
+// Returns false when it wrote nothing.
 bool runSlot(ChainEngines& engines, SlotFades& fades, int s, const ChainSnapshot& snap, const float* in, float* out,
              int n, PitchPath& path);
 

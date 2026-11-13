@@ -37,6 +37,7 @@ void checkTx();                // core_tx_queue.cpp
 void checkFade();              // core_layout_fade.cpp
 void checkChainRun();          // core_chain_run.cpp
 void checkBlockTail();         // core_block_tail.cpp
+void checkSwapAtOnce();        // core_swap_at_once.cpp
 void checkFuzz();              // core_protocol_fuzz.cpp
 void checkInputLogic();        // core_input.cpp
 void checkMenu();              // ui_menu.cpp

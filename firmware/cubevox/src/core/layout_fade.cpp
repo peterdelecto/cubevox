@@ -11,6 +11,28 @@ uint32_t engineBit(Card c) {
   return e == kNoEngine ? 0u : 1u << static_cast<int>(e);
 }
 
+// True when the card in slot `s` reads Autotune's tracker: the Formant engine with only Empty slots
+// between it and Autotune, Mob or Deepthroat with Autotune anywhere ahead. The chain walk (runFormant,
+// runCrowd, the Growl stage) reads it on the same terms, whether the Autotune slot is on or off.
+bool readsAutotune(const Layout& layout, int s) {
+  const Engine e = engineOf(layout.card[static_cast<size_t>(s)]);
+  if (e != Engine::Formant && e != Engine::Crowd && e != Engine::Growl) return false;
+  bool onlyEmpty = true;
+  for (int a = s - 1; a >= 0; --a) {
+    const Card c = layout.card[static_cast<size_t>(a)];
+    if (c == Card::Autotune) return onlyEmpty || e != Engine::Formant;
+    if (c != Card::Empty) onlyEmpty = false;
+  }
+  return false;
+}
+
+bool placesCard(const Layout& layout, Card c) {
+  for (const Card placed : layout.card) {
+    if (placed == c) return true;
+  }
+  return false;
+}
+
 }  // namespace
 
 LayoutFade::Block LayoutFade::ramp(bool swap) {
@@ -81,4 +103,22 @@ uint32_t enginesToReset(const Layout& from, const Layout& to) {
     if (from.card[s] != to.card[s]) mask |= engineBit(from.card[s]) | engineBit(to.card[s]);
   }
   return mask;
+}
+
+uint32_t enginesReadBy(const Layout& layout, int s) {
+  const Card c = layout.card[static_cast<size_t>(s)];
+  uint32_t mask = engineBit(c);
+  if (readsAutotune(layout, s)) mask |= engineBit(Card::Autotune);
+  if (c == Card::Bloom && placesCard(layout, Card::InputGate)) mask |= engineBit(Card::InputGate);
+  return mask;
+}
+
+bool changeHeard(const Layout& from, const Layout& to, uint8_t liveMask, uint32_t clearing) {
+  for (int s = 0; s < kSlotCount; ++s) {
+    if (!((liveMask >> s) & 1u)) continue;
+    if (from.card[static_cast<size_t>(s)] != to.card[static_cast<size_t>(s)]) return true;
+    const uint32_t reads = enginesReadBy(from, s);
+    if (reads != enginesReadBy(to, s) || (reads & clearing) != 0) return true;
+  }
+  return false;
 }

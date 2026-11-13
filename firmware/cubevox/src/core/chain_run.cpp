@@ -70,10 +70,10 @@ bool stageToggleOn(const ChainSnapshot& snap, Engine e) {
   return false;
 }
 
-// True when slot `s` runs its engine this block or fades out of it: its toggle is on, or its fade has not
-// reached the dry end.
+// True when slot `s` runs its engine this block or fades out of it: its toggle is on and it waits for no
+// engine clear, or its fade has not reached the dry end.
 bool slotLive(const ChainSnapshot& snap, const SlotFades& fades, int s) {
-  return snap.slotOn[static_cast<size_t>(s)] || fades.level(s) > 0;
+  return (snap.slotOn[static_cast<size_t>(s)] && !fades.waiting(s)) || fades.level(s) > 0;
 }
 
 // What the Autotune slot `s` owes the cards behind it. The tracker runs while a reader behind is live: the
@@ -279,11 +279,12 @@ bool runSlot(ChainEngines& engines, SlotFades& fades, int s, const ChainSnapshot
   if (e == kNoEngine) return false;
 
   // The Autotune engine and the Input gate's engine keep running with their slot settled off, the gate for
-  // its detector and Autotune for the readers of its tracker.
+  // its detector and Autotune for the readers of its tracker, unless the slot waits for its engine to clear.
   StageContext ctx;
   if (e == Engine::Autotune) ctx = autotuneContext(engines, snap, fades, s);
-  const bool detectorLive = e == Engine::InputGate;
-  const bool trackerLive = ctx.tracker.run;
+  const bool waiting = fades.waiting(s);
+  const bool detectorLive = e == Engine::InputGate && !waiting;
+  const bool trackerLive = ctx.tracker.run && !waiting;
   const SlotFades::Step step = fades.step(s, stageToggleOn(snap, e));
   if (step.from == 0 && step.to == 0 && !detectorLive && !trackerLive) {
     restSlot(engines, e, in, n, path);
