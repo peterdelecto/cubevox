@@ -242,7 +242,7 @@ End powerOn(Box& box) {
   box.starts = 0;
   for (int start = 0; start < kMaxStarts; ++start) {
     cvBootAdopt(&box.block, flags);
-    const CvBootInputs in{false, CvImageValid, 0u};
+    const CvBootInputs in{CvImageValid, 0u};
     if (cvBootDecide(&box.block, &in).action != CvActionRunApp) return End::UpdateMode;
     ++box.starts;
     const bool fault = box.faulted;
@@ -471,7 +471,7 @@ void checkGiveBack() {
     int ran = 0;
     for (int start = 0; start < 6; ++start) {
       cvBootAdopt(&block, flags);
-      const CvBootInputs in{false, CvImageValid, 0u};
+      const CvBootInputs in{CvImageValid, 0u};
       if (cvBootDecide(&block, &in).action != CvActionRunApp) break;
       ++ran;
       if (start > 0) cvBootFailsSet(&block, failsAfterEccRecovery(cvBootFailsGet(&block), learned));

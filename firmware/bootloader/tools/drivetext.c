@@ -170,7 +170,7 @@ static void sampleBlock(struct CvBootBlock* block) {
 
 // The two files whose log must not be read, so there is no sector to read.
 static int writeUnreadable(const char* dir, struct CvBootBlock* block, CvDriveState* state) {
-  block->lastReason = CvReasonMenuHeld;
+  block->lastReason = CvReasonAppRequest;
   block->faultAddress = 0x08141230u;
   state->log = NULL;
   if (writeDiag(dir, "DIAG-unreadable.TXT", state) != 0) return 1;

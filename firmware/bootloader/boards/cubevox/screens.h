@@ -24,7 +24,7 @@ extern "C" {
 #define CV_SCREEN_LINE_BYTES 48u
 
 typedef enum {
-  // Waiting, from the menu or MENU held: the installed image is valid and the timeout may run.
+  // Waiting, from the menu: the installed image is valid and the timeout may run.
   CvScreenWaitMenu,
   // Waiting, no valid image.
   CvScreenWaitNoImage,

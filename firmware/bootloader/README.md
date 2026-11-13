@@ -87,7 +87,7 @@ and `./build.sh --selftest` runs it.
 25 MHz crystal, USB OTG_FS on PA11/PA12 with the B-session override, VID:PID
 `CV_USB_VID_BOOT`:`CV_USB_PID_BOOT` (1209:0001), manufacturer `cubevox`, product `cubevox update`,
 serial the 96-bit UID as 24 uppercase hex characters, bytes in address order (the firmware's
-`deviceSerial()` prints the same text). MENU on PE13 with a pull-up, sampled 20 ms after start.
+`deviceSerial()` prints the same text).
 
 ## Boot
 1. `clock.c` mirrors `firmware/cubevox/src/board/sysclock.cpp` with its 360 MHz profile on every
@@ -164,7 +164,7 @@ serial the 96-bit UID as 24 uppercase hex characters, bytes in address order (th
    TinyUSB's own VBUS sensing would, so the host session ends; with nothing written the 60 s timeout
    runs again from the pull. With a write begun but not complete, or no image to return to, the
    screen says the cable came out. After a complete write the pull resets the box.
-9. With reason MenuHeld, AppRequest or BootFault, a valid image, no host enumerated since the cable
+9. With reason AppRequest or BootFault, a valid image, no host enumerated since the cable
    went in and no block written, update mode resets after 60 s; the request is consumed, so the
    decision then runs the application. While a host is connected the menu screen's last line says
    `Unplug USB to cancel.`, because the pull starts that 60 s again.
@@ -238,7 +238,7 @@ slots. A slot is blank when every byte is 0xFF, valid when its magic and its tra
    the 5 s stop on a truncated copy.
 3. The read-fault path: a power cut mid-copy, the ECC fault, the sector erase, `ImageUnreadable`.
 4. The OLED driver: I2C timing at 400 kHz, the init sequence, orientation against the firmware.
-5. The MENU switch at power-on, the 60 s timeout, the LED.
+5. The 60 s timeout, the LED.
 6. Real log entries listed after a fault reboot, and the `unreadable` line after a double ECC error in
    bank 2 (one reset, then the sector is skipped).
 7. A different file copied after a cable pulled mid-copy, and after a copy cancelled in Finder, with

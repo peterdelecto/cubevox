@@ -52,7 +52,10 @@ bool cvBootRequestPending(const struct CvBootBlock* block) {
 // The reason a resume request returns to. Update mode always stores one, so anything else is a
 // fault the bootloader could not name.
 static enum CvBootReason resumeReason(uint32_t lastReason) {
-  if (lastReason == (uint32_t)CvReasonNone || !cvBootReasonKnown(lastReason)) return CvReasonBootFault;
+  if (lastReason == (uint32_t)CvReasonNone || lastReason == (uint32_t)CvReasonMenuHeld ||
+      !cvBootReasonKnown(lastReason)) {
+    return CvReasonBootFault;
+  }
   return (enum CvBootReason)lastReason;
 }
 
@@ -60,7 +63,6 @@ static enum CvBootReason reasonFor(const struct CvBootBlock* block, const CvBoot
                                    const CvBootDecision* decision, bool readFault) {
   const uint32_t fails = cvBootFailsGet(block);
   if (in->clockStep != 0u) return CvReasonClockFailed;
-  if (in->menuHeld) return CvReasonMenuHeld;
   if (readFault) return decision->eraseAddress != 0u ? CvReasonImageUnreadable : CvReasonImageInvalid;
   if (block->request == CV_REQUEST_RESUME) return resumeReason(block->lastReason);
   if (block->request == CV_REQUEST_UPDATE) return CvReasonAppRequest;
@@ -118,8 +120,7 @@ void cvBootRecordFault(struct CvBootBlock* block, const CvFaultInfo* fault) {
 bool cvBootTimeoutAllowed(const struct CvBootBlock* block, CvImageStatus image, bool hostSeen,
                           bool writeBegun) {
   const uint32_t reason = block->lastReason;
-  const bool leavable = reason == (uint32_t)CvReasonMenuHeld || reason == (uint32_t)CvReasonAppRequest ||
-                        reason == (uint32_t)CvReasonBootFault;
+  const bool leavable = reason == (uint32_t)CvReasonAppRequest || reason == (uint32_t)CvReasonBootFault;
   return leavable && image == CvImageValid && !hostSeen && !writeBegun;
 }
 
@@ -222,7 +223,6 @@ bool cvDirNamesWrongFile(const uint8_t* sector, char name[13]) {
 
 static CvScreen waitingScreen(const CvScreenInputs* in) {
   switch (in->reason) {
-    case CvReasonMenuHeld:
     case CvReasonAppRequest:
     case CvReasonBootFault: return in->imageValid ? CvScreenWaitMenu : CvScreenWaitNoImage;
     case CvReasonBootFailed: return CvScreenWaitBootFailed;

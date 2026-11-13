@@ -13,7 +13,7 @@ extern "C" {
 
 // Shown in INFO_UF2.TXT and DIAG.TXT. Bumped with every bootloader change; independent of
 // VERSION.txt because the two programs ship on different paths.
-#define CV_BOOT_VERSION "0.08"
+#define CV_BOOT_VERSION "0.09"
 
 //--------------------------------------------------------------------+
 // Board identity
@@ -27,15 +27,6 @@ extern "C" {
 #define UF2_BOARD_ID         "cubevox-h743-v4"
 #define UF2_VOLUME_LABEL     "CUBEVOX"
 #define LED_STATE_ON         1
-
-//--------------------------------------------------------------------+
-// MENU switch
-//--------------------------------------------------------------------+
-
-// ENC_MENU_SW (pins.h kEncMenuSw), low while pressed. Held at reset, it forces update mode.
-#define CV_MENU_PORT         GPIOE
-#define CV_MENU_PIN          GPIO_PIN_13
-#define CV_MENU_SETTLE_MS    20u
 
 //--------------------------------------------------------------------+
 // Flash
