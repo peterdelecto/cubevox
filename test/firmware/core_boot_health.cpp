@@ -105,7 +105,7 @@ void checkStallClockWrap() {
 // all read None.
 void checkAudioFaultSeal() {
   const AudioFaultCause causes[] = {AudioFaultCause::RepeatedFaults, AudioFaultCause::RestartFailed,
-                                    AudioFaultCause::Stalled};
+                                    AudioFaultCause::Stalled, AudioFaultCause::StartFailed};
   bool roundTrip = true;
   for (const AudioFaultCause cause : causes) {
     uint32_t stored = sealAudioFault(cause);
@@ -119,19 +119,29 @@ void checkAudioFaultSeal() {
   uint32_t near = sealAudioFault(AudioFaultCause::Stalled) ^ 0x100u;
   check(takeAudioFaultSeal(near) == AudioFaultCause::None, "audio fault seal: a word one bit off the seal reads None");
   uint32_t none = sealAudioFault(AudioFaultCause::None);
-  uint32_t four = kAudioFaultSeal | 4u;
-  check(takeAudioFaultSeal(none) == AudioFaultCause::None && takeAudioFaultSeal(four) == AudioFaultCause::None,
-        "audio fault seal: a sealed word with no cause 1 to 3 reads None");
+  uint32_t crash = sealAudioFault(AudioFaultCause::Crashed);
+  uint32_t hang = sealAudioFault(AudioFaultCause::Hung);
+  check(takeAudioFaultSeal(none) == AudioFaultCause::None && takeAudioFaultSeal(crash) == AudioFaultCause::None &&
+            takeAudioFaultSeal(hang) == AudioFaultCause::None,
+        "audio fault seal: a sealed word with no cause 1 to 4 reads None, C1 and W1 are never sealed");
   check(std::string(audioFaultCode(AudioFaultCause::RepeatedFaults)) == "A1" &&
             std::string(audioFaultCode(AudioFaultCause::RestartFailed)) == "A2" &&
-            std::string(audioFaultCode(AudioFaultCause::Stalled)) == "A3",
-        "audio fault seal: the codes are A1 to A3");
+            std::string(audioFaultCode(AudioFaultCause::Stalled)) == "A3" &&
+            std::string(audioFaultCode(AudioFaultCause::StartFailed)) == "A4" &&
+            std::string(audioFaultCode(AudioFaultCause::Crashed)) == "C1" &&
+            std::string(audioFaultCode(AudioFaultCause::Hung)) == "W1",
+        "audio fault seal: the codes are A1 to A4, C1 and W1");
   check(std::string(audioFaultDiagText(AudioFaultCause::RepeatedFaults)) == "A1 repeated stream faults" &&
             std::string(audioFaultDiagText(AudioFaultCause::RestartFailed)) == "A2 stream restart failed" &&
-            std::string(audioFaultDiagText(AudioFaultCause::Stalled)) == "A3 audio stalled",
+            std::string(audioFaultDiagText(AudioFaultCause::Stalled)) == "A3 audio stalled" &&
+            std::string(audioFaultDiagText(AudioFaultCause::StartFailed)) == "A4 audio did not start" &&
+            std::string(audioFaultDiagText(AudioFaultCause::Crashed)) == "C1 processor fault" &&
+            std::string(audioFaultDiagText(AudioFaultCause::Hung)) == "W1 watchdog reset",
         "audio fault seal: DIAG.TXT's text puts the code in front of the cause");
   bool fits = true;
   for (const AudioFaultCause cause : causes) fits = fits && std::string(audioFaultDiagText(cause)).size() < sizeof(CvDiagEntry::fault);
+  fits = fits && std::string(audioFaultDiagText(AudioFaultCause::Crashed)).size() < sizeof(CvDiagEntry::fault) &&
+         std::string(audioFaultDiagText(AudioFaultCause::Hung)).size() < sizeof(CvDiagEntry::fault);
   check(fits, "audio fault seal: each DIAG.TXT text fits the entry's fault field with its NUL");
 }
 

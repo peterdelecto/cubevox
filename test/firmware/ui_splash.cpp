@@ -87,6 +87,63 @@ void checkHold() {
   check(plain.draw(kSplashMs, kVersion, canvas, false) == SplashStep::Ended, "splash: no hold, ends at kSplashMs");
 }
 
+// A warm start after an audio error keeps the splash 6 s and ends it early on a touch. Without an
+// error code the splash is the plain one.
+void checkWarmError() {
+  check(kSplashWarmErrorMs == 6000u, "splash warm: the error splash stays 6 s");
+  check(splashUp(true, 500, 500 + kSplashWarmErrorMs - 1, kSplashWarmErrorMs) &&
+            !splashUp(true, 500, 500 + kSplashWarmErrorMs, kSplashWarmErrorMs),
+        "splash warm: the timer takes its own duration");
+
+  Splash splash;
+  Canvas canvas;
+  splash.startAfterWarmError(1000);
+  check(splash.draw(1000, kVersion, canvas, false, AudioFaultCause::Stalled) == SplashStep::Up, "splash warm: up at once");
+  check(splash.draw(1000 + kSplashMs, kVersion, canvas, false, AudioFaultCause::Stalled) == SplashStep::Up,
+        "splash warm: still up after the normal 2 s");
+  check(splash.draw(1000 + kSplashWarmErrorMs - 1, kVersion, canvas, false, AudioFaultCause::Stalled) == SplashStep::Up,
+        "splash warm: up until 6 s");
+  check(splash.draw(1000 + kSplashWarmErrorMs, kVersion, canvas, false, AudioFaultCause::Stalled) == SplashStep::Ended,
+        "splash warm: ends at 6 s");
+
+  Splash touched;
+  touched.startAfterWarmError(0);
+  touched.draw(0, kVersion, canvas, false, AudioFaultCause::RepeatedFaults);
+  touched.noteTouch();
+  check(touched.draw(100, kVersion, canvas, false, AudioFaultCause::RepeatedFaults) == SplashStep::Ended,
+        "splash warm: a touch ends it at once");
+  check(touched.draw(200, kVersion, canvas, false, AudioFaultCause::RepeatedFaults) == SplashStep::Off,
+        "splash warm: and it stays ended");
+
+  Splash held;
+  held.startAfterWarmError(0);
+  held.draw(0, kVersion, canvas, true, AudioFaultCause::RestartFailed);
+  held.noteTouch();
+  check(held.draw(10, kVersion, canvas, true, AudioFaultCause::RestartFailed) == SplashStep::Ended,
+        "splash warm: a touch ends it through the power-on hold");
+
+  Splash cold;
+  cold.start(0);
+  cold.draw(0, kVersion, canvas, false, AudioFaultCause::Stalled);
+  cold.noteTouch();
+  check(cold.draw(100, kVersion, canvas, false, AudioFaultCause::Stalled) == SplashStep::Up,
+        "splash warm: a cold start's splash ignores a touch");
+  check(cold.draw(kSplashMs, kVersion, canvas, false, AudioFaultCause::Stalled) == SplashStep::Ended,
+        "splash warm: and keeps its 2 s");
+
+  Splash again;
+  again.startAfterWarmError(0);
+  again.noteTouch();
+  again.start(5000);
+  check(again.draw(5000, kVersion, canvas, false) == SplashStep::Up, "splash warm: a fresh start() clears the touch");
+
+  Splash plainWarm;
+  plainWarm.start(0);  // a warm start with no error code keeps the plain splash
+  check(plainWarm.draw(kSplashMs - 1, kVersion, canvas, false) == SplashStep::Up &&
+            plainWarm.draw(kSplashMs, kVersion, canvas, false) == SplashStep::Ended,
+        "splash warm: no error code keeps the normal 2 s");
+}
+
 void checkPaintedOnce() {
   Splash splash;
   Canvas canvas;
@@ -239,6 +296,35 @@ void checkFaultTexts() {
   checkFaultText(AudioFaultCause::RepeatedFaults, "THE AUDIO LINK FAILED", "4 TIMES IN A MINUTE.", "ERROR A1");
   checkFaultText(AudioFaultCause::RestartFailed, "THE AUDIO LINK DID", "NOT START AGAIN.", "ERROR A2");
   checkFaultText(AudioFaultCause::Stalled, "THE AUDIO STREAM", "STOPPED MOVING.", "ERROR A3");
+  checkFaultText(AudioFaultCause::StartFailed, "THE AUDIO DID NOT", "START. TRYING AGAIN.", "ERROR A4");
+  checkFaultText(AudioFaultCause::Crashed, "THE BOX CRASHED AND", "RESTARTED ITSELF.", "ERROR C1");
+  checkFaultText(AudioFaultCause::Hung, "THE BOX FROZE AND", "RESTARTED ITSELF.", "ERROR W1");
+}
+
+// Every code's splash stays 6 s on a warm start and ends on a touch, and no two codes share a frame.
+void checkEveryCodeWarm() {
+  const AudioFaultCause codes[] = {AudioFaultCause::RepeatedFaults, AudioFaultCause::RestartFailed,
+                                   AudioFaultCause::Stalled,        AudioFaultCause::StartFailed,
+                                   AudioFaultCause::Crashed,        AudioFaultCause::Hung};
+  bool sixSeconds = true;
+  bool touchEnds = true;
+  bool distinct = true;
+  Canvas canvas;
+  for (size_t i = 0; i < 6; ++i) {
+    Splash timed;
+    timed.startAfterWarmError(0);
+    sixSeconds = sixSeconds && timed.draw(kSplashWarmErrorMs - 1, kVersion, canvas, false, codes[i]) == SplashStep::Up &&
+                 timed.draw(kSplashWarmErrorMs, kVersion, canvas, false, codes[i]) == SplashStep::Ended;
+    Splash touched;
+    touched.startAfterWarmError(0);
+    touched.draw(0, kVersion, canvas, false, codes[i]);
+    touched.noteTouch();
+    touchEnds = touchEnds && touched.draw(1, kVersion, canvas, false, codes[i]) == SplashStep::Ended;
+    for (size_t j = i + 1; j < 6; ++j) distinct = distinct && !sameFrame(splashFrame(codes[i]), splashFrame(codes[j]));
+  }
+  check(sixSeconds, "splash codes: each of the six stays 6 s on a warm start");
+  check(touchEnds, "splash codes: a touch ends each of the six");
+  check(distinct, "splash codes: the six screens differ");
 }
 
 // The sketch's order each pass: the menu takes the encoder's input, then the splash draws, and the
@@ -288,6 +374,9 @@ void writeProof() {
   writePgm(splashFrame(AudioFaultCause::RepeatedFaults, kFirmwareVersion), "oled-splash-a1.pgm");
   writePgm(splashFrame(AudioFaultCause::RestartFailed, kFirmwareVersion), "oled-splash-a2.pgm");
   writePgm(splashFrame(AudioFaultCause::Stalled, kFirmwareVersion), "oled-splash-a3.pgm");
+  writePgm(splashFrame(AudioFaultCause::StartFailed, kFirmwareVersion), "oled-splash-a4.pgm");
+  writePgm(splashFrame(AudioFaultCause::Crashed, kFirmwareVersion), "oled-splash-c1.pgm");
+  writePgm(splashFrame(AudioFaultCause::Hung, kFirmwareVersion), "oled-splash-w1.pgm");
 }
 
 }  // namespace
@@ -296,12 +385,14 @@ void checkSplash() {
   checkTimerRule();
   checkSequence();
   checkHold();
+  checkWarmError();
   checkPaintedOnce();
   checkCentred();
   checkReplacesWhatWasThere();
   checkTooWide();
   checkPlainUnchanged();
   checkFaultTexts();
+  checkEveryCodeWarm();
   checkInputDuringSplash();
   writeProof();
 }

@@ -4,6 +4,7 @@
 
 #include "board/audio.h"
 #include "board/boot_block_access.h"
+#include "board/mid_song_mark.h"
 #include "core/boot_health_rule.h"
 
 namespace {
@@ -31,6 +32,7 @@ void bootHealthPoll(uint32_t nowMs) {
   if (!gOpen || gReported) return;
   if (!bootHealthy(gSetupDoneMs, nowMs, gBlocksAtSetup, audioBlockCount(), CV_HEALTHY_MS)) return;
   cvBootFailsSet(&bootBlock(), 0u);
+  midSongMarkWrite();  // a restart from here on is mid-song, not a failed start
   gReported = true;
 }
 

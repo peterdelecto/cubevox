@@ -13,6 +13,10 @@ extern const CvImageHeader kImageHeader;
 // The release name in the header, such as v2.00.10 or v2.00.10-bench.
 const char* imageVersion();
 
+// The CRC the stamp step wrote into the header of the running image, or 0 when the header in flash
+// has no magic. It reads four words and never faults, so setup() may call it first.
+uint32_t imageStampedCrc();
+
 // True when the image in flash matches its stamped header: magic, header version, a length inside
 // the application region, and the CRC of every byte of the image. The first call reads the whole
 // image, a few milliseconds, and keeps the answer.

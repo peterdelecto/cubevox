@@ -343,6 +343,35 @@ void checkLateBlockPassesDry() {
         "late block: the block after the dry one is the chain's output eased in from the dry block's last sample, the engines one block stale");
 }
 
+// Before the first snapshot is published the blocks pass silence and run no card; the first block
+// after it runs the chain.
+void checkSilenceUntilFirstSnapshot() {
+  const ChainSnapshot snap = snapshotOf(distortionOnly(), true, true);
+  Rig rig;
+  BlockFlow flow;
+  bool silent = true;
+  bool ranNone = true;
+  for (int block = 0; block < 4; ++block) {
+    Block a = tone(block, 1.0f);
+    Block b{};
+    Block out{};
+    const BlockFlow::Start start = flow.begin(false, false, true);
+    const BlockFlow::Report report = flow.run(rig.engines, snap, start, a.data(), b.data(), false, StillClock(),
+                                              [&out](int i, float v) { out[static_cast<size_t>(i)] = v; });
+    ranNone = ranNone && !report.chainRan;
+    for (float v : out) silent = silent && v == 0.0f;
+  }
+  check(ranNone && silent, "awaiting snapshot: blocks run no card and play silence");
+
+  const Played after = play(flow, rig, snap, tone(4, 1.0f));
+  check(after.report.chainRan, "awaiting snapshot: the chain runs once a snapshot is in");
+
+  BlockFlow late;
+  late.markLate();
+  late.begin(false, false, true);
+  check(late.dryBlocks() == 0, "awaiting snapshot: a silent block takes the late flag without counting a dry block");
+}
+
 // The policy alone: a block that skips the chain anyway takes the flag without counting it.
 void checkLatePolicy() {
   LateBlocks late;
@@ -600,6 +629,7 @@ void checkBlockTail() {
   checkGuardKeepsEqFinite();
   checkLatePolicy();
   checkLateBlockPassesDry();
+  checkSilenceUntilFirstSnapshot();
   checkRunawayRecovers();
   checkDiscardCuts();
   checkWindowTakesChainBlocks();

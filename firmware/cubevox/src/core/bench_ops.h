@@ -39,6 +39,7 @@ enum class BenchOp : uint8_t {
   CleanupEq,
   StreamFault,
   FailRestart,
+  FailAudioStart,
   Count,
 };
 
@@ -46,7 +47,7 @@ constexpr int kBenchOpCount = static_cast<int>(BenchOp::Count);
 
 // Bytes of an op name including the NUL. A name read from the wire is clipped to this, so every
 // real name is at least two characters shorter than it.
-constexpr size_t kOpNameBytes = 16;
+constexpr size_t kOpNameBytes = 20;
 
 // Query ops are read-only and exist in every build. Bench ops act on the box and exist only in
 // bench builds.

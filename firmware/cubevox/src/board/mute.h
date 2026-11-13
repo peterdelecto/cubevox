@@ -10,6 +10,10 @@
 // Drives MUTE_N and XSMT low. Call first in setup(), before anything that takes time.
 void muteInit();
 
+// A warm start (core/restart_rule): the first release skips the kRelayCloseAfterPowerOnMs wait. Call
+// right after muteInit(), once the start is known to be warm.
+void muteWarmStart();
+
 // Tells the mute logic the SAI clocks run. The box stays muted until then, even if MUTE_SW is
 // released. XSMT rises as soon as it can, into the open relay. The first release after power-on
 // closes the relay no earlier than kRelayCloseAfterPowerOnMs after muteInit().

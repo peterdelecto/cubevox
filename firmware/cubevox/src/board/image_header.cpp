@@ -43,6 +43,11 @@ bool checkImageInFlash() {
 
 const char* imageVersion() { return kImageHeader.version; }
 
+uint32_t imageStampedCrc() {
+  const volatile CvImageHeader* stamped = reinterpret_cast<const volatile CvImageHeader*>(kHeaderAddress);
+  return stamped->magic == CV_IMAGE_MAGIC ? stamped->crc32 : 0u;
+}
+
 bool imageCrcOk() {
   if (gVerdict == Verdict::Unknown) gVerdict = checkImageInFlash() ? Verdict::Good : Verdict::Bad;
   return gVerdict == Verdict::Good;

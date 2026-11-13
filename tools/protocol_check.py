@@ -229,8 +229,8 @@ def check_bench_ops(link, rep, build):
         r = link.bench("set_knob", 1, knob=1, value=101)
         rep.check("bench set_knob value 101: error", err_reply(r, "value must be 0 to 100"), str(r))
     else:
-        for op in ("fault", "record_erase", "stop_audio", "stream_fault", "fail_restart", "slot_on", "all_on",
-                   "set_knob", "knobs_live"):
+        for op in ("fault", "record_erase", "stop_audio", "stream_fault", "fail_restart", "fail_audio_start",
+                   "slot_on", "all_on", "set_knob", "knobs_live"):
             r = link.bench(op)
             rep.check(f"release bench {op}: refused", err_reply(r, f"op not in this build: {op}"), str(r))
     r = link.ask("status")

@@ -532,6 +532,51 @@ void checkMutePowerOnWait() {
   check(out.xsmtHigh && out.muteNHigh, "mute: and MUTE_N follows after the XSMT lead");
 }
 
+// A warm start skips the 6 s: XSMT rises when the clocks run, MUTE_N follows the XSMT lead later, the
+// relay settles, and the hold lifts. A hold, the switch and the clocks still gate it.
+void checkMuteWarmStart() {
+  MuteSequence m;
+  m.reset(true, 0);
+  m.warmStart();
+  MuteOutputs out = runMute(m, 0, 99, true);
+  check(!out.xsmtHigh && !out.muteNHigh, "mute warm: stays muted before the clocks run");
+  m.clocksRunning();
+  out = m.update(100, true);
+  check(out.xsmtHigh && !out.muteNHigh && m.outputHeld(), "mute warm: XSMT rises with the clocks");
+  out = runMute(m, 101, 100 + kXsmtLeadMs - 1, true);
+  check(!out.muteNHigh, "mute warm: MUTE_N waits for the XSMT lead");
+  out = m.update(100 + kXsmtLeadMs, true);
+  check(out.xsmtHigh && out.muteNHigh && m.outputHeld(), "mute warm: MUTE_N rises one XSMT lead after XSMT");
+  out = runMute(m, 100 + kXsmtLeadMs + 1, 100 + kXsmtLeadMs + kRelaySettleMs - 1, true);
+  check(m.outputHeld(), "mute warm: the output stays held through the relay settle");
+  out = m.update(100 + kXsmtLeadMs + kRelaySettleMs, true);
+  check(!m.active() && !m.outputHeld() && m.powerOnWait() == false, "mute warm: the output fades up after the settle, with no 6 s");
+
+  MuteSequence cold;
+  cold.reset(true, 0);
+  cold.clocksRunning();
+  out = runMute(cold, 0, 5000, true);
+  check(!out.muteNHigh, "mute warm: a cold start still waits for 6 s");
+
+  MuteSequence held;
+  held.reset(true, 0);
+  held.warmStart();
+  held.clocksRunning();
+  held.hold(true);
+  out = runMute(held, 0, 2000, true);
+  check(!out.xsmtHigh && !out.muteNHigh, "mute warm: a hold keeps the relay open");
+  held.hold(false);
+  out = runMute(held, 2001, 2001 + kXsmtLeadMs + 1, true);
+  check(out.muteNHigh, "mute warm: the relay closes once the hold lifts");
+
+  MuteSequence sw;
+  sw.reset(false, 0);
+  sw.warmStart();
+  sw.clocksRunning();
+  out = runMute(sw, 0, 2000, false);
+  check(!out.xsmtHigh && !out.muteNHigh, "mute warm: the MUTE switch keeps the relay open");
+}
+
 // The power-on wait runs once. A release just after the millisecond counter wraps, 49.7 days on,
 // waits only the XSMT lead.
 void checkMuteClockWrap() {
@@ -757,6 +802,7 @@ void checkInputLogic() {
   checkJackRequestWithdrawn();
   checkMuteSequence();
   checkMutePowerOnWait();
+  checkMuteWarmStart();
   checkMuteClockWrap();
   checkMutePowerOnFlag();
   checkMuteLatchAndHold();
