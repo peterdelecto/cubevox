@@ -12,8 +12,9 @@
 #include "core/panel.h"
 
 // Sets up the mux selects, ADC3 and the toggles. A failed ADC leaves the panel unread, so the box
-// stays muted; controlsReport() says why.
-void controlsInit();
+// stays muted; controlsReport() says why. The mux scan waits for 3V3A after power-on; on a warm
+// start (core/restart_rule) the rail is already up and the scan starts with the first controlsPoll().
+void controlsInit(bool warmStart);
 
 // Call every loop pass. Each pass takes one step of the mux scan (select, start a conversion or
 // read it) and never waits on the ADC; it also debounces the toggles. A conversion that fails or

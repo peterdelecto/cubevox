@@ -18,7 +18,8 @@ constexpr uint32_t kRelaySettleMs = 20;
 // exceeds the 3.4 ms the DAC needs at 48 kHz.
 constexpr uint32_t kXsmtLeadMs = 5;
 
-// The output relay closes no earlier than this long after the app started, counted from setup(). The
+// On a cold start the output relay closes no earlier than this long after the app started, counted
+// from setup(). A warm start (core/restart_rule) skips the wait, since the capacitor kept its charge. The
 // output buffer's bias reaches the jack side of the 10 uF coupling capacitor at power-on and decays
 // through 100 kOhm to ground, a 1 s time constant that takes about 5.5 s to fall under 10 mV.
 // Closing the relay sooner puts the remainder on the tip. The bootloader's time is not counted, so

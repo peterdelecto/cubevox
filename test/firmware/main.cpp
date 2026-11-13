@@ -35,6 +35,8 @@ int main() {
   checkEntryLog();
   checkCrc32();
   checkBootHealth();
+  checkRestartRule();
+  checkLoadRule();
   checkScreenDim();
   checkSplash();
   checkBootDecide();

@@ -7,15 +7,20 @@
 #include <new>
 
 #include "board/bench_drill.h"
+#include "board/boot_block_access.h"
 #include "board/block_mem.h"
 #include "board/clocks.h"
 #include "board/mute.h"
 #include "board/pins.h"
 #include "board/serial_link.h"
+#include "board/start_timing.h"
 #include "core/audio_recovery.h"
 #include "core/block_flow.h"
 #include "core/chain_run.h"
+#include "core/late_window.h"
 #include "core/layout_fade.h"
+#include "core/load_rule.h"
+#include "core/mid_song_mark.h"
 #include "core/load_window.h"
 #include "core/registry.h"
 #include "engine/common.h"
@@ -146,6 +151,15 @@ volatile uint32_t gWindowMax = 0;
 constexpr uint32_t kLoadWindowBlocks = cv::kSampleRate / kFramesPerHalf;
 LoadWindow gLoad;
 
+// The load rule. The block interrupt feeds the late window and names the slot of a NaN block. Only
+// loop() calls gLoadRule, through audioLoadRulePoll(), which takes the window's trip. processHalf()
+// leaves the slot cycles of a block that ran the chain in gBlockSlots for recordBlock(), which knows the
+// block's verdict.
+LateWindow gLateWindow;
+SlotCycles gBlockSlots{};
+bool gBlockRanChain = false;
+LoadRule gLoadRule;
+
 // SAI and DMA errors, counted from the HAL error callback.
 volatile uint32_t gSaiErrors = 0;
 volatile uint32_t gSaiErrorCodes = 0;
@@ -273,7 +287,7 @@ void processHalf(int half) {
 
   syncSnapshot();
   // The mute sequence holds the output at zero until the relay is closed.
-  const BlockFlow::Start start = gFlow.begin(muteOutputHeld(), gLayoutPending);
+  const BlockFlow::Start start = gFlow.begin(muteOutputHeld(), gLayoutPending, gSeenSeq == 0);
   if (start.fade.swap) swapSnapshot();
 
   std::array<float, cv::kBlock> a;
@@ -284,7 +298,9 @@ void processHalf(int half) {
   const BlockFlow::Report report =
       gFlow.run(gChain, gHeld, start, a.data(), b.data(), bypassOn(), CycleCounter(), TxWriter{tx});
   if (report.discarded) gCounts.nanBlocks = gCounts.nanBlocks + 1;
+  gBlockRanChain = report.chainRan;
   if (report.chainRan) {
+    gBlockSlots = report.cycles.slot;
     addChainCycles(report.cycles);
     noteGatePeak();
   }
@@ -440,10 +456,12 @@ void onRxHalf(int half) {
 void recordBlock(uint32_t cycles, bool readTooSoon) {
   gCounts.blocks = gCounts.blocks + 1;
   if (cycles > gCounts.maxCycles) gCounts.maxCycles = cycles;
-  if (cycles > gCounts.budgetCycles || readTooSoon) {
+  const bool late = cycles > gCounts.budgetCycles || readTooSoon;
+  if (late) {
     gCounts.late = gCounts.late + 1;
     gFlow.markLate();
   }
+  if (gBlockRanChain) gLateWindow.add(late, cycles, gBlockSlots);
   gSumCycles = gSumCycles + cycles;
   gSumBlocks = gSumBlocks + 1;
   gWindowSum = gWindowSum + cycles;
@@ -516,6 +534,7 @@ void SWPMI1_IRQHandler(void) {
     __enable_irq();
     gNextHalf ^= 1u;
     recordBlock(cycles, readTooSoon);
+    startTimingNoteBlock();
   }
 }
 
@@ -645,6 +664,26 @@ bool restartStream() {
   return initPeripherals() && startStream();
 }
 
+#if CUBEVOX_BENCH
+// The fail_audio_start op leaves this word in the boot block's application area, after the mid-song
+// mark, so it outlives the reset it is meant to be read after. The bootloader clears the area at a
+// power-on.
+constexpr uint32_t kBenchFailStartWord = 0xFA11AD10u;
+constexpr size_t kBenchFailStartOffset = sizeof(MidSongMark);
+
+// True once after the op set the word; the word clears as it is read.
+bool takeBenchFailStart() {
+  CvBootBlock& block = bootBlock();
+  if (!cvBootBlockInitialised(&block)) return false;
+  uint32_t word = 0;
+  memcpy(&word, block.appReserved + kBenchFailStartOffset, sizeof word);
+  if (word != kBenchFailStartWord) return false;
+  word = 0;
+  memcpy(block.appReserved + kBenchFailStartOffset, &word, sizeof word);
+  return true;
+}
+#endif
+
 // The fault behind a restart, for the report line.
 void printFaultCause(Print& out) {
   if (gOverrunTripped) {
@@ -654,6 +693,13 @@ void printFaultCause(Print& out) {
   }
   out.print("a SAI/DMA error, HAL error bits 0x");
   out.print(gSaiErrorCodes, HEX);
+}
+
+// Empties the late window with the block interrupt masked.
+void clearLateWindow() {
+  NVIC_DisableIRQ(SWPMI1_IRQn);
+  gLateWindow.clear();
+  NVIC_EnableIRQ(SWPMI1_IRQn);
 }
 
 AudioEvent restartAfterFault() {
@@ -670,6 +716,7 @@ AudioEvent restartAfterFault() {
     return AudioEvent::RestartFailed;
   }
   muteTripClear(MuteReason::Audio);
+  clearLateWindow();  // the late blocks before the restart were a fault of the stream, not load
   muteClocksRunning();  // the release runs in the usual order: XSMT, zero output, relay, fade up
   return AudioEvent::Restarted;
 }
@@ -677,6 +724,12 @@ AudioEvent restartAfterFault() {
 }  // namespace
 
 bool audioInit() {
+#if CUBEVOX_BENCH
+  if (takeBenchFailStart()) {
+    gError = "audio start refused (bench fail_audio_start)";
+    return false;
+  }
+#endif
   if (!checkMemoryAndClock()) return false;
   resetAudioState();
   if (!initPeripherals()) return false;
@@ -716,14 +769,16 @@ void audioReport(Print& out) {
     out.print(" SAI/DMA errors since boot, HAL error bits 0x");
     out.println(h.errors.codes, HEX);
   }
-  if (h.overruns > 0 || h.restarts > 0 || h.nanBlocks > 0) {
+  if (h.overruns > 0 || h.restarts > 0 || h.nanBlocks > 0 || gLoadRule.steps() > 0) {
     out.print("[WARN] audio: ");
     out.print(h.overruns);
     out.print(" overruns, ");
     out.print(h.restarts);
     out.print(" stream restarts, ");
     out.print(h.nanBlocks);
-    out.println(" NaN blocks since boot");
+    out.print(" NaN blocks, ");
+    out.print(gLoadRule.steps());
+    out.println(" overload steps since boot");
   }
 }
 
@@ -744,6 +799,26 @@ AudioHealth audioHealth() {
   h.restarts = gRecovery.restarts();
   return h;
 }
+
+LoadStep audioLoadRulePoll(uint32_t nowMs, const Layout& layout, const PanelReading& panel, bool layoutApplied) {
+  LateTrip tripInfo;
+  bool trip = false;
+  // The flag is a one-word read, so a pass with no trip takes no mask.
+  if (gLateWindow.tripPending()) {
+    NVIC_DisableIRQ(SWPMI1_IRQn);
+    trip = gLateWindow.take(tripInfo);
+    NVIC_EnableIRQ(SWPMI1_IRQn);
+  }
+  LoadInput in{layout, panel.toggle, nowMs, trip, tripInfo.lateCount, tripInfo.worstBlock, gLateWindow.lateCount(),
+               layoutApplied};
+  const LoadStep step = gLoadRule.update(in);
+  if (step.layoutCleared) clearLateWindow();
+  return step;
+}
+
+uint8_t audioHeldMask() { return gLoadRule.heldMask(); }
+
+uint32_t audioLoadSteps() { return gLoadRule.steps(); }
 
 void audioPublish(const ChainSnapshot& snapshot) {
   const uint32_t next = gPublished.load(std::memory_order_relaxed) + 1;
@@ -802,6 +877,14 @@ void audioStreamFaultForBench() {
   NVIC_EnableIRQ(DMA1_Stream1_IRQn);
   NVIC_EnableIRQ(DMA1_Stream0_IRQn);
   NVIC_EnableIRQ(SAI1_IRQn);
+}
+
+bool audioBenchFailNextStart() {
+  CvBootBlock& block = bootBlock();
+  if (!cvBootBlockInitialised(&block)) return false;
+  const uint32_t marker = kBenchFailStartWord;
+  memcpy(block.appReserved + kBenchFailStartOffset, &marker, sizeof marker);
+  return true;
 }
 
 bool audioBenchToggleFailRestart() {

@@ -20,6 +20,7 @@
 #include "board/planned_reset.h"
 #include "board/print_hex.h"
 #include "board/serial_link.h"
+#include "board/start_timing.h"
 #include "core/audio_fault_cause.h"
 #include "core/audio_stall.h"
 #include "core/record_store.h"
@@ -69,6 +70,7 @@ CvFaultRecord& gStored = gNoInit.fault;
 CvFaultRecord gLast = {};  // copy taken at boot, printed by every report this run
 uint32_t gResetFlags = 0;
 AudioFaultCause gLastAudioCause = AudioFaultCause::None;
+AudioFaultCause gRestartCode = AudioFaultCause::None;  // what the splash and DIAG.TXT name for this start
 bool gInitDone = false;
 bool gWatchdogPeriodSet = false;  // the 2 s period read back as written
 uintptr_t gPaintTop = 0;          // one past the highest painted word
@@ -278,6 +280,7 @@ void faultInit() {
     gStored.magic = 0;
   }
   gLastAudioCause = takeAudioFaultSeal(gNoInit.audioCause);
+  gRestartCode = restartCode(gLastAudioCause, gLast.magic == CV_FAULT_MAGIC, gResetFlags);
 
   // Without these the three lesser faults escalate to HardFault and lose their kind.
   SCB->SHCSR |= SCB_SHCSR_MEMFAULTENA_Msk | SCB_SHCSR_BUSFAULTENA_Msk | SCB_SHCSR_USGFAULTENA_Msk;
@@ -299,6 +302,8 @@ bool faultResetWasPowerOn() {
 bool faultRecordPresent() { return gLast.magic == CV_FAULT_MAGIC; }
 
 AudioFaultCause faultLastAudioCause() { return gLastAudioCause; }
+
+AudioFaultCause faultRestartCode() { return gRestartCode; }
 
 void faultForgetAudioCause() { gNoInit.audioCause = 0; }
 
@@ -351,7 +356,12 @@ void faultAudioWatch(uint32_t nowMs, bool audioRunning, AudioEvent event) {
     case AudioEvent::OutOfRestarts: resetForAudio(nowMs, AudioFaultCause::RepeatedFaults); break;
     case AudioEvent::RestartFailed: resetForAudio(nowMs, AudioFaultCause::RestartFailed); break;
   }
-  if (!audioRunning) return;
+  if (!audioRunning) {
+    // Audio that did not start on a warm start resets again with its own code. A cold start keeps
+    // today's path, so the bootloader's failed-start count still ends in update mode.
+    if (startIsWarm() && !plannedResetPending()) resetForAudio(nowMs, AudioFaultCause::StartFailed);
+    return;
+  }
   reportTransferErrors(nowMs);
   const AudioHealth health = audioHealth();
   if (!gStallWatch.update(nowMs, !plannedResetPending(), health.restarts, audioBlockCount())) return;

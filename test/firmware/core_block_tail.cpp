@@ -18,6 +18,7 @@
 #include "core/chain_run.h"
 #include "core/compose.h"
 #include "core/late_block.h"
+#include "core/late_window.h"
 #include "core/layout.h"
 #include "core/level.h"
 #include "core/output_stage.h"
@@ -342,6 +343,35 @@ void checkLateBlockPassesDry() {
         "late block: the block after the dry one is the chain's output eased in from the dry block's last sample, the engines one block stale");
 }
 
+// Before the first snapshot is published the blocks pass silence and run no card; the first block
+// after it runs the chain.
+void checkSilenceUntilFirstSnapshot() {
+  const ChainSnapshot snap = snapshotOf(distortionOnly(), true, true);
+  Rig rig;
+  BlockFlow flow;
+  bool silent = true;
+  bool ranNone = true;
+  for (int block = 0; block < 4; ++block) {
+    Block a = tone(block, 1.0f);
+    Block b{};
+    Block out{};
+    const BlockFlow::Start start = flow.begin(false, false, true);
+    const BlockFlow::Report report = flow.run(rig.engines, snap, start, a.data(), b.data(), false, StillClock(),
+                                              [&out](int i, float v) { out[static_cast<size_t>(i)] = v; });
+    ranNone = ranNone && !report.chainRan;
+    for (float v : out) silent = silent && v == 0.0f;
+  }
+  check(ranNone && silent, "awaiting snapshot: blocks run no card and play silence");
+
+  const Played after = play(flow, rig, snap, tone(4, 1.0f));
+  check(after.report.chainRan, "awaiting snapshot: the chain runs once a snapshot is in");
+
+  BlockFlow late;
+  late.markLate();
+  late.begin(false, false, true);
+  check(late.dryBlocks() == 0, "awaiting snapshot: a silent block takes the late flag without counting a dry block");
+}
+
 // The policy alone: a block that skips the chain anyway takes the flag without counting it.
 void checkLatePolicy() {
   LateBlocks late;
@@ -409,6 +439,36 @@ void checkDiscardCuts() {
   const Played cut = play(flow, rig, snap, bad);
   const BlockFlow::Start next = flow.begin(false, false);
   check(cut.report.discarded && next.fade.silent && next.fade.to == 0.0f, "runaway: the block after a discard is silent");
+}
+
+// The late window takes a block only when the report says the chain ran, as audio.cpp feeds it. A
+// layout swap's silent blocks and the dry block after a late one report no chain run, so neither counts.
+void checkWindowTakesChainBlocks() {
+  const ChainSnapshot snap = snapshotOf(emptyLayout(), false, false);
+  Rig rig;
+  BlockFlow flow;
+  LateWindow window;
+  int silent = 0;
+  int dry = 0;
+  int fed = 0;
+  bool swapped = false;
+  for (int b = 0; b < 220; ++b) {
+    if (b == 150) flow.markLate();
+    const BlockFlow::Start start = flow.begin(false, b >= 5 && !swapped);
+    swapped = swapped || start.fade.swap;
+    Block a = tone(b, 0.5f);
+    Block scratch{};
+    const BlockFlow::Report report =
+        flow.run(rig.engines, snap, start, a.data(), scratch.data(), false, StillClock(), [](int, float) {});
+    silent += start.fade.silent ? 1 : 0;
+    dry += start.dry ? 1 : 0;
+    if (report.chainRan) {
+      window.add(true, 700000, report.cycles.slot);
+      ++fed;
+    }
+  }
+  check(silent > 0 && dry == 1 && fed == 220 - silent - dry && window.lateCount() == kLateWindowBlocks,
+        "late window: swap blocks and the dry block are not fed to it, every chain block is");
 }
 
 // The newest block the scope's ring holds.
@@ -569,8 +629,10 @@ void checkBlockTail() {
   checkGuardKeepsEqFinite();
   checkLatePolicy();
   checkLateBlockPassesDry();
+  checkSilenceUntilFirstSnapshot();
   checkRunawayRecovers();
   checkDiscardCuts();
+  checkWindowTakesChainBlocks();
   checkScopeRingAdvances();
   checkScopeAheadOfTrim();
   checkSwapClearsReengaged();

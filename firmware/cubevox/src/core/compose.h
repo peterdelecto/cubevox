@@ -68,11 +68,13 @@ struct ChainSnapshot {
   std::array<bool, kSlotCount> slotOn = allSlotsOn();
 };
 
+// `held` is the load rule's mask of held slots, bit s for slot s. A held slot composes off whatever its
+// toggle reads.
 ChainSnapshot composeSnapshot(const Layout& layout, const PanelReading& panel, const Settings& settings,
-                              const BenchOverrides& bench);
+                              const BenchOverrides& bench, uint8_t held = 0);
 
 // The same snapshot built in `out`, which the caller owns. A snapshot is over a kilobyte, so a caller
 // on the firmware's shared stack builds it here and keeps the object off its own frame. `out` takes
 // the default state first, so a reused object keeps nothing from the layout before.
 void composeSnapshotInto(ChainSnapshot& out, const Layout& layout, const PanelReading& panel, const Settings& settings,
-                         const BenchOverrides& bench);
+                         const BenchOverrides& bench, uint8_t held = 0);

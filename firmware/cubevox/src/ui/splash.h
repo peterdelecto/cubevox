@@ -15,10 +15,14 @@
 
 constexpr uint32_t kSplashMs = 2000;
 
-// True from the start until kSplashMs have passed. The unsigned subtraction stays right across a
+// After a warm start that followed an audio error the splash stays this long, so Adam can read the
+// error and its code, and ends early when he touches a knob, a toggle or MENU.
+constexpr uint32_t kSplashWarmErrorMs = 6000;
+
+// True from the start until `durationMs` have passed. The unsigned subtraction stays right across a
 // millis() wrap.
-constexpr bool splashUp(bool started, uint32_t startMs, uint32_t nowMs) {
-  return started && nowMs - startMs < kSplashMs;
+constexpr bool splashUp(bool started, uint32_t startMs, uint32_t nowMs, uint32_t durationMs = kSplashMs) {
+  return started && nowMs - startMs < durationMs;
 }
 
 // Who owns the canvas this pass, in the words of BenchPattern. Up: the splash is showing and the
@@ -33,12 +37,16 @@ struct SplashFaultText {
   const char* code;
 };
 
-// A1 to A3, in the order of AudioFaultCause.
+// A1 to A4, C1 and W1, in the order of AudioFaultCause.
 constexpr SplashFaultText kSplashFaultText[] = {
     {{"THE AUDIO LINK FAILED", "4 TIMES IN A MINUTE."}, "ERROR A1"},
     {{"THE AUDIO LINK DID", "NOT START AGAIN."}, "ERROR A2"},
     {{"THE AUDIO STREAM", "STOPPED MOVING."}, "ERROR A3"},
+    {{"THE AUDIO DID NOT", "START. TRYING AGAIN."}, "ERROR A4"},
+    {{"THE BOX CRASHED AND", "RESTARTED ITSELF."}, "ERROR C1"},
+    {{"THE BOX FROZE AND", "RESTARTED ITSELF."}, "ERROR W1"},
 };
+static_assert(sizeof(kSplashFaultText) / sizeof(kSplashFaultText[0]) == 6, "one text per code");
 
 // A1 is the fault past the restart budget, the one after kRestartsPerWindow restarts.
 static_assert(kRestartsPerWindow + 1 == 4 && kRestartWindowMs == 60000, "A1's text says 4 times in a minute");
@@ -63,11 +71,28 @@ constexpr const SplashFaultText* splashFaultText(AudioFaultCause cause) {
 
 class Splash {
  public:
-  // Starts the timer. Call once, as setup() ends.
+  // Starts the timer for kSplashMs. Call once, as setup() ends.
   void start(uint32_t nowMs) {
     startMs_ = nowMs;
+    durationMs_ = kSplashMs;
+    endsOnTouch_ = false;
+    touched_ = false;
     started_ = true;
     painted_ = false;
+  }
+
+  // Starts the timer for a warm start that followed an audio error: kSplashWarmErrorMs, ended early
+  // by noteTouch().
+  void startAfterWarmError(uint32_t nowMs) {
+    start(nowMs);
+    durationMs_ = kSplashWarmErrorMs;
+    endsOnTouch_ = true;
+  }
+
+  // A knob, a toggle or MENU was touched. Ends a splash started by startAfterWarmError(), the
+  // power-on wait or not; any other splash ignores it.
+  void noteTouch() {
+    if (endsOnTouch_) touched_ = true;
   }
 
   // Call every pass before the face draws. Paints `version`, and the text of `cause` when there is
@@ -78,6 +103,9 @@ class Splash {
 
  private:
   uint32_t startMs_ = 0;
+  uint32_t durationMs_ = kSplashMs;
+  bool endsOnTouch_ = false;
+  bool touched_ = false;
   bool started_ = false;
   bool painted_ = false;
   CanvasHandoff handoff_;

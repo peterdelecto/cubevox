@@ -8,6 +8,8 @@
 #include <array>
 
 #include "core/canvas.h"
+#include "core/display.h"
+#include "core/layout.h"
 #include "core/registry.h"
 #include "core/scope.h"
 #include "core/settings.h"
@@ -97,6 +99,16 @@ const char* topSwitchWord(TopSwitch role);
 
 // The word centred on the panel, nothing else.
 void renderMuted(Canvas& canvas, const char* word);
+
+// The OVERLOAD row on the voice screen, in 5x7 on text row 0. One held card reads `OVERLOAD: ` and its
+// word (the menu's SLOT word, or the card's name in capitals when it has none), for example
+// `OVERLOAD: DEEPTHROAT`. More than one reads `OVERLOAD: 3 CARDS`. It draws over the canvas without
+// clearing it, and moves with `walk`. `held` is the load rule's mask, bit s for slot s; an empty mask
+// draws nothing.
+void drawOverload(Canvas& canvas, const Layout& layout, uint8_t held, Walk walk);
+
+// The text of the OVERLOAD row for `held` and `layout`, "" when nothing is held.
+void overloadText(const Layout& layout, uint8_t held, char* out, size_t size);
 
 // The DEBUG load figure, for example 42%, in 5x7 at the bottom right. Its last column is 126 and its
 // top row is 56, so it keeps kScreenPad from both edges. It draws over the canvas without clearing it,

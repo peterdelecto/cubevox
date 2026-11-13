@@ -20,6 +20,10 @@ void powerSensePoll(uint32_t nowMs);
 // Power-fail trips since boot.
 uint32_t powerSenseTrips();
 
+// True once powerSenseInit() took a first reading. The warm start rule (core/restart_rule) needs it,
+// since a box with no reading cannot say its rail is good.
+bool powerSenseHasReading();
+
 // True from a trip, the interrupt's included, until the rail has held for kPowerHoldMs. The flash
 // stores start no erase or program word while it holds.
 bool powerSenseTripped();

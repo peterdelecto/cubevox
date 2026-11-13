@@ -53,6 +53,8 @@ void checkRecordCuts();        // core_record_cut.cpp
 void checkEntryLog();          // core_entry_log.cpp
 void checkCrc32();             // core_crc32.cpp
 void checkBootHealth();        // core_boot_health.cpp
+void checkRestartRule();       // core_restart_rule.cpp
+void checkLoadRule();          // core_load_rule.cpp
 void checkScreenDim();         // ui_screen_dim.cpp
 void checkSplash();            // ui_splash.cpp
 void checkBootDecide();        // boot_decide.cpp

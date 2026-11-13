@@ -167,6 +167,8 @@ void powerSensePoll(uint32_t nowMs) {
 
 uint32_t powerSenseTrips() { return gTrips; }
 
+bool powerSenseHasReading() { return gError == nullptr; }
+
 bool powerSenseTripped() { return gWatch.tripped() || gFired.load(); }
 
 void powerSenseReport(Print& out) {

@@ -26,14 +26,14 @@ float slotKnobPosition(const Layout& layout, const PanelReading& panel, const Be
   return bench.knobsPinned ? topPosition(c, knob) : panel.knob[slot][knob];
 }
 
-void applySlot(const Layout& layout, const PanelReading& panel, const BenchOverrides& bench, int slot,
+void applySlot(const Layout& layout, const PanelReading& panel, const BenchOverrides& bench, uint8_t held, int slot,
                ChainSnapshot& snap) {
   const Card c = layout.card[slot];
   ChainParams& out = snap.params;
   applyPlacement(c, out);
   for (int k = 0; k < kKnobsPerCard; ++k) applyKnob(c, k, slotKnobPosition(layout, panel, bench, slot, k), out);
   const bool forcedOn = (bench.slotsForcedOn >> slot) & 1u;
-  const bool forcedOff = (bench.slotsOff >> slot) & 1u;
+  const bool forcedOff = ((bench.slotsOff | held) >> slot) & 1u;  // a held card stays off whatever its toggle reads
   const bool on = (panel.toggle[slot] || forcedOn) && !forcedOff;
   applyToggle(c, on, out);
   snap.slotOn[static_cast<size_t>(slot)] = on;
@@ -41,9 +41,9 @@ void applySlot(const Layout& layout, const PanelReading& panel, const BenchOverr
 
 // Fills a snapshot that holds its default state.
 void fill(ChainSnapshot& snap, const Layout& layout, const PanelReading& panel, const Settings& settings,
-          const BenchOverrides& bench) {
+          const BenchOverrides& bench, uint8_t held) {
   snap.layout = layout;
-  for (int s = 0; s < kSlotCount; ++s) applySlot(layout, panel, bench, s, snap);
+  for (int s = 0; s < kSlotCount; ++s) applySlot(layout, panel, bench, held, s, snap);
   if (bench.reverbChasm) snap.params.reverb.engine = cv::kReverbChasm;
   snap.params.eq.on = settings.cleanupEq != CleanupEq::Off && !bench.eqOff;
   snap.params.eq.cuts = settings.cleanupEq == CleanupEq::Strong;
@@ -53,14 +53,14 @@ void fill(ChainSnapshot& snap, const Layout& layout, const PanelReading& panel, 
 }  // namespace
 
 ChainSnapshot composeSnapshot(const Layout& layout, const PanelReading& panel, const Settings& settings,
-                              const BenchOverrides& bench) {
+                              const BenchOverrides& bench, uint8_t held) {
   ChainSnapshot snap;
-  fill(snap, layout, panel, settings, bench);
+  fill(snap, layout, panel, settings, bench, held);
   return snap;
 }
 
 void composeSnapshotInto(ChainSnapshot& out, const Layout& layout, const PanelReading& panel, const Settings& settings,
-                         const BenchOverrides& bench) {
+                         const BenchOverrides& bench, uint8_t held) {
   new (&out) ChainSnapshot();
-  fill(out, layout, panel, settings, bench);
+  fill(out, layout, panel, settings, bench, held);
 }

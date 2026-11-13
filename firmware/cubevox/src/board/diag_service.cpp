@@ -76,6 +76,24 @@ void reportFailure() {
   serialOut().println(" entries since boot");
 }
 
+// A crash (C1) or a watchdog reset (W1) puts its code in front of the entry's fault text, the way
+// the audio entries (A1 to A4) carry theirs.
+void addRestartCode(CvDiagEntry& e) {
+  const AudioFaultCause code = faultRestartCode();
+  if (code != AudioFaultCause::Crashed && code != AudioFaultCause::Hung) return;
+  char body[sizeof e.fault];
+  memcpy(body, e.fault, sizeof body);
+  memset(e.fault, 0, sizeof e.fault);
+  if (code == AudioFaultCause::Hung) {
+    copyText(e.fault, sizeof e.fault, audioFaultDiagText(code), SIZE_MAX);
+    return;
+  }
+  copyText(e.fault, sizeof e.fault, audioFaultCode(code), SIZE_MAX);
+  const size_t used = strlen(e.fault);
+  e.fault[used] = ' ';
+  copyText(e.fault + used + 1, sizeof e.fault - used - 1, body, SIZE_MAX);
+}
+
 // A start that followed a plain power-on with no fault record and a working option byte step has
 // nothing to explain.
 void queueBootEntry() {
@@ -86,6 +104,7 @@ void queueBootEntry() {
     const CvBootBlock& block = bootBlock();
     copyText(e.summary, sizeof e.summary, block.appSummary, sizeof block.appSummary);
   }
+  addRestartCode(e);
   queue(e);
 }
 

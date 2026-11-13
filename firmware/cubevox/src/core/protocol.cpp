@@ -787,6 +787,7 @@ void replyStatus(Writer& w, uint32_t id, const Status& s) {
   w.format("\"rec_errors\":%lu,\"serial_dropped\":%lu,\"stray_bytes\":%lu,\"boot_fails\":%lu,",
            static_cast<unsigned long>(s.recordErrors), static_cast<unsigned long>(s.serialDropped),
            static_cast<unsigned long>(s.strayBytes), static_cast<unsigned long>(s.bootFails));
+  w.format("\"held\":%lu,\"steps\":%lu,", static_cast<unsigned long>(s.heldMask), static_cast<unsigned long>(s.steps));
   w.format("\"overruns\":%lu,\"sai_errors\":%lu,\"restarts\":%lu,\"nan_blocks\":%lu,",
            static_cast<unsigned long>(s.overruns), static_cast<unsigned long>(s.saiErrors),
            static_cast<unsigned long>(s.restarts), static_cast<unsigned long>(s.nanBlocks));
