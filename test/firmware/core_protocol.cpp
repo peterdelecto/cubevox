@@ -855,6 +855,16 @@ void checkOpBurnParsing() {
   check(!parses(burnLine(",\"cycles\":1000,\"blocks\":0").c_str(), r, err) && err == "blocks must be 1 to 1000", "burn: blocks 0");
   check(!parses(burnLine(",\"cycles\":1000,\"blocks\":1001").c_str(), r, err) && err == "blocks must be 1 to 1000",
         "burn: blocks over the range");
+  check(parses(burnLine(",\"cycles\":200000").c_str(), r, err) && r.benchSlot == 0, "burn: the slot left out reads 0");
+  check(parses(burnLine(",\"cycles\":200000,\"slot\":4").c_str(), r, err) && r.benchSlot == 4 && r.benchCycles == 200000,
+        "burn: a slot parses");
+  check(parses(burnLine(",\"slot\":8,\"cycles\":1000,\"blocks\":2").c_str(), r, err) && r.benchSlot == 8 && r.benchBlocks == 2,
+        "burn: slot 8 parses beside blocks, in any key order");
+  check(!parses(burnLine(",\"cycles\":1000,\"slot\":0").c_str(), r, err) && err == "slot must be 1 to 8", "burn: slot 0");
+  check(!parses(burnLine(",\"cycles\":1000,\"slot\":9").c_str(), r, err) && err == "slot must be 1 to 8", "burn: slot 9");
+  check(!parses(burnLine(",\"cycles\":1000,\"slot\":-1").c_str(), r, err) && err == "slot must be an integer",
+        "burn: a negative slot");
+  check(!parses(burnLine(",\"slot\":4").c_str(), r, err) && err == "missing cycles", "burn: a slot alone still needs cycles");
 }
 
 void checkOpSetKnobParsing() {

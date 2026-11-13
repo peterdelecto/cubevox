@@ -182,8 +182,9 @@ reads `OVERLOAD: MOB`. Two seconds later the card is back and the row is blank. 
 
 ## 3. Drills, on the bench, every release
 Bench ops, so they exist only in the bench image and only over the serial port. `stop_audio`,
-`spin` and `fault` are built. The new ops are `burn` (cycles spun inside each block) and
-`fail_audio_start` (the next `audioInit()` fails). `bringup.py --survival` runs the table from the
+`spin` and `fault` are built. The new ops are `burn` (cycles spun inside each block; with a slot,
+spun only while that slot's card runs and counted in that slot's cycles, so the load rule sees that
+card as the costly one) and `fail_audio_start` (the next `audioInit()` fails). `bringup.py --survival` runs the table from the
 Mac with no hands on the box, on the costliest layout, and writes the measured column to the
 board's log in `hardware/bringup/`. The boot report's `[boot] restart code` line carries the code the
 splash shows. The bad update is the bench image under another header version, so another CRC,
@@ -197,11 +198,12 @@ installed through `enter_dfu` (the path the menu item takes) and faulted with `f
 | C1 repeated | `fault` five times, 2 s apart, after 10 s of running | the same layout and panel after each, never update mode | gap, five times |
 | A4 | `fail_audio_start`, then `fault` | a second restart with `ERROR A4`, then sound | gap |
 | Bad update | an image that faults 1 s after its start, installed from the menu | third start is "Startup failed." and the drive | starts |
-| Overload | `burn` sized to make every chain block late on the costliest layout | one step inside 120 ms, the slowest card out, the row reads `OVERLOAD:` and its word, voice continuous | time to step |
-| Overload ends | `burn 0` | the card back 2 s after it went, the row blank | time to return |
-| Overload stays | the burn left on for 60 s | waits of 2, 4, 8, 16, 16 s, no restart, no mute | steps |
-| One late block | `burn` for one block | one tick, no step | late count |
-| Save under load | 20 menu saves during a burn at 80 % | no late block | late count |
+| Overload | `burn` in Mob's slot (slot 4), sized to make every block late while Mob runs | one step inside 120 ms, Mob out and no other card, the row reads `OVERLOAD:` and Mob's word, voice continuous | time to step |
+| Overload ends | `burn 0` | Mob back 2 s after it went, the row blank | time to return |
+| Overload stays | the Mob burn left on for 60 s | waits of 2, 4, 8, 16, 16 s on Mob alone, no restart, no mute | steps |
+| Overload outside the cards | `burn` in no slot, above 100 % of the block, for 20 s, then `burn 0` | every card out but the Input gate, no restart, no mute; after `burn 0` every card back | time to all out, time to all back |
+| One late block | `burn` in no slot for one block | one tick, no step | late count |
+| Save under load | 20 menu saves during a burn in no slot at 80 % | no late block | late count |
 
 ## 4. Set aside
 1. The safe start (every card off after a failed start, a remembered card). The owner's rule 4.

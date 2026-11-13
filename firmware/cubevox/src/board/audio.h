@@ -154,9 +154,11 @@ void audioStreamFaultForBench();
 bool audioBenchFailNextStart();
 
 // Makes every block that runs the chain spin `cycles` cycles after the chain, inside the block's
-// measured time and attributed to no slot, so the block is late when the chain and the spin together
-// pass the budget. `blocks` limits the burn to that many chain blocks; 0 keeps it until cycles is 0.
-void audioBenchBurn(uint32_t cycles, uint32_t blocks);
+// measured time, so the block is late when the chain and the spin together pass the budget. `slot`
+// (0 to 7) ties the burn to that slot: it spins only while the slot's card runs and counts in the
+// slot's cycles. A slot of -1 attributes it to no slot. `blocks` limits the burn to that many burnt
+// blocks; 0 keeps it until cycles is 0.
+void audioBenchBurn(uint32_t cycles, uint32_t blocks, int slot);
 
 // Flips whether the next stream restart fails, as one whose DMA start is refused. Returns the new
 // state. A failed restart clears it.
