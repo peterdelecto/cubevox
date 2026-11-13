@@ -1,221 +1,209 @@
 # cubevox — the ways the box can fail on stage, and what it does about each
 
 Owner direction 2026-10-31: a robust way to ensure the box cannot die during a performance.
-Target: the H7 firmware on the v4 board, 48 kHz, 64-sample blocks, float32. This is a spec;
-nothing is built.
+Rewritten 2026-11-13 from the owner's rules of that day, after an audit of the earlier text
+(`build/audit/stage-survival-audit.md`, 23 findings). Target: the H7 firmware on the v4 board,
+48 kHz, 64-sample blocks, float32. Board changes are out of scope.
 
-Settled: a card the box turns off stays off until Adam flips its toggle off and on. The box never
-turns a card back on by itself. Board changes are out of scope.
+## The owner's rules
+1. No more cards are being added. The design case is the costliest combination of today's cards,
+   and the plan is "don't let the box fail".
+2. After a fault the box comes back as it was. Adam never has to stop and set anything up again,
+   and never has to act in the middle of a song.
+3. The software always matches the panel. After any restart the toggles and pots are read again
+   and what the panel shows is what the box plays.
+4. A stage box comes back in the state the musician expects. It shows no fault-finding screen and
+   has no reduced mode.
+5. A box that fails to start before a gig is a different case from a box that restarts in the
+   middle of a song. A restart mid-song never ends in update mode.
+6. An error shows Adam a code or a plain word on the screen (owner 2026-11-10). `OVERLOAD` is the
+   word for load.
+7. Update mode is reached from the menu's `Update firmware` item. Holding MENU at a start does
+   nothing (owner 2026-11-13).
 
-## How to read this
-One entry per failure. Each gives how it arises, what Adam hears today, what he hears after this
-spec, the bound the box must meet, and the drill that proves it (section 4). A bound without a
-measured number in the run log is not met.
+## Where the box stands (measured 2026-11-13, v2.01.90, board 1)
+The costliest combination the menu builds is Input gate, Autotune, Apraxia, Mob, Echo, Deepthroat,
+Lo-fi and Spring Reverb. `firmware/stress.py --layouts costliest` ran it with every slot on,
+CLEANUP EQ at STRONG, every knob swept and the toggles flipped, twice for 181 s: mean block
+34.1 %, worst block 44.1 %, 0 late blocks, 0 overruns (`build/bench/2026-11-13-stress.md`). The
+limits are 75 % and 95 %. The stress run gates that layout before every release.
 
-## 1. Failures
+## 1. What the box does
 
-### F1. One block runs long
-How. A worst-case block in Autotune, Octave or Reverb lands with an interrupt on top. Rare and
-single.
-Today. The block is counted late; the next block passes the dry input; the chain resumes. One tick.
-After. Unchanged. The late block also counts into the load rule's window (F2).
-Bound. One tick, no mute.
-Drill. `burn 700000` for one block.
+### R. Restart: every fault that stops the box mid-song
+Causes. A hard fault, a hang that the watchdog ends, an audio stream that cannot be recovered
+(A1 to A3), audio that does not start.
+What Adam gets. The sound drops, and about a second later it is back with the same layout, the
+same settings and the panel as it stands. The screen shows `ERROR` and a code for 6 s, then the
+voice screen. He does nothing.
 
-### F2. The load stays over the limit
-How. A layout near the 95 % line with knobs at their costliest positions, a firmware regression, or
-an input that drives a tracker hard.
-Today. Every chain block is late, so blocks alternate dry and effected every 1.3 ms. A buzz. The
-dry blocks hand back enough time that the overrun mute never trips, so nothing recovers until the
-load falls.
-After. The load rule. A rolling window of 48 blocks (64 ms) counts late blocks. Two late blocks
-inside the window turn off the engaged card with the highest `worst` in the cost table, through the
-slot's 8 ms equal-power fade. POLISH COMP, POLISH EQ and the Input gate are never turned off.
-Steps are at least 50 ms apart. The bottom is every card off, his dry voice through the Input
-gate, POLISH COMP and POLISH EQ. A card the rule turned off stays off for the rest of the power
-cycle; Adam brings it back by flipping its toggle off and on, and if the load is still over the
-rule steps it off again with one tick. A layout apply or a card swap clears the holds, because that
-path restarts the chain anyway. A 5x7 row on the voice screen names the cards held, `HOLD REVERB
-OCTAVE`, row chosen on the proof by number.
-Bound. His voice at every moment, one tick per step, never a buzz, the mute relay never drops
-for load.
-Drill. `burn 200000` (about 103 %), `burn 400000` (about 134 %), a ramp 0 to 400 000 over 10 s.
+1. Warm or cold. A start is warm when the boot block's reset flags hold SFTRSTF, IWDG1RSTF or
+   WWDG1RSTF, hold neither PORRSTF nor BORRSTF, and the power sense has a reading with no trip.
+   Every other start is cold and keeps today's 6 s before the relay closes, because the pop it
+   prevents is real. PINRSTF decides nothing; this chip sets it on every reset. The rule is
+   `core/restart_rule.h`, pure. The bootloader's `cvBootPowerOn` uses the same flags but is not
+   the same test: a bare NRST pulse is cold to the application and not a power-on to the
+   bootloader. Nothing depends on the two agreeing.
+2. Order. On every start `setup()` runs the mute pins, the power sense, the fault record, the
+   mid-song mark (item 8), the record read and then audio. The panel, USB and the menu come
+   after audio. `faultWatchdogKick()` stays between the long steps.
+3. Knobs. On a cold start the mux selects wait 1100 ms for U107 to bring 3V3A up. On a warm start
+   3V3A never went down, so the scan starts at once. The first snapshot needs all 16 pots and the
+   toggles read. Until it is in, the blocks pass silence and run no card, so nothing processed
+   with default settings is left in a delay line or a reverb tail.
+4. Relay. On a warm start the mute sequence skips the 6 s. MUTE_N goes high once the clocks run
+   and the first snapshot is in, then 20 ms for the relay and the 50 ms fade up.
+5. Input relay. A reset leaves PAD_EN an input, so K103 drops to MIC through every restart.
+   `setup()` drives K103 to the saved setting on every start, warm or cold, while the output is
+   still muted, as today.
+6. Flash. The reset before a restart keeps today's wait (`ResetWait`): it goes at once when both
+   stores are idle, waits out a running erase, and gives up after 3 s with no erase running. An
+   erase is never cut. A fault during an erase costs one longer gap, 1 to 2 s more, and no repair
+   at the next start.
+7. Audio that does not start. When `audioInit()` fails on a warm start the box does not sit silent.
+   It resets again with its own code. On a cold start three such starts end in "Startup failed."
+   as today.
+8. Never update mode mid-song. The bootloader counts starts that do not run audio for 5 s, and
+   three in a row end in update mode. That rule is for a box that cannot start after power-on or
+   after an update. Once the box has run audio for 5 s, the application writes a mark into the
+   boot block's application area: a magic word, the CRC of the running image from its header, and
+   a check word. The bootloader zeroes that block at power-on. The first thing `setup()` does on a
+   box-caused reset (SFTRSTF, IWDG1RSTF or WWDG1RSTF, no PORRSTF or BORRSTF) is read the mark; when
+   it is whole and names the running image, `setup()` zeroes the failed-start counter. A new
+   image has another CRC, so after an update the mark does not count and a bad update still ends
+   in "Startup failed." and the drive.
+9. MENU at a start does nothing. The bootloader no longer reads MENU. Update mode is entered by
+   the menu's `Update firmware` item or the `enter_dfu` request, by an image that fails its
+   check, or by three failed starts. A box whose application cannot reach its menu is recovered
+   through the ROM DFU with BOOT0. Bootloader v0.09.
+10. Codes. The splash shows a code for every box-caused restart, on the rows A1 to A3 use, with
+    one plain line of what happened:
 
-### F3. An engine produces NaN or infinity
-How. A numeric edge in one card.
-Today. The block is silenced and every engine is cleared, so every tail and every tracker starts
-cold. One silent block and a cold chain.
-After. The NaN guard names the slot. The load rule turns that card off at once, with no window,
-because an engine that produces NaN is broken, not busy. The other cards keep their state.
-Bound. One silent block, then his voice through the other cards.
-Drill. `nan <slot>`.
+    | Code | Cause |
+    |---|---|
+    | `ERROR A1` | the audio stream faulted four times inside a minute |
+    | `ERROR A2` | the audio stream could not be restarted |
+    | `ERROR A3` | the audio stopped for 100 ms |
+    | `ERROR A4` | the audio did not start |
+    | `ERROR C1` | the processor faulted (a crash) |
+    | `ERROR W1` | the watchdog ended a hang |
 
-### F4. The audio interrupt stops
-How. A stuck DMA stream, a SAI error the stream did not ride through, a lock in the block
-interrupt.
-Today. Eight overruns in a row drop the mute relay; the stream restarts, the mute holds, then opens.
-At most three restarts fit in any minute. Three cases reset the box, all by one path
-(`faultAudioWatch`), each with an error code (owner 2026-11-10): A1, a fourth fault inside a
-minute of three restarts (owner 2026-11-10); A2, a restart that fails; A3, a stall, where no block
-finishes for 100 ms. The box mutes at once, writes one `audio` entry whose fault text names the
-code and the cause (`A1 repeated stream faults`, `A2 stream restart failed`, `A3 audio stalled`),
-waits for the flash to be idle with no cap, and resets. Every reset then takes the power-on path,
-so the relay closes 6 s after the app starts. Through that wait the splash explains the error and
-shows its code (`ERROR A1` to `ERROR A3`), so Adam sees why the sound went (OLED GUI spec,
-Priority 11). A start that does not run
-audio for 5 s counts as a failed start, so a stream that faults past the budget inside 5 s of every
-start ends on the third start in "Startup failed." (update mode, until the power is cycled). A stream
-that runs longer than 5 s before it faults resets the box again and again, with the 6 s gap each
-time.
-After. Warm restart. The reset cause in the boot block (`resetFlags`) with 5VA good decides the
-path. SFTRSTF, IWDG1RSTF or WWDG1RSTF is warm; PORRSTF, BORRSTF or PINRSTF is cold and keeps
-today's 6 s. On a warm restart `setup()` runs audio first (clocks, the record read, the engines,
-SAI and DMA, XSMT high at zero output), then MUTE_N high at once, 20 ms for the relay, the 50 ms
-fade up, and only then the panel, USB and the menu. The stall path's flash wait is capped at
-200 ms; past that the box resets without the DIAG.TXT entry. The boot report prints the time from
-reset to the first block and to the relay.
-Bound. Gap ≤ 1.5 s from the last good block to the first good block, same layout and settings,
-nothing pressed. Budget: stall detect 100 ms, flash wait ≤ 200 ms, reset and bootloader ≤ 20 ms,
-setup to the first block ≤ 400 ms (target, measured), relay 20 ms, fade 50 ms.
-Drill. `stall`.
+    On a warm start the splash stays 6 s and ends early when Adam touches a knob, a toggle or
+    MENU. Sound is already back while it shows. DIAG.TXT gets the same code in its entry.
+11. Report. The boot report prints warm or cold and, on a warm start, the ms from the start of
+    `setup()` to the first block, to the first snapshot and to the relay.
 
-### F5. loop() hangs
-How. The panel's SPI, USB or a flash write waits forever.
-Today. The audio interrupt keeps running, so the sound continues while the menu and screen freeze.
-IWDG1 fires at 2 s and the box resets onto the 6 s path.
-After. Same until the watchdog, then the warm restart of F4. The RX DMA interrupt sits above the
-block interrupt and the block interrupt above everything else, so a stuck loop() never touches
-audio before the watchdog.
-Bound. Sound for the 2 s, then a gap ≤ 1.5 s.
-Drill. `hang`.
+Bound. Gap ≤ 1.5 s from the last good block to the first good block with no erase running,
+measured by the drills. The path, with today's figures where they exist: stall detect 100 ms
+(A3 only), one loop pass, the flash wait (ms when idle), serial flush ≤ 100 ms, mute for reset
+25 ms, reset and bootloader (unmeasured, 25 to 40 ms expected), `setup()` to the first block
+(target ≤ 400 ms), the 16 pots, XSMT lead 5 ms, relay 20 ms, fade 50 ms. For A1 the three stream
+restarts before the reset each mute as well; that is today's behaviour and stays.
 
-### F6. A hard fault or a runaway
-How. A bad pointer, a stack overflow, a corrupt table.
-Today. The fault handler mutes and resets; the reason reaches DIAG.TXT. Then the 6 s path.
-After. The warm restart of F4.
-Bound. Gap ≤ 1.5 s.
-Drill. `crash`.
+What a restart does not bring back.
+1. A menu change made in the last 500 ms before the fault. The record is saved 500 ms after the
+   last change, or at once when the menu closes.
+2. An open menu. The box comes back on the splash and then the voice screen.
 
-### F7. A card crashes the box every time it runs
-How. A fault inside one engine that the layout and his input reach each time.
-Today. Crash, reset, the same layout, crash. After three starts that never reach healthy the
-bootloader stays in update mode, a silent box showing the update screen until a power cycle.
-After. Safe start. When `bootFails` is 1 or more at start, the application starts with every card
-held and the screen row reads `HOLD ALL  RESTART`. Adam brings cards back one at a time with their
-toggles. The application keeps one word in DTCM, which survives a system reset, holding the slot
-most recently switched on by a toggle flip, or none. On a safe start that card stays held even after
-a flip and the row names it, so one card costs one restart and cannot start a loop. A layout apply
-or a power cycle clears the word. The bootloader's three-strikes rule stays; with safe start ahead
-of it, three in a row means the dry chain itself fails, which only a new `.uf2` fixes.
-Bound. One restart, then his dry voice, stable.
-Drill. `crash-in <slot>`.
+A hang. When `loop()` hangs, the block interrupt keeps running and the sound continues for the
+2 s until the watchdog; then the restart. When an interrupt handler hangs (USB, the encoder),
+the blocks stop too, so Adam gets up to 2 s of silence and then the restart. The block interrupt
+is the lowest priority, 15; USB, the encoder and the DMA and SAI interrupts all preempt it.
 
-### F8. Brownout or power loss
-How. The 9 V supply sags or is pulled.
-Today. The PVD interrupt drops the mute relay at once; the power-fail path holds XSMT low until
-5VA recovers; power-on returns on the 6 s path.
-After. Unchanged. A cold reset keeps the 6 s because the pop it prevents is real.
-Bound. Mute before garbage. Return in the power-on time.
-Drill. 9 V pulled to 7 V, then cut.
+A fault that repeats. The box restarts the same way each time, as it was. No card is switched off
+and nothing is asked of Adam. The stress run exercises every card on every layout before a
+release, and that is where a card that faults is caught.
 
-### F9. A flash write during a song
-How. A menu click saves the layout record while the chain runs.
-Today. The record store writes bank 2 while code runs from bank 1, chunked and polled from loop().
-A reset mid-write lands in the store's ECC recovery and append log (layout-record spec).
-After. Unchanged, now drilled under full load and with a reset during the write.
-Bound. No late block from a save. A record cut mid-write loads or falls back to the default layout.
-Drill. 20 menu saves during `burn 300000`; `crash` during a save.
+### O. Overload: the load stays over the limit
+This is a net for a catastrophic fault. With today's cards the worst block is 44.1 % and the box
+does not reach it.
+Today. Every chain block is late, so blocks alternate dry and effected every 1.3 ms. A buzz, and
+nothing recovers until the load falls.
+What Adam gets. He hears one tick and a card drop out, his voice never stops, and the top row
+reads `OVERLOAD: MOB`. Two seconds later the card is back and the row is blank. He does nothing.
 
-### F10. USB plugged or unplugged mid-song
-How. A host attaches or drops.
-Today. Handled in loop(). The USB interrupt sits at level 1, above the block interrupt at 15,
-so USB traffic counts toward block time. The serial reader handles one line per loop() pass, so a host that
-keeps sending cannot hold loop() into the watchdog.
-After. Unchanged, drilled.
-Bound. No late block.
-Drill. Plug and unplug the host under load.
+1. Window. The block interrupt keeps, for the last 48 blocks that ran the chain (64 ms), whether
+   each was late and how many cycles each slot took. A dry block and a layout-fade block are not
+   counted. The window is emptied after each step, on a stream restart and on a layout apply.
+2. Trip. 12 late blocks inside the window raise a trip, which `loop()` takes on its next pass. The
+   buzz makes every chain block late, so it trips inside 32 ms. One or two late blocks from a
+   burst of interrupts never trip.
+3. Which card. The rule takes out the running card whose slot took the most cycles in the window's
+   worst block. The Input gate is never taken out. Autotune is passed over while a card behind it
+   reads its tracker (Formant or Apraxia directly behind it, Mob, Deepthroat), because its engine
+   keeps running for them. CLEANUP EQ, the soft ceiling and the BYPASS mix are not cards.
+4. How. The hold is one more term where a slot is switched (`compose.cpp`, beside the bench's
+   forced-off mask), and the card goes out through its slot's 8 ms fade. Steps are at least 50 ms
+   apart.
+5. Coming back. Each held card has its own wait, counted from when it was held: 2 s. When the wait
+   is up and the window holds no late block, the card comes back. If it is taken out again its
+   wait doubles, up to 16 s, and it keeps coming back at 16 s for as long as the fault lasts. A
+   card that has stayed in for 60 s starts again at 2 s. No card is ever left out for good.
+6. Parity. A hold ends when the card's toggle goes off, when the layout changes and at any
+   restart. The only time a card is off with its toggle up is while the row says `OVERLOAD`.
+7. The row. Text row 0 of the voice screen, 5x7, moving with the burn-in walk, blank unless a card
+   is held. One card: `OVERLOAD: ` and its word, the word its SLOT row shows in the menu, or
+   `AUTOTUNE` and `ECHO` for the two cards with no SLOT row. The longest, `OVERLOAD: DEEPTHROAT`,
+   is 20 columns. More than one card: `OVERLOAD: 3 CARDS`. Proof by number.
+8. The bottom. With every card it may take out held, the rule does nothing more. If the load is
+   still over, the buzz stays until the fault ends; the cause is then outside the cards.
+9. Reports. `held` (a bitmask of held slots) and `steps` join the status reply. DIAG.TXT gets one
+   line per step, in the entry's text field under the audio kind, naming the card and the late
+   count. The boot report's audio line prints the steps since boot.
 
-### F11. The panel fails
-How. The OLED ribbon or the SH1106 stops answering.
-Today. The driver's retry rule (OLED GUI spec) retries without blocking the loop beyond its budget.
-After. Unchanged, plus `setup()` starts audio before the panel on every start (F4), so a dead panel
-never delays the first block.
-Bound. Sound continues with a blank screen. No late block.
-Drill. `panel-fail`, forcing the driver's error path.
+### Unchanged
+1. One block runs long. Counted late; the next block passes the dry input; one tick. It counts
+   toward the overload window only if 11 more follow inside 64 ms.
+2. An engine produces NaN or infinity, or a block past +60 dBFS. The block is silenced, every
+   engine and CLEANUP EQ are cleared over about 13 silent blocks (17 ms), and the chain fades back
+   in over 50 ms, as it was. No card is switched off.
+3. Brownout or power loss. The PVD interrupt drops the mute relay at once; the return is a cold
+   start with its 6 s.
+4. A flash write during a song. Bank 2 is written while code runs from bank 1, chunked and polled
+   from `loop()`; a write cut by a reset lands in the store's recovery (layout-record spec).
+5. USB plugged or unplugged, a dead panel, a corrupt or over-budget layout at start, a hot input
+   or DC: as today.
+6. The processor dies. K102 mutes. Nothing on the board passes the mic around a dead processor.
 
-### F12. A door into update mode during a song
-How. A hand on MENU.
-Today. UPDATE FIRMWARE opens a confirm screen first. MENU held at power-on is the only other way in.
-After. Unchanged, drilled.
-Bound. No single click or hold leaves audio.
-Drill. Click UPDATE FIRMWARE, cancel; hold MENU with the box running.
+## 2. Host tests
+1. `core/restart_rule.h`: warm against cold from the reset flags and the power sense.
+2. The mid-song mark, pure: whole and naming the running image zeroes the counter; a broken check
+   word, another image's CRC or a power-on does not.
+3. `core/mute_sequence`: the warm path skips the 6 s and still waits for the clocks, the first
+   snapshot and the holds.
+4. The splash: each code's text fits 21 columns; 6 s on a warm start with a code, ended by a touch.
+5. `core/load_rule.h` and its window: 11 late blocks do not trip and 12 do; dry and fade blocks
+   are not counted; the card with the most cycles goes; the Input gate never; Autotune passed over
+   with a reader behind it; 50 ms spacing; the waits 2, 4, 8, 16, 16 s; back to 2 s after 60 s in;
+   a toggle off, a layout apply and a stream restart end holds or empty the window.
+6. `test/firmware/ui_*`: the `OVERLOAD` row for one card, the longest word and several cards.
+7. `core_protocol`: the two new status fields.
+8. Bootloader selftest: MENU down at a start changes no decision.
 
-### F13. A corrupt or over-budget layout at start
-How. Power lost during a save, a record from a bad app build, a layout past 75 % mean or 95 %
-worst.
-Today. The record is refused and the default layout loads; the reason is in the boot report.
-After. Unchanged.
-Bound. Sound with the default layout.
-Drill. `corrupt-record`, then power cycle.
+## 3. Drills, on the bench, every release
+Bench ops, so they exist only in the bench image and only over the serial port. `stop_audio`,
+`spin` and `fault` are built. The new ops are `burn` (cycles spun inside each block) and
+`fail_audio_start` (the next `audioInit()` fails). `bringup.py --survival` runs the table from the
+Mac with no hands on the box, on the costliest layout, and writes the measured column to the
+board's log in `hardware/bringup/`.
 
-### F14. A hot input or DC
-How. A shouted note, a plugged jack, a DC step from Octave or the reverb.
-Today. The soft ceiling never passes 1.0, the 5 Hz DC blockers after Octave and the reverb,
-flush-to-zero, the Input gate.
-After. Unchanged.
-Bound. No sample past full scale, no NaN.
-Drill. A +6 dBFS burst; a jack plugged under load.
-
-### F15. The processor dies
-How. A hardware fault, a rail.
-Today and after. K102 mutes. Nothing on the board passes the mic around a dead processor, so the
-output is silent until the restart, and silent for good if it never restarts.
-Bound. None on this board. Board changes are out of scope.
-Drill. None.
-
-## 2. Counters and reports
-`held` (a bitmask of held slots), `steps` and `window_worst` join the status reply. The boot
-report's audio line prints steps since boot and, on a warm restart, the time to the first block and
-to the relay. DIAG.TXT gets one line per step with the card and the window's worst percent, and one
-line per safe start naming the held card.
-
-## 3. Host tests
-1. `core/load_rule.h`, pure: window counts, the two-late trip, step order by `worst`, 50 ms
-   spacing, the polish stages and the Input gate never held, a flip off and on releases a hold, a
-   layout apply clears holds, a NaN slot is held at once.
-2. `core/restart_rule.h`, pure: warm against cold from the reset flags and 5VA.
-3. `core/safe_start_rule.h`, pure: `bootFails` ≥ 1 holds all; the DTCM word keeps its card held
-   through a flip; a layout apply clears it.
-4. `core_chain_run`: a NaN block names its slot.
-5. `test/firmware/ui_*`: the HOLD row, proof by number.
-6. `core_protocol`: the three new status fields.
-
-## 4. Fault drills, on the bench, every release
-A serial command set that works only while DEBUG is ON and a host is attached, so nothing on the
-panel can reach it. Each drill records its number in the run log beside the version. A release
-`.uf2` ships with a drill table at its version.
-
-| Failure | Drill | Expected | Measured |
+| Case | Drill | Expected | Measured |
 |---|---|---|---|
-| F1 | `burn 700000` once | one dry block, one tick | ticks |
-| F2 | `burn 200000` | one step inside 120 ms, Reverb held, voice continuous; Reverb stays held after `burn 0` until its toggle is flipped off and on | time to step, ticks |
-| F2 | `burn 400000` | steps to the bottom at 50 ms spacing, voice continuous, no mute | steps, time to bottom |
-| F2 | ramp 0 to 400 000 over 10 s | one step at a time, no mute, no buzz | steps, late count |
-| F3 | `nan <slot>` | that card held at once, other tails intact | silent blocks |
-| F4 | `stall` | mute inside 100 ms, reset, back with the same layout | gap |
-| F5 | `hang` | sound for 2 s, watchdog, back | gap after the watchdog |
-| F6 | `crash` | mute, reset, back; DIAG.TXT entry | gap |
-| F7 | `crash-in <slot>` | one restart, all cards held, the slot named, no second crash after its flip | restarts |
-| F8 | 9 V to 7 V, then cut | mute before garbage; return on the power-on path | gap on return |
-| F9 | 20 saves during `burn 300000`; `crash` during a save | no late block beyond the rule's steps; the record loads or the default layout does | late count |
-| F10 | host plug and unplug under load | no late block | late count |
-| F11 | `panel-fail` | sound continues, blank screen | late count |
-| F12 | UPDATE FIRMWARE then cancel; MENU held while running | audio unbroken | late count |
-| F13 | `corrupt-record`, power cycle | default layout, reason in the boot report | — |
-| F14 | +6 dBFS burst; jack plugged under load | nothing past full scale, no NaN | peak |
+| A3 | `stop_audio` | restart, `ERROR A3`, the same layout and panel | gap |
+| W1 | `spin` | sound for 2 s, restart, `ERROR W1` | gap after the watchdog |
+| C1 | `fault` | restart, `ERROR C1`, DIAG.TXT entry | gap |
+| C1 repeated | `fault` five times, 2 s apart, after 10 s of running | the same layout and panel after each, never update mode | gap, five times |
+| A4 | `fail_audio_start`, then `fault` | a second restart with `ERROR A4`, then sound | gap |
+| Bad update | an image that faults 1 s after its start, installed from the menu | third start is "Startup failed." and the drive | starts |
+| Overload | `burn` sized to make every chain block late on the costliest layout | one step inside 120 ms, the slowest card out, the row reads `OVERLOAD:` and its word, voice continuous | time to step |
+| Overload ends | `burn 0` | the card back 2 s after it went, the row blank | time to return |
+| Overload stays | the burn left on for 60 s | waits of 2, 4, 8, 16, 16 s, no restart, no mute | steps |
+| One late block | `burn` for one block | one tick, no step | late count |
+| Save under load | 20 menu saves during a burn at 80 % | no late block | late count |
 
-## 5. Costs
-The load rule is a few compares per block and a 48-byte window. The rest costs nothing at run time.
-
-## Open item for the owner
-1. The 1.5 s bound in F4, or tighter, which forces `setup()` to be measured and trimmed.
+## 4. Set aside
+1. The safe start (every card off after a failed start, a remembered card). The owner's rule 4.
+2. A card held until its toggle is flipped, and the word `HOLD`. The owner's rules 2 and 6.
+3. The per-slot NaN check. It could leave the voice silent where today's guard costs one cut.
+4. The 200 ms cap on the flash wait. It cut erases.
+5. MENU held at a start as a way into update mode. The owner's rule 7.
