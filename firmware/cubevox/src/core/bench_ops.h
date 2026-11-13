@@ -63,13 +63,14 @@ constexpr int kMaxBenchKnob = kKnobsPerCard;
 constexpr int kMaxBenchKnobValue = 100;
 
 // burn names the cycles spun inside each chain block (0 turns it off) and, optionally, how many
-// blocks it lasts. One block is 640 000 cycles at 480 MHz, so the range runs past a whole block.
+// blocks it lasts and the slot it belongs to. One block is 640 000 cycles at 480 MHz, so the range
+// runs past a whole block.
 constexpr int kMaxBenchBurnCycles = 1000000;
 constexpr int kMaxBenchBurnBlocks = 1000;
 
 // The arguments of a bench request, as the parser read them.
 struct BenchArgs {
-  int slot = 0;    // slot_off, slot_on, set_knob: 1 to kMaxBenchSlot
+  int slot = 0;    // slot_off, slot_on, set_knob: 1 to kMaxBenchSlot; burn: the same, 0 when left out
   int knob = 0;    // set_knob: 1 to kMaxBenchKnob
   int value = 0;   // set_knob: 0 to kMaxBenchKnobValue
   int cycles = 0;  // burn: 0 to kMaxBenchBurnCycles

@@ -175,11 +175,13 @@ bool gStreamUp = false;  // the stream started and no restart has failed since
 #if CUBEVOX_BENCH
 bool gFailNextRestart = false;  // the fail_restart op: the next restart refuses to start the stream
 
-// The burn op. Every block that runs the chain spins gBurnCycles cycles after the chain, inside the
-// block's measured time. gBurnBlocksLeft counts the blocks a timed burn has left; 0 means until
-// burn 0. The block interrupt reads both, loop() sets them with that interrupt masked.
+// The burn op. A block that runs the chain spins gBurnCycles cycles after the chain, inside the
+// block's measured time. gBurnSlot names the slot the burn belongs to, or -1 for none.
+// gBurnBlocksLeft counts the blocks a timed burn has left; 0 means until burn 0. The block interrupt
+// reads all three, loop() sets them with that interrupt masked.
 volatile uint32_t gBurnCycles = 0;
 volatile uint32_t gBurnBlocksLeft = 0;
+volatile int gBurnSlot = -1;
 #endif
 
 // The input's energy since the last audioTakeInputEnergy(), summed by the block interrupt.
@@ -288,19 +290,30 @@ struct TxWriter {
 };
 
 #if CUBEVOX_BENCH
-// Spins the burn's cycles. The time belongs to no slot, so the load rule still picks the slowest
-// real card.
-void burnBlock() {
-  const uint32_t cycles = gBurnCycles;
-  if (cycles == 0) return;
+// True when the burn's slot holds a card that ran this block: placed, and on in the held snapshot,
+// which is off for a toggle off, a bench force off and a load-rule hold.
+bool burnSlotRuns(int slot) {
+  const size_t s = static_cast<size_t>(slot);
+  return gHeld.slotOn[s] && gHeld.layout.card[s] != Card::Empty;
+}
+
+// Spins the burn's cycles. With no slot the time belongs to no card. With a slot it spins only while
+// that slot's card runs, and its cycles join the slot's figure before the late window, the stats and
+// the load rule read it, so the rule sees that card as the costly one.
+void burnBlock(ChainCycles& cycles) {
+  const uint32_t want = gBurnCycles;
+  if (want == 0) return;
+  const int slot = gBurnSlot;
+  if (slot >= 0 && !burnSlotRuns(slot)) return;
   const uint32_t left = gBurnBlocksLeft;
   if (left != 0) {
     gBurnBlocksLeft = left - 1;
     if (left == 1) gBurnCycles = 0;
   }
   const uint32_t start = DWT->CYCCNT;
-  while (DWT->CYCCNT - start < cycles) {
+  while (DWT->CYCCNT - start < want) {
   }
+  if (slot >= 0) cycles.slot[static_cast<size_t>(slot)] += DWT->CYCCNT - start;
 }
 #endif
 
@@ -318,17 +331,17 @@ void processHalf(int half) {
   loadInput(a.data(), rx);
   gInputSumSquares = gInputSumSquares + level::sumSquares(a.data(), kFramesPerHalf);
   gInputSamples = gInputSamples + kFramesPerHalf;
-  const BlockFlow::Report report =
+  BlockFlow::Report report =
       gFlow.run(gChain, gHeld, start, a.data(), b.data(), bypassOn(), CycleCounter(), TxWriter{tx});
   if (report.discarded) gCounts.nanBlocks = gCounts.nanBlocks + 1;
   gBlockRanChain = report.chainRan;
   if (report.chainRan) {
+#if CUBEVOX_BENCH
+    burnBlock(report.cycles);
+#endif
     gBlockSlots = report.cycles.slot;
     addChainCycles(report.cycles);
     noteGatePeak();
-#if CUBEVOX_BENCH
-    burnBlock();
-#endif
   }
 }
 
@@ -914,8 +927,9 @@ bool audioBenchFailNextStart() {
   return true;
 }
 
-void audioBenchBurn(uint32_t cycles, uint32_t blocks) {
+void audioBenchBurn(uint32_t cycles, uint32_t blocks, int slot) {
   NVIC_DisableIRQ(SWPMI1_IRQn);
+  gBurnSlot = slot >= 0 && slot < kSlotCount ? slot : -1;
   gBurnBlocksLeft = blocks;
   gBurnCycles = cycles;
   NVIC_EnableIRQ(SWPMI1_IRQn);

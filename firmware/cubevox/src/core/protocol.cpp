@@ -508,6 +508,7 @@ bool checkBenchArgs(Fields& f, char* err, size_t errSize) {
     }
     if (!inBenchRange(f.req.benchCycles, 0, kMaxBenchBurnCycles, "cycles", err, errSize)) return false;
     if (f.hasBlocks && !inBenchRange(f.req.benchBlocks, 1, kMaxBenchBurnBlocks, "blocks", err, errSize)) return false;
+    if (f.hasSlot && !inBenchRange(f.req.benchSlot, kMinBenchSlot, kMaxBenchSlot, "slot", err, errSize)) return false;
   }
   return true;
 }

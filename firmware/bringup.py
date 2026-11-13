@@ -1615,7 +1615,13 @@ REPEAT_GAP_S = 2.0
 STATS_SETTLE_S = 2.0
 STATUS_POLL_S = 0.02
 LATE_SETTLE_S = 0.5
-NEVER_TAKEN = ("empty", "input_gate", "autotune")  # Autotune is passed over: costliest has readers behind it
+BURN_CARD = "crowd"             # Mob, slot 4 of the costliest layout: the overload drills burn in its slot
+BURN_MARGIN = 0.10              # the slot burn puts the mean block this far past the budget, plus the spread
+BURN_BLOCK_CAP = 1.5            # the chain's worst block and the burn together stay under this many blocks
+STEP_SETTLE_S = 0.5             # after the step, no second step while the burnt card is out
+OUTSIDE_LOAD = 1.10             # the burn outside the cards, as a share of the block budget
+OUTSIDE_S = 20.0
+NOT_TAKEABLE = ("empty", "input_gate")  # the load rule never takes the Input gate out
 START_LINE = r"^\[boot\] start: (warm|cold).*$"
 CODE_LINE = r"^\[boot\] restart code (\S+)"
 REPORT_END = r"^\[(boot\] pots|ERROR\] pots:)"
@@ -1628,8 +1634,8 @@ class SurvivalCtx(Ctx):
         super().__init__(log, False, tmp)
         self.slots = slots
         self.budget = None   # cycles in one block
-        self.burn = None     # cycles a block that make the costliest chain late
-        self.slow = None     # the slot the overload step should take out
+        self.burn = None     # cycles a block, in the burnt slot, that make every block late while its card runs
+        self.burn_slot = None  # the slot, counted from 0, that the burn is tied to and the step takes out
         self.held_at = None  # host time the overload step was seen
         self.back_at = None  # host time the held card came back
 
@@ -1812,37 +1818,58 @@ def chain_stats(port):
 
 
 def size_burn(ctx, stats):
-    """The burn that puts the mean block past the budget by half the slowest takeable card's cycles, so blocks
-    are late with that card in and on time with it out."""
-    takeable = [s for s, card in enumerate(ctx.slots) if card not in NEVER_TAKEN]
-    ctx.slow = max(takeable, key=lambda s: stats.slot_avg[s])
+    """The burn in Mob's slot that puts every block past the budget while Mob runs: the budget less the mean
+    block, plus the block-to-block spread and BURN_MARGIN. It spins only while Mob runs, so once the rule
+    takes Mob out the blocks fall back to the chain alone and none is late."""
+    if BURN_CARD not in ctx.slots:
+        raise DrillError(f"the {SURVIVAL_LAYOUT} layout has no {BURN_CARD} card to burn in")
+    ctx.burn_slot = ctx.slots.index(BURN_CARD)
     ctx.budget = stats.budget
-    ctx.burn = max(0, min(MAX_BURN_CYCLES, stats.budget - stats.avg + stats.slot_avg[ctx.slow] // 2))
+    spread = max(0, stats.worst - stats.avg)
+    burn = stats.budget - stats.avg + spread + int(BURN_MARGIN * stats.budget)
+    # A block past two block times would make the next one overrun, and overruns mute the box.
+    burn = min(burn, int(BURN_BLOCK_CAP * stats.budget) - stats.worst)
+    ctx.burn = max(0, min(MAX_BURN_CYCLES, burn))
 
 
 def percent(cycles, budget):
     return f"{100.0 * cycles / budget:.1f} %"
 
 
+def burn_in_slot(port, ctx, cycles):
+    bench_ask(port, "burn", slot=ctx.burn_slot + 1, cycles=cycles)
+
+
+def slowest_takeable(ctx, stats):
+    """The takeable card with the most mean cycles, Autotune aside, as the burnt card is compared with."""
+    takeable = [s for s, card in enumerate(ctx.slots) if card not in NOT_TAKEABLE + ("autotune",)]
+    return max(takeable, key=lambda s: stats.slot_avg[s])
+
+
 def drill_overload(ctx):
     port = ctx.app()
     stats = chain_stats(port)
     size_burn(ctx, stats)
+    slow = slowest_takeable(ctx, stats)
     before = status_now(port)
     sent = time.monotonic()
-    bench_ask(port, "burn", cycles=ctx.burn)
+    burn_in_slot(port, ctx, ctx.burn)
     seen = poll_status(port, sent, STEP_WAIT_S, lambda r: r.get("steps", 0) > before["steps"])
-    plan = (f"burn {ctx.burn} cycles a block ({percent(ctx.burn, stats.budget)}) on a chain averaging "
-            f"{percent(stats.avg, stats.budget)}")
+    plan = (f"burn {ctx.burn} cycles a block ({percent(ctx.burn, stats.budget)}) in {card_at(ctx, ctx.burn_slot)} on "
+            f"a chain averaging {percent(stats.avg, stats.budget)}, worst {percent(stats.worst, stats.budget)}; "
+            f"slowest card by its own mean {card_at(ctx, slow)}")
     if not seen or seen[-1][1]["steps"] <= before["steps"]:
         return FAIL, f"{plan}; no step in {STEP_WAIT_S:g} s", ""
-    step_s, reply = seen[-1]
+    step_s = seen[-1][0]
     ctx.held_at = sent + step_s
-    held = held_slots(reply["held"])
+    seen += poll_status(port, sent, step_s + STEP_SETTLE_S)
+    steps = seen[-1][1]["steps"] - before["steps"]
+    masks = {r["held"] for _, r in seen if r.get("held")}
     muted = any(r.get("muted") for _, r in seen)
-    ok = step_s <= STEP_LIMIT_S and held == [ctx.slow] and not muted
-    detail = (f"{plan}; step {1000 * step_s:.0f} ms after the burn, limit {1000 * STEP_LIMIT_S:.0f} ms; held "
-              f"{', '.join(card_at(ctx, s) for s in held) or 'nothing'}, slowest {card_at(ctx, ctx.slow)}; "
+    ok = step_s <= STEP_LIMIT_S and masks == {1 << ctx.burn_slot} and steps == 1 and not muted
+    held = ", ".join(card_at(ctx, s) for m in sorted(masks) for s in held_slots(m)) or "nothing"
+    detail = (f"{plan}; step {1000 * step_s:.0f} ms after the burn, limit {1000 * STEP_LIMIT_S:.0f} ms; held {held}, "
+              f"want {card_at(ctx, ctx.burn_slot)} alone; {steps} steps in {step_s + STEP_SETTLE_S:.1f} s, want 1; "
               f"{'MUTED' if muted else 'never muted'}; the OVERLOAD row is not read")
     return (PASS if ok else FAIL), detail, f"{1000 * step_s:.0f} ms to the step"
 
@@ -1924,7 +1951,7 @@ def drill_overload_stays(ctx):
         time.sleep(max(0.0, ctx.back_at + LOAD_RESET_AFTER_S + HEALTHY_MARGIN_S - time.monotonic()))
     before = status_now(port)
     sent = time.monotonic()
-    bench_ask(port, "burn", cycles=ctx.burn)
+    burn_in_slot(port, ctx, ctx.burn)
     seen = poll_status(port, sent, OVERLOAD_STAYS_S)
     bench_ask(port, "burn", cycles=0)
     holds, masks = hold_lengths(seen)
@@ -1932,8 +1959,8 @@ def drill_overload_stays(ctx):
     wrong = []
     if len(holds) < LOAD_HOLDS or any(abs(g - w) > LOAD_WAIT_TOL_S for g, w in zip(holds, want)):
         wrong.append(f"want holds of {', '.join(f'{w:g}' for w in want)} s ± {LOAD_WAIT_TOL_S:g} s")
-    if masks != {1 << ctx.slow}:
-        wrong.append(f"held masks {sorted(masks)}, want only {card_at(ctx, ctx.slow)}")
+    if masks != {1 << ctx.burn_slot}:
+        wrong.append(f"held masks {sorted(masks)}, want only {card_at(ctx, ctx.burn_slot)}")
     if any(r.get("muted") for _, r in seen):
         wrong.append("status read muted")
     if after["restarts"] != before["restarts"]:
@@ -1943,20 +1970,62 @@ def drill_overload_stays(ctx):
     return (FAIL if wrong else PASS), "; ".join(wrong + [detail]), measured
 
 
+def drill_overload_outside(ctx):
+    """A burn past the whole block that belongs to no card: the rule takes out every card it may, the Input
+    gate stays in, and after burn 0 every card comes back."""
+    port = ctx.app()
+    budget = ctx.budget or chain_stats(port).budget
+    cycles = min(MAX_BURN_CYCLES, int(OUTSIDE_LOAD * budget))
+    takeable = sum(1 << s for s, card in enumerate(ctx.slots) if card not in NOT_TAKEABLE)
+    gate = sum(1 << s for s, card in enumerate(ctx.slots) if card == "input_gate")
+    before = status_now(port)
+    sent = time.monotonic()
+    bench_ask(port, "burn", cycles=cycles)
+    seen = poll_status(port, sent, OUTSIDE_S)
+    bench_ask(port, "burn", cycles=0)
+    off = time.monotonic()
+    back = poll_status(port, off, LOAD_WAIT_CAP_S + HEALTHY_MARGIN_S, lambda r: r.get("held") == 0)
+    every = [t for t, r in seen if r.get("held", 0) & takeable == takeable]
+    ever = 0
+    for _, r in seen + back:
+        ever |= r.get("held", 0)
+    after = (back or seen)[-1][1] if (back or seen) else before
+    wrong = []
+    if not every:
+        wrong.append(f"held at most mask {ever}, never every takeable card (mask {takeable})")
+    if ever & gate:
+        wrong.append("the Input gate was taken out")
+    if any(r.get("muted") for _, r in seen + back):
+        wrong.append("status read muted")
+    if after["restarts"] != before["restarts"]:
+        wrong.append(f"{after['restarts'] - before['restarts']} stream restarts")
+    if after.get("held") != 0:
+        wrong.append(f"held mask {after.get('held')} {LOAD_WAIT_CAP_S + HEALTHY_MARGIN_S:g} s after burn 0, want 0")
+    out_s = f"{every[0]:.2f} s" if every else "never"
+    back_s = f"{back[-1][0]:.1f} s" if back and back[-1][1].get("held") == 0 else "not back"
+    detail = (f"burn {cycles} cycles a block ({percent(cycles, budget)}) in no slot for {OUTSIDE_S:g} s: every "
+              f"takeable card out {out_s} after the burn, {after['steps'] - before['steps']} steps; every card back "
+              f"{back_s} after burn 0; the port stayed up")
+    return (FAIL if wrong else PASS), "; ".join(wrong + [detail]), f"all out after {out_s}, all back after {back_s}"
+
+
 # (case, what it sends, what it checks, function), in run order. The overload drills run first, from one
 # start, so the load rule's waits begin at 2 s; each restart drill then starts the box again.
 SURVIVAL_DRILLS = (
-    ("Overload", "reset_peaks and stats with no burn, then burn (the block budget less the mean block plus half "
-     "the slowest takeable card's mean)",
-     "one step inside 120 ms, the slowest takeable card alone in status held, muted false; ms to the step",
+    ("Overload", "reset_peaks and stats with no burn, then burn in slot 4 (Mob): the block budget less the mean "
+     "block, plus the spread and 10 % of the budget, spun only while Mob runs",
+     "slot 4 alone in status held inside 120 ms, one step in the 0.5 s after it, muted false; ms to the step",
      drill_overload),
     ("Overload ends", "burn 0", "status held 0 again 2 s ± 0.5 s after the step; s to return", drill_overload_ends),
     ("One late block", "burn (the block budget) for 1 block", "status late +1, steps +0; late count", drill_one_late),
     ("Save under load", "burn to an 80 % mean block, record_save 20 times 0.5 s apart, burn 0",
      "status late +0, steps +0; late count", drill_save_under_load),
-    ("Overload stays", "the overload burn for 60 s once the card has been back 60 s, then burn 0",
-     "holds of 2, 4, 8, 16, 16 s ± 0.5 s, one card only, muted false, no restart; the holds in s",
+    ("Overload stays", "the slot 4 burn for 60 s once Mob has been back 60 s, then burn 0",
+     "holds of 2, 4, 8, 16, 16 s ± 0.5 s on slot 4 alone, muted false, no restart; the holds in s",
      drill_overload_stays),
+    ("Overload outside the cards", "burn in no slot at 110 % of the block budget for 20 s, then burn 0",
+     "every card but the Input gate held at once, the Input gate never, muted false, no restart, held 0 again "
+     "within 18 s of burn 0; s to all out and to all back", drill_overload_outside),
     ("A3", "stop_audio", "a warm start, restart code A3, the same layout and settings, the panel read again, "
      "setup() to relay <= 1500 ms; the gap", drill_a3),
     ("W1", "spin", "the port drops 2 s ± 1 s after the op, then as A3 with W1; the gap after the watchdog", drill_w1),

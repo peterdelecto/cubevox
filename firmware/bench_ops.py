@@ -2,7 +2,7 @@
 
 The firmware takes no single-byte commands. Every bench action is a framed request,
 {"id":N,"cmd":"bench","op":"<name>"}, plus "slot" for slot_off and slot_on, and "slot", "knob" and
-"value" for set_knob, and "cycles" with an optional "blocks" for burn. The familiar letters stay as
+"value" for set_knob, and "cycles" with an optional "blocks" and "slot" for burn. The familiar letters stay as
 host-side shorthand and expand here (op names: core/bench_ops.cpp). DFU is its own command,
 enter_dfu, in every build.
 """
@@ -53,7 +53,8 @@ def next_id():
 def op_line(op, slot=None, req_id=None, knob=None, value=None, cycles=None, blocks=None):
     """The request line for a bench op, newline included. slot_off and slot_on take a slot;
     set_knob takes a slot, a knob (1 upper, 2 lower) and a value in whole percent of travel; burn takes
-    the cycles spun inside each chain block (0 is off) and, optionally, how many blocks it lasts."""
+    the cycles spun inside each chain block (0 is off) and, optionally, how many blocks it lasts and the
+    slot whose card it belongs to (it then spins only while that card runs)."""
     req = {"id": req_id if req_id is not None else next_id(), "cmd": "bench", "op": op}
     if slot is not None:
         req["slot"] = slot

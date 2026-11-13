@@ -234,6 +234,8 @@ def check_bench_ops(link, rep, build):
         rep.check("bench burn cycles 1000001: error", err_reply(r, "cycles must be 0 to 1000000"), str(r))
         r = link.bench("burn", cycles=1000, blocks=0)
         rep.check("bench burn blocks 0: error", err_reply(r, "blocks must be 1 to 1000"), str(r))
+        r = link.bench("burn", 9, cycles=1000)
+        rep.check("bench burn slot 9: error", err_reply(r, "slot must be 1 to 8"), str(r))
     else:
         for op in ("fault", "record_erase", "stop_audio", "stream_fault", "fail_restart", "fail_audio_start",
                    "burn", "slot_on", "all_on", "set_knob", "knobs_live"):

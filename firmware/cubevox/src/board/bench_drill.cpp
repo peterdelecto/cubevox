@@ -95,10 +95,14 @@ const char* failNextAudioStart() {
 }
 
 void burn(const BenchArgs& args) {
-  audioBenchBurn(static_cast<uint32_t>(args.cycles), static_cast<uint32_t>(args.blocks));
+  audioBenchBurn(static_cast<uint32_t>(args.cycles), static_cast<uint32_t>(args.blocks), args.slot - 1);
   serialOut().print("[bench] burn ");
   serialOut().print(args.cycles);
   serialOut().print(" cycles");
+  if (args.cycles > 0 && args.slot > 0) {
+    serialOut().print(" in slot ");
+    serialOut().print(args.slot);
+  }
   if (args.cycles > 0 && args.blocks > 0) {
     serialOut().print(" for ");
     serialOut().print(args.blocks);
