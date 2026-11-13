@@ -3,7 +3,7 @@
 Owner direction 2026-10-31: a robust way to ensure the box cannot die during a performance.
 Target: the H7 firmware on the v4 board, 48 kHz, 64-sample blocks, float32. Revised 2026-11-13
 against the code at v2.01.90; the build started that day, in the order load rule and NaN guard,
-warm restart, safe start, drills.
+warm restart, drills.
 
 Settled (owner 2026-11-13, replacing the 2026-10-31 rule that a card stayed off until its toggle
 was flipped): a card the box turns off comes back by itself, so Adam never has to act in the middle
@@ -101,7 +101,7 @@ today's 6 s; that includes a bare NRST tap and a start with no 5VA reading. PINR
 nothing, because this chip sets it on every reset (the boot report reads `reset: software pin`).
 The bootloader's `cvBootPowerOn` is the same test, and `core/restart_rule.h` shares its masks.
 1. Order. On every start `setup()` runs the mute pins, the power sense, the fault record, the
-   record read, the safe-start check (F7) and then audio (the engines, SAI and DMA, XSMT high at
+   record read and then audio (the engines, SAI and DMA, XSMT high at
    zero output). The panel, USB and the menu come after audio.
 2. Knobs. The first real snapshot needs all 16 pots read. On a cold start the mux selects wait
    1100 ms for U107 to bring 3V3A up. On a warm start 3V3A never went down, so the scan starts at
@@ -145,18 +145,15 @@ Drill. `crash`.
 How. A fault inside one engine that the layout and his input reach each time.
 Today. Crash, reset, the same layout, crash. After three starts that never reach healthy the
 bootloader stays in update mode, a silent box showing the update screen until a power cycle.
-After. Safe start. When one or more earlier starts failed (`bootHealthFails()`, the bootloader's
-counter less the running start, read before audio starts), the application starts with every card
-held and the screen row reads `HOLD ALL  RESTART`. Adam brings cards back one at a time with their
-toggles. The application keeps one word that survives a system reset, holding the slot most
-recently switched on by a toggle flip, or none. The word sits in the boot block's application area
-with its complement beside it as a check; the bootloader zeroes that block on a power-on, so a
-power cycle clears the word with no code. On a safe start that card stays held even after a flip
-and the row names it, so one card costs one restart and cannot start a loop. A layout apply
-clears the word. The bootloader's three-strikes rule stays; with safe start ahead of it, three in
-a row means the dry chain itself fails, which only a new `.uf2` fixes.
-Bound. One restart, then his dry voice, stable.
-Drill. `crash-in <slot>`.
+After. No special mode (owner 2026-11-13: a stage box comes back in the state the musician
+expects; it does not show a fault-finding screen or ask him to work out what failed). Every restart
+is the warm restart of F4: the same layout, the same settings, and the panel as it stands, read
+again from the toggles and pots. The software keeps no memory of a toggle or a knob, so what the
+panel shows is what the box plays. A crash that repeats restarts the box again each time. The
+bootloader's three-strikes rule stays as it is, because it is what recovers a box from a bad
+update: three starts in a row that do not run audio for 5 s end in update mode.
+Bound. Gap ≤ 1.5 s at each restart.
+Drill. `crash` twice, 10 s apart: the same layout and panel after each.
 
 ### F8. Brownout or power loss
 How. The 9 V supply sags or is pulled.
@@ -224,9 +221,8 @@ Drill. None.
 ## 2. Counters and reports
 `held` (a bitmask of held slots), `steps` and `window_worst` join the status reply. The boot
 report's audio line prints steps since boot and, on a warm restart, the time to the first block and
-to the relay. DIAG.TXT gets one line per step with the card and the window's worst percent, and one
-line per safe start naming the held card. Both go in the entry's text field under the audio kind,
-as the A1 to A3 texts do, so the entry layout and the bootloader do not change.
+to the relay. DIAG.TXT gets one line per step with the card and the window's worst percent. It goes in
+the entry's text field under the audio kind, as the A1 to A3 texts do, so the entry layout and the bootloader do not change.
 
 ## 3. Host tests
 1. `core/load_rule.h`, pure: window counts, the two-late trip, step order by `worst`, 50 ms
@@ -235,8 +231,7 @@ as the A1 to A3 texts do, so the entry layout and the bootloader do not change.
    to 16 s, the fifth hold stays, a flip off and on lets the card go at once and resets its count,
    a layout apply clears holds and counts.
 2. `core/restart_rule.h`, pure: warm against cold from the reset flags and 5VA.
-3. `core/safe_start_rule.h`, pure: `bootFails` ≥ 1 holds all; the DTCM word keeps its card held
-   through a flip; a layout apply clears it.
+3. (No safe-start rule; F7 has no special mode.)
 4. `core_chain_run`: a NaN block names its slot.
 5. `test/firmware/ui_*`: the `OVERLOAD` row, proof by number.
 6. `core_protocol`: the three new status fields.
@@ -245,7 +240,7 @@ as the A1 to A3 texts do, so the entry layout and the bootloader do not change.
 The drills are bench ops, so they exist only in the bench image (`BENCH=1 ./build.sh`) and only
 over the serial port; nothing on the panel can reach them and the release image carries none.
 `stall` is the op `stop_audio`, `hang` is `spin` and `crash` is `fault`, all three built. The new
-ops are `burn` (cycles spun inside each block), `nan` (a slot), `crash_in` (a slot), `panel_fail`
+ops are `burn` (cycles spun inside each block), `nan` (a slot), `panel_fail`
 and `corrupt_record`. `bringup.py --survival` runs them from the Mac with no hands on the box and
 writes the measured column to the board's log in `hardware/bringup/` beside the version. The rows
 for F8, F10, F12 and F14 need hands on the box; their behaviour is unchanged by this spec and the
@@ -261,7 +256,7 @@ run skips them.
 | F4 | `stall` | mute inside 100 ms, reset, back with the same layout | gap |
 | F5 | `hang` | sound for 2 s, watchdog, back | gap after the watchdog |
 | F6 | `crash` | mute, reset, back; DIAG.TXT entry | gap |
-| F7 | `crash-in <slot>` | one restart, all cards held, the slot named, no second crash after its flip | restarts |
+| F7 | `crash` twice, 10 s apart | the same layout and panel after each | gap, twice |
 | F8 | 9 V to 7 V, then cut | mute before garbage; return on the power-on path | gap on return |
 | F9 | 20 saves during `burn 300000`; `crash` during a save | no late block beyond the rule's steps; the record loads or the default layout does | late count |
 | F10 | host plug and unplug under load | no late block | late count |
