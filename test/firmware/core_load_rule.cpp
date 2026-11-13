@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <cstring>
 
+#include "core/compose.h"
 #include "core/late_window.h"
 #include "core/layout.h"
 #include "core/load_rule.h"
@@ -137,6 +138,26 @@ void checkWhichCard() {
   sparse.card[4] = Card::Empty;
   LoadRule e;
   check(trip(e, sparse, on, 1000, heavy(4)).slot != 4, "rule: an empty slot is never taken");
+}
+
+// The rule reads the toggles through slotToggles(), so the bench's force masks reach it as they reach
+// the snapshot.
+void checkBenchForce() {
+  const Layout layout = defaultLayout();
+  PanelReading panel;
+  panel.toggle.fill(true);
+  panel.toggle[4] = false;
+  BenchOverrides bench;
+  bench.slotsForcedOn = bit(4);
+  LoadRule r;
+  check(trip(r, layout, slotToggles(panel, bench), 1000, heavy(4)).slot == 4,
+        "bench: a slot forced on with its panel toggle off is running, so it is taken");
+  bench.slotsOff = bit(4);
+  idle(r, layout, slotToggles(panel, bench), 1100, 5);
+  check(r.heldMask() == 0, "bench: forcing the held slot off ends its hold");
+  LoadRule o;
+  check(trip(o, layout, slotToggles(panel, bench), 1000, heavy(4)).slot != 4,
+        "bench: a slot forced off is not running, so it is not taken");
 }
 
 void checkAutotunePassedOver() {
@@ -335,6 +356,7 @@ void checkLoadRule() {
   checkWindowWorstBlock();
   checkWindowClear();
   checkWhichCard();
+  checkBenchForce();
   checkAutotunePassedOver();
   checkSpacing();
   checkWaits();

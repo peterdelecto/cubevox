@@ -94,6 +94,19 @@ const char* failNextAudioStart() {
   return nullptr;
 }
 
+void burn(const BenchArgs& args) {
+  audioBenchBurn(static_cast<uint32_t>(args.cycles), static_cast<uint32_t>(args.blocks));
+  serialOut().print("[bench] burn ");
+  serialOut().print(args.cycles);
+  serialOut().print(" cycles");
+  if (args.cycles > 0 && args.blocks > 0) {
+    serialOut().print(" for ");
+    serialOut().print(args.blocks);
+    serialOut().print(" blocks");
+  }
+  serialOut().println();
+}
+
 }  // namespace
 
 const BenchOverrides& benchOverrides() { return gBench; }
@@ -143,6 +156,7 @@ BenchResult benchDrillRun(BenchOp op, const BenchArgs& args) {
     case BenchOp::StreamFault: raiseStreamFault(); break;
     case BenchOp::FailRestart: toggleFailRestart(); break;
     case BenchOp::FailAudioStart: r.error = failNextAudioStart(); break;
+    case BenchOp::Burn: burn(args); break;
     case BenchOp::Fault: faultForceBusFault(); break;
     case BenchOp::Spin: faultSpinForWatchdog(); break;
     case BenchOp::RecordSave: recordSaveNow(); break;

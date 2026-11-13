@@ -72,10 +72,11 @@ AudioHealth audioHealth();
 
 // The load rule (core/load_rule.h). Call once per loop pass, ahead of publishing. It takes the late
 // window's trip from the audio interrupt and runs the rule over it.
-// `panel` carries the toggle levels, and `layoutApplied` is true on the pass a layout apply or card
-// swap happened. The step it returns holds nothing when its slot is -1. A hold that ends by a toggle,
-// a changed layout or its wait shows only in audioHeldMask().
-LoadStep audioLoadRulePoll(uint32_t nowMs, const Layout& layout, const PanelReading& panel, bool layoutApplied);
+// `toggles` are the slot toggles as slotToggles() reads them, and `layoutApplied` is true on the pass a
+// layout apply or card swap happened. The step it returns holds nothing when its slot is -1. A hold
+// that ends by a toggle, a changed layout or its wait shows only in audioHeldMask().
+LoadStep audioLoadRulePoll(uint32_t nowMs, const Layout& layout, const std::array<bool, kSlotCount>& toggles,
+                           bool layoutApplied);
 
 // The load rule's state, for the snapshot, the status reply and the voice screen's OVERLOAD row. Main
 // loop only.
@@ -151,6 +152,11 @@ void audioStreamFaultForBench();
 // Makes the next audioInit() fail once, across a reset: the word that says so sits in the boot
 // block's application area. Returns false when no bootloader wrote the block.
 bool audioBenchFailNextStart();
+
+// Makes every block that runs the chain spin `cycles` cycles after the chain, inside the block's
+// measured time and attributed to no slot, so the block is late when the chain and the spin together
+// pass the budget. `blocks` limits the burn to that many chain blocks; 0 keeps it until cycles is 0.
+void audioBenchBurn(uint32_t cycles, uint32_t blocks);
 
 // Flips whether the next stream restart fails, as one whose DMA start is refused. Returns the new
 // state. A failed restart clears it.

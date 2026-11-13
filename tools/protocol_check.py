@@ -7,8 +7,8 @@ survived. The layout it found is put back at the end. Prints PASS or FAIL per ch
 non-zero on any FAIL.
 
 The checks follow the build hello reports. A bench build runs a query op and the reset check
-(bench spin) and checks the argument errors of slot_on and set_knob. A release build must refuse
-bench fault, record_erase, stop_audio, stream_fault, fail_restart, slot_on, all_on, set_knob and
+(bench spin) and checks the argument errors of slot_on, set_knob and burn. A release build must refuse
+bench fault, record_erase, stop_audio, stream_fault, fail_restart, fail_audio_start, burn, slot_on, all_on, set_knob and
 knobs_live with "op not in this build", and has no reset check. Both builds must ignore raw bytes outside a line.
 
 The port handling comes from firmware/cubevox_port.py and the bench requests from
@@ -49,10 +49,10 @@ class Link(cubevox_port.Link):
     def ask(self, cmd, **fields):
         return super().ask(cmd, REPLY_WAIT_S, self.text.append, **fields)
 
-    def bench(self, op, slot=None, wait=REPLY_WAIT_S, knob=None, value=None):
+    def bench(self, op, slot=None, wait=REPLY_WAIT_S, knob=None, value=None, cycles=None, blocks=None):
         """Sends a bench op through bench_ops.py and returns its reply."""
         rid = self.take_id()
-        self.send_line(bench_ops.op_line(op, slot, rid, knob, value))
+        self.send_line(bench_ops.op_line(op, slot, rid, knob, value, cycles, blocks))
         return self.read_json(rid, wait)
 
     def drain(self, quiet=0.3):
@@ -228,9 +228,15 @@ def check_bench_ops(link, rep, build):
         rep.check("bench set_knob knob 3: error", err_reply(r, "knob must be 1 to 2"), str(r))
         r = link.bench("set_knob", 1, knob=1, value=101)
         rep.check("bench set_knob value 101: error", err_reply(r, "value must be 0 to 100"), str(r))
+        r = link.bench("burn")
+        rep.check("bench burn without cycles: error", err_reply(r, "missing cycles"), str(r))
+        r = link.bench("burn", cycles=1000001)
+        rep.check("bench burn cycles 1000001: error", err_reply(r, "cycles must be 0 to 1000000"), str(r))
+        r = link.bench("burn", cycles=1000, blocks=0)
+        rep.check("bench burn blocks 0: error", err_reply(r, "blocks must be 1 to 1000"), str(r))
     else:
         for op in ("fault", "record_erase", "stop_audio", "stream_fault", "fail_restart", "fail_audio_start",
-                   "slot_on", "all_on", "set_knob", "knobs_live"):
+                   "burn", "slot_on", "all_on", "set_knob", "knobs_live"):
             r = link.bench(op)
             rep.check(f"release bench {op}: refused", err_reply(r, f"op not in this build: {op}"), str(r))
     r = link.ask("status")

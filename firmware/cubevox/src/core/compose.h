@@ -52,6 +52,11 @@ struct BenchOverrides {
   }
 };
 
+// Whether each slot's toggle counts as on: the panel toggle with the bench force masks applied, where
+// slotsOff wins over slotsForcedOn. The held mask is not in it. The snapshot and the load rule both
+// read the toggles from here, so they agree on which slots are on.
+std::array<bool, kSlotCount> slotToggles(const PanelReading& panel, const BenchOverrides& bench);
+
 // Every slot on, the start state of a snapshot.
 constexpr std::array<bool, kSlotCount> allSlotsOn() {
   std::array<bool, kSlotCount> on{};

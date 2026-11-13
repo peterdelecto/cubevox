@@ -5,7 +5,8 @@ firmware/bench_ops.py against the op table in core/bench_ops.cpp, and firmware/b
 panel thresholds, block rate and SAI kernel clock against core/panel_test.h, engine/common.h
 and board/audio.cpp. The stream fault drills' restart budget, relay wait, software reset flag and
 audio entry causes against core/audio_recovery.h, core/timing.h, the bootloader's boot_decide.h,
-board/fault.cpp and core/audio_fault_cause.h. build.sh runs this, so a drift fails the build.
+board/fault.cpp and core/audio_fault_cause.h. The survival drills' watchdog period, load rule waits and
+burn cap against board/fault.cpp, core/load_rule.h and core/bench_ops.h. build.sh runs this, so a drift fails the build.
 
   python3 -I tools/bench_ops_check.py
 """
@@ -28,6 +29,8 @@ FAULT_CPP = os.path.join(SRC, "board", "fault.cpp")
 AUDIO_FAULT_CAUSE_H = os.path.join(SRC, "core", "audio_fault_cause.h")
 AUDIO_RECOVERY_H = os.path.join(SRC, "core", "audio_recovery.h")
 TIMING_H = os.path.join(SRC, "core", "timing.h")
+LOAD_RULE_H = os.path.join(SRC, "core", "load_rule.h")
+BENCH_OPS_H = os.path.join(SRC, "core", "bench_ops.h")
 BOOT_DECIDE_H = os.path.join(ROOT, "firmware", "bootloader", "boards", "cubevox", "boot_decide.h")
 ENGINE_COMMON_H = os.path.join(ROOT, "engine", "common.h")
 ROW = re.compile(r'\{BenchOp::\w+,\s*"(\w+)",\s*OpClass::(Query|Bench)\}')
@@ -70,6 +73,11 @@ def constant_failures():
         ("RESTART_WINDOW_S", bringup.RESTART_WINDOW_S, constant(AUDIO_RECOVERY_H, "kRestartWindowMs") / 1000.0),
         ("RELAY_AFTER_START_S", bringup.RELAY_AFTER_START_S, constant(TIMING_H, "kRelayCloseAfterPowerOnMs") / 1000.0),
         ("SOFTWARE_RESET", bringup.SOFTWARE_RESET, software_reset_flag()),
+        ("WATCHDOG_S", bringup.WATCHDOG_S, constant(FAULT_CPP, "kWatchdogMs") / 1000.0),
+        ("LOAD_WAIT_FIRST_S", bringup.LOAD_WAIT_FIRST_S, constant(LOAD_RULE_H, "kLoadWaitFirstMs") / 1000.0),
+        ("LOAD_WAIT_CAP_S", bringup.LOAD_WAIT_CAP_S, constant(LOAD_RULE_H, "kLoadWaitCapMs") / 1000.0),
+        ("LOAD_RESET_AFTER_S", bringup.LOAD_RESET_AFTER_S, constant(LOAD_RULE_H, "kLoadResetAfterMs") / 1000.0),
+        ("MAX_BURN_CYCLES", bringup.MAX_BURN_CYCLES, constant(BENCH_OPS_H, "kMaxBenchBurnCycles")),
     ]
     return [f"bringup.py {name} is {have}, firmware has {want}"
             for name, have, want in pairs if not math.isclose(have, want, rel_tol=1e-6)]
@@ -109,7 +117,7 @@ def main():
         print("FAIL", msg)
     if not failed:
         print(f"PASS host tools match the firmware ({n_ops} bench ops, panel thresholds, block rate, SAI clock, "
-              "restart budget, relay wait, reset flag, audio causes)")
+              "restart budget, relay wait, reset flag, audio causes, watchdog, load waits, burn cap)")
     return 1 if failed else 0
 
 

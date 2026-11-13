@@ -185,7 +185,9 @@ Bench ops, so they exist only in the bench image and only over the serial port. 
 `spin` and `fault` are built. The new ops are `burn` (cycles spun inside each block) and
 `fail_audio_start` (the next `audioInit()` fails). `bringup.py --survival` runs the table from the
 Mac with no hands on the box, on the costliest layout, and writes the measured column to the
-board's log in `hardware/bringup/`.
+board's log in `hardware/bringup/`. The boot report's `[boot] restart code` line carries the code the
+splash shows. The bad update is the bench image under another header version, so another CRC,
+installed through `enter_dfu` (the path the menu item takes) and faulted with `fault` at each start.
 
 | Case | Drill | Expected | Measured |
 |---|---|---|---|

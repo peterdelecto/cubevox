@@ -30,7 +30,7 @@ constexpr uint32_t kLoadResetAfterMs = 60000;
 // What one loop() pass hands the rule.
 struct LoadInput {
   const Layout& layout;
-  const std::array<bool, kSlotCount>& toggle;  // the panel's toggle levels, not the held snapshot's
+  const std::array<bool, kSlotCount>& toggle;  // slotToggles(): the panel with the bench masks, no held mask
   uint32_t nowMs;
   bool trip = false;         // the late window tripped since the last pass
   int tripLate = 0;          // late blocks in the window at that trip

@@ -174,6 +174,12 @@ StreamRecovery gRecovery;
 bool gStreamUp = false;  // the stream started and no restart has failed since
 #if CUBEVOX_BENCH
 bool gFailNextRestart = false;  // the fail_restart op: the next restart refuses to start the stream
+
+// The burn op. Every block that runs the chain spins gBurnCycles cycles after the chain, inside the
+// block's measured time. gBurnBlocksLeft counts the blocks a timed burn has left; 0 means until
+// burn 0. The block interrupt reads both, loop() sets them with that interrupt masked.
+volatile uint32_t gBurnCycles = 0;
+volatile uint32_t gBurnBlocksLeft = 0;
 #endif
 
 // The input's energy since the last audioTakeInputEnergy(), summed by the block interrupt.
@@ -281,6 +287,23 @@ struct TxWriter {
   }
 };
 
+#if CUBEVOX_BENCH
+// Spins the burn's cycles. The time belongs to no slot, so the load rule still picks the slowest
+// real card.
+void burnBlock() {
+  const uint32_t cycles = gBurnCycles;
+  if (cycles == 0) return;
+  const uint32_t left = gBurnBlocksLeft;
+  if (left != 0) {
+    gBurnBlocksLeft = left - 1;
+    if (left == 1) gBurnCycles = 0;
+  }
+  const uint32_t start = DWT->CYCCNT;
+  while (DWT->CYCCNT - start < cycles) {
+  }
+}
+#endif
+
 void processHalf(int half) {
   const uint32_t* rx = gRxRing.data() + half * kWordsPerHalf;
   uint32_t* tx = gTxRing.data() + half * kWordsPerHalf;
@@ -303,6 +326,9 @@ void processHalf(int half) {
     gBlockSlots = report.cycles.slot;
     addChainCycles(report.cycles);
     noteGatePeak();
+#if CUBEVOX_BENCH
+    burnBlock();
+#endif
   }
 }
 
@@ -800,7 +826,8 @@ AudioHealth audioHealth() {
   return h;
 }
 
-LoadStep audioLoadRulePoll(uint32_t nowMs, const Layout& layout, const PanelReading& panel, bool layoutApplied) {
+LoadStep audioLoadRulePoll(uint32_t nowMs, const Layout& layout, const std::array<bool, kSlotCount>& toggles,
+                           bool layoutApplied) {
   LateTrip tripInfo;
   bool trip = false;
   // The flag is a one-word read, so a pass with no trip takes no mask.
@@ -809,7 +836,7 @@ LoadStep audioLoadRulePoll(uint32_t nowMs, const Layout& layout, const PanelRead
     trip = gLateWindow.take(tripInfo);
     NVIC_EnableIRQ(SWPMI1_IRQn);
   }
-  LoadInput in{layout, panel.toggle, nowMs, trip, tripInfo.lateCount, tripInfo.worstBlock, gLateWindow.lateCount(),
+  LoadInput in{layout, toggles, nowMs, trip, tripInfo.lateCount, tripInfo.worstBlock, gLateWindow.lateCount(),
                layoutApplied};
   const LoadStep step = gLoadRule.update(in);
   if (step.layoutCleared) clearLateWindow();
@@ -885,6 +912,13 @@ bool audioBenchFailNextStart() {
   const uint32_t marker = kBenchFailStartWord;
   memcpy(block.appReserved + kBenchFailStartOffset, &marker, sizeof marker);
   return true;
+}
+
+void audioBenchBurn(uint32_t cycles, uint32_t blocks) {
+  NVIC_DisableIRQ(SWPMI1_IRQn);
+  gBurnBlocksLeft = blocks;
+  gBurnCycles = cycles;
+  NVIC_EnableIRQ(SWPMI1_IRQn);
 }
 
 bool audioBenchToggleFailRestart() {

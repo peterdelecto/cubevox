@@ -40,6 +40,7 @@ enum class BenchOp : uint8_t {
   StreamFault,
   FailRestart,
   FailAudioStart,
+  Burn,
   Count,
 };
 
@@ -61,16 +62,24 @@ constexpr int kMinBenchKnob = 1;
 constexpr int kMaxBenchKnob = kKnobsPerCard;
 constexpr int kMaxBenchKnobValue = 100;
 
+// burn names the cycles spun inside each chain block (0 turns it off) and, optionally, how many
+// blocks it lasts. One block is 640 000 cycles at 480 MHz, so the range runs past a whole block.
+constexpr int kMaxBenchBurnCycles = 1000000;
+constexpr int kMaxBenchBurnBlocks = 1000;
+
 // The arguments of a bench request, as the parser read them.
 struct BenchArgs {
-  int slot = 0;   // slot_off, slot_on, set_knob: 1 to kMaxBenchSlot
-  int knob = 0;   // set_knob: 1 to kMaxBenchKnob
-  int value = 0;  // set_knob: 0 to kMaxBenchKnobValue
+  int slot = 0;    // slot_off, slot_on, set_knob: 1 to kMaxBenchSlot
+  int knob = 0;    // set_knob: 1 to kMaxBenchKnob
+  int value = 0;   // set_knob: 0 to kMaxBenchKnobValue
+  int cycles = 0;  // burn: 0 to kMaxBenchBurnCycles
+  int blocks = 0;  // burn: 1 to kMaxBenchBurnBlocks, 0 when left out (the burn lasts until burn 0)
 };
 
 // Which arguments an op needs. The parser requires and range-checks exactly these.
 bool opTakesSlot(BenchOp op);
-bool opTakesKnob(BenchOp op);  // knob and value
+bool opTakesKnob(BenchOp op);    // knob and value
+bool opTakesCycles(BenchOp op);  // cycles, and blocks when given
 
 // The op at table index `index`; BenchOp::Count when the index is out of range.
 BenchOp benchOp(int index);
